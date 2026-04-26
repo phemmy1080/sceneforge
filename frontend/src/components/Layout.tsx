@@ -1,0 +1,284 @@
+import React, { useState, useEffect } from 'react'
+import { useStore, type AppStep } from '../store'
+import StepNav from './StepNav'
+import UserMenu from './UserMenu'
+
+const STEPS: { id: AppStep; label: string }[] = [
+  { id: 'setup',  label: 'Setup' },
+  { id: 'ideas',  label: 'Ideas' },
+  { id: 'script', label: 'Script' },
+  { id: 'scenes', label: 'Scene editor' },
+  { id: 'voice',  label: 'Voice & visuals' },
+  { id: 'export', label: 'Export' },
+]
+
+const ICONS: Record<string, React.ReactNode> = {
+  setup:  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>,
+  ideas:  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 2a4 4 0 0 1 1.5 7.7V12H6.5V9.7A4 4 0 0 1 8 2z"/><path d="M6.5 13h3M7 15h2"/></svg>,
+  script: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="2" width="10" height="12" rx="1.5"/><path d="M5 6h6M5 9h4"/></svg>,
+  scenes: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>,
+  voice:  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 2v12M5 4v8M11 4v8M2 7v2M14 7v2"/></svg>,
+  export: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10"/></svg>,
+}
+
+interface LayoutProps {
+  children: React.ReactNode
+  onLogout: () => void
+  onNewProject: () => void
+}
+
+function TokenGateBar({ onUpgrade }: { onUpgrade: () => void }) {
+  const [balance, setBalance] = useState<{ tokens_remaining: number; tokens_total: number } | null>(null)
+
+  useEffect(() => {
+    const load = () => {
+      import('../lib/api').then(({ getTokenBalance }) => {
+        getTokenBalance().then(setBalance).catch(() => {})
+      })
+    }
+    load()
+    const id = setInterval(load, 30000)
+    return () => clearInterval(id)
+  }, [])
+
+  if (!balance) return null
+
+  const pct = Math.min(100, Math.round((balance.tokens_remaining / balance.tokens_total) * 100))
+  const empty = balance.tokens_remaining === 0
+  const low   = balance.tokens_remaining < 200 && !empty
+
+  if (!empty && !low) return null
+
+  return (
+    <div className={`mx-2 mb-2 rounded-xl p-3 flex-shrink-0 border ${
+      empty ? 'bg-red-500/10 border-red-500/25' : 'bg-amber-500/10 border-amber-500/20'
+    }`}>
+      <p className={`text-[11px] font-bold mb-1 ${empty ? 'text-red-400' : 'text-amber-400'}`}>
+        {empty ? 'Tokens exhausted' : 'Tokens running low'}
+      </p>
+      <div className="h-1 bg-white/10 rounded-full overflow-hidden mb-2">
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: empty ? '#FF6B6B' : '#F59E0B' }} />
+      </div>
+      <p className="text-[10.5px] text-white/40 mb-2">{balance.tokens_remaining} tokens left</p>
+      <button
+        onClick={onUpgrade}
+        className={`w-full text-[11.5px] font-semibold py-1.5 rounded-lg transition-colors ${
+          empty ? 'bg-red-500/20 text-red-300 hover:bg-red-500/30' : 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25'
+        }`}
+      >
+        Top up tokens →
+      </button>
+    </div>
+  )
+}
+
+export default function Layout({ children, onLogout, onNewProject }: LayoutProps) {
+  const currentStep    = useStore((s) => s.currentStep)
+  const completedSteps = useStore((s) => s.completedSteps)
+  const setStep        = useStore((s) => s.setStep)
+  const config         = useStore((s) => s.config)
+  const scenes         = useStore((s) => s.scenes)
+  const renderStatus   = useStore((s) => s.renderStatus)
+  const projects       = useStore((s) => s.projects)
+  const folders        = useStore((s) => s.folders)
+  const folderOpen     = useStore((s) => s.folderOpen)
+  const activeProjectId = useStore((s) => s.activeProjectId)
+  const toggleFolder   = useStore((s) => s.toggleFolder)
+  const openProject    = useStore((s) => s.openProject)
+
+  const [upgradePrompt, setUpgradePrompt] = useState<{ reason: string; max?: number } | null>(null)
+
+  useEffect(() => {
+    const handler = (e: CustomEvent) => setUpgradePrompt(e.detail)
+    document.addEventListener('show-upgrade-prompt', handler as EventListener)
+    return () => document.removeEventListener('show-upgrade-prompt', handler as EventListener)
+  }, [])
+
+  const activeProject = projects.find((p) => p.id === activeProjectId)
+  const dotColor: Record<string, string> = { active: '#A78BFA', exported: '#2DD4BF', draft: '#F59E0B' }
+
+  function handleOpenProject(id: string) {
+    openProject(id)
+    setStep('setup')
+  }
+
+  return (
+    <>
+      <div className="flex min-h-screen bg-[#0A0A0F] text-[#F0F0FF]">
+        {/* Sidebar */}
+        <aside className="w-56 shrink-0 bg-[#111118] border-r border-white/[0.07] flex flex-col sticky top-0 h-screen overflow-hidden">
+          {/* Top */}
+          <div className="p-3.5 border-b border-white/[0.07] flex-shrink-0">
+            <div className="font-display text-[17px] font-extrabold tracking-tight mb-2.5 px-1">
+              Scene<span className="text-violet-400">Forge</span>
+            </div>
+            {activeProject ? (
+              <div className="w-full rounded-lg overflow-hidden border border-violet-500/25 bg-violet-500/8">
+                <div className="px-3 py-2 flex items-center gap-2 min-w-0">
+                  <div className="w-2 h-2 rounded-full bg-violet-400 flex-shrink-0 animate-pulse" />
+                  <span className="text-[12px] font-semibold text-violet-300 truncate flex-1">{activeProject.name}</span>
+                </div>
+                <button
+                  onClick={onNewProject}
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 border-t border-violet-500/15 text-violet-400/60 text-[11px] font-medium hover:text-violet-300 hover:bg-violet-500/10 transition-all"
+                >
+                  <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 1v10M1 6h10"/></svg>
+                  New project
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={onNewProject}
+                className="w-full flex items-center justify-center gap-2 py-2 bg-violet-500/15 border border-dashed border-violet-500/35 rounded-lg text-violet-300 text-[12px] font-semibold hover:bg-violet-500/22 hover:border-violet-400/50 transition-all"
+              >
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 1v10M1 6h10"/></svg>
+                New project
+              </button>
+            )}
+          </div>
+
+          {/* Scrollable nav */}
+          <div className="flex-1 overflow-y-auto p-2 scrollbar-thin">
+            <p className="text-[9.5px] font-bold text-white/25 uppercase tracking-widest px-2 pt-2 pb-1">Workflow</p>
+            {STEPS.map((step) => {
+              const isActive = currentStep === step.id
+              const isDone   = completedSteps.has(step.id)
+              return (
+                <button
+                  key={step.id}
+                  onClick={() => setStep(step.id)}
+                  className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12.5px] font-medium transition-all mb-0.5 text-left border
+                    ${isActive ? 'bg-violet-500/15 text-violet-300 border-violet-500/20'
+                      : isDone ? 'text-teal-400 border-transparent hover:bg-white/4'
+                      : 'text-white/45 border-transparent hover:bg-white/4 hover:text-white/75'}`}
+                >
+                  <span className={isActive ? 'text-violet-400' : isDone ? 'text-teal-400' : 'text-white/30'}>
+                    {ICONS[step.id]}
+                  </span>
+                  {step.label}
+                  {isDone && !isActive && (
+                    <svg className="ml-auto w-3 h-3 text-teal-400" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M2 6l3 3 5-5"/></svg>
+                  )}
+                </button>
+              )
+            })}
+
+            <div className="flex items-center justify-between px-2 pt-3 pb-1">
+              <p className="text-[9.5px] font-bold text-white/25 uppercase tracking-widest">Projects</p>
+              <button onClick={onNewProject} className="text-white/25 hover:text-white/55 text-[14px] leading-none px-1 transition-colors">+</button>
+            </div>
+
+            {Object.keys(folders).map((folder) => {
+              const folderProjects = folders[folder]
+                .map((id) => projects.find((p) => p.id === id))
+                .filter(Boolean) as typeof projects
+              if (folderProjects.length === 0) return null
+              const isOpen = folderOpen[folder] !== false
+              return (
+                <div key={folder} className="mb-0.5">
+                  <button
+                    onClick={() => toggleFolder(folder)}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/4 transition-colors text-left"
+                  >
+                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5"
+                      className={`text-white/30 flex-shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`}>
+                      <path d="M3 4l3 4 3-4"/>
+                    </svg>
+                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="rgba(167,139,250,0.4)" strokeWidth="1.3" className="flex-shrink-0">
+                      <path d="M1 4a1 1 0 0 1 1-1h3l2 2h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4z"/>
+                    </svg>
+                    <span className="text-[12px] font-semibold text-white/55 flex-1 truncate">{folder}</span>
+                    <span className="text-[10px] bg-white/7 text-white/30 px-1.5 py-0.5 rounded-full">{folderProjects.length}</span>
+                  </button>
+                  {isOpen && (
+                    <div className="pl-4">
+                      {folderProjects.map((proj) => (
+                        <button
+                          key={proj.id}
+                          onClick={() => handleOpenProject(proj.id)}
+                          className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-all mb-0.5 ${
+                            proj.id === activeProjectId ? 'bg-violet-500/12 text-violet-300' : 'text-white/50 hover:bg-white/4 hover:text-white/75'
+                          }`}
+                        >
+                          <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: dotColor[proj.status] || '#F59E0B' }} />
+                          <span className="text-[11.5px] flex-1 truncate">{proj.name}</span>
+                          <span className="text-[9.5px] text-white/25">
+                            {proj.duration > 0 ? proj.duration + 's' : proj.sceneCount > 0 ? proj.sceneCount + 'sc' : proj.step}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Active project status */}
+          {activeProject && (
+            <div className="mx-2 mb-2 bg-violet-500/10 border border-violet-500/20 rounded-xl p-2.5 flex-shrink-0">
+              <p className="text-[9.5px] font-semibold text-violet-400 uppercase tracking-widest mb-1">Active</p>
+              <p className="text-[11.5px] text-white/75 font-medium leading-snug truncate">{activeProject.name}</p>
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {scenes.length > 0 && <span className="text-[9.5px] bg-teal-500/15 text-teal-400 px-1.5 py-0.5 rounded-full">{scenes.length} scenes</span>}
+                {renderStatus === 'complete' && <span className="text-[9.5px] bg-teal-500/15 text-teal-400 px-1.5 py-0.5 rounded-full">Ready to export</span>}
+              </div>
+            </div>
+          )}
+
+          <TokenGateBar onUpgrade={() => useStore.getState().setStep('upgrade')} />
+          <UserMenu onLogout={onLogout} />
+        </aside>
+
+        {/* Main */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="max-w-5xl mx-auto px-8 py-8">
+            <StepNav />
+            {children}
+          </div>
+        </main>
+      </div>
+
+      {/* Upgrade prompt modal */}
+      {upgradePrompt && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={() => setUpgradePrompt(null)}
+        >
+          <div
+            style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 18, padding: 32, maxWidth: 420, width: '100%', textAlign: 'center' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 40, marginBottom: 16 }}>🚀</div>
+            <h2 style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px', margin: '0 0 10px', color: '#F0F0FF' }}>
+              Upgrade to unlock this
+            </h2>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', margin: '0 0 8px', lineHeight: 1.6 }}>
+              {upgradePrompt.reason === 'scene_limit' && `Free plan is limited to ${upgradePrompt.max} scenes per video.`}
+              {upgradePrompt.reason === 'upload_footage' && 'Upload your own footage and voiceover on paid plans.'}
+              {upgradePrompt.reason === 'ai_voices' && 'Natural AI voices are available on paid plans.'}
+              {upgradePrompt.reason === 'daily_limit' && 'Free plan allows 3 renders per day.'}
+            </p>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', margin: '0 0 24px' }}>
+              Upgrade for unlimited scenes, AI voices, 1080p exports, and more.
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => { setUpgradePrompt(null); setStep('plans') }}
+                style={{ flex: 1, background: '#7C5CFF', color: '#fff', border: 'none', borderRadius: 10, padding: '12px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                See upgrade plans
+              </button>
+              <button
+                onClick={() => setUpgradePrompt(null)}
+                style={{ flex: 1, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '12px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                Not now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
