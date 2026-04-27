@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { useAuthStore } from '../authStore'
 
-export const BASE = import.meta.env.VITE_API_BASE_URL
+export const BASE = 'https://sceneforge-production-8d19.up.railway.app'
 
 export const api = axios.create({ baseURL: BASE })
 
