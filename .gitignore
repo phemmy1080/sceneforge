@@ -10,3 +10,5 @@ frontend/.env.local
 frontend/.env.production
 .DS_Store
 *.log
+backend/.env
+backend_OLD/
