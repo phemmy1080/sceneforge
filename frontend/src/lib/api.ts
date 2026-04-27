@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { useAuthStore } from '../authStore'
 
-export const BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
+export const BASE = import.meta.env.VITE_API_BASE_URL
 
 export const api = axios.create({ baseURL: BASE })
 
