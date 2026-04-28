@@ -61,20 +61,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Build allowed origins list
-_raw_origins = settings.frontend_origin or ""
-_allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
-_allowed_origins += [
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "https://sceneforge-alpha.vercel.app",
-]
-_allowed_origins = list(set(_allowed_origins))
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_allowed_origins,
-    allow_origin_regex=r'https://.*\.vercel\.app',
+    allow_origins=[
+        "https://sceneforge-alpha.vercel.app",
+        "http://localhost:5173",
+        "http://localhost:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
