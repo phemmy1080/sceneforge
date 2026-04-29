@@ -12,27 +12,6 @@ logger = logging.getLogger(__name__)
 
 W, H = 1080, 1920
 
-# ── Scale filter ──────────────────────────────────────────────────────────────
-# Problem with the original:
-#   scale=force_original_aspect_ratio=increase then crop works BUT only when
-#   the scaled dimensions are EVEN numbers. A 1080x2048 source scales to
-#   1080x2048 (no change needed) then crops to 1080x1920 — this actually works.
-#   However some Pexels sources produce odd intermediate dimensions.
-#
-# Fix: add scale2ref trick replaced with explicit even-safe scale expression.
-# We scale so the SMALLER ratio dimension fills the target, then center-crop.
-# The "trunc(X/2)*2" ensures libx264 always gets even dimensions.
-SCALE_VF = (
-    # 1. Scale: fill target box, keep aspect ratio, guarantee even pixel dims
-    f"scale="
-    f"w='if(gt(iw/ih,{W}/{H}),{H}*iw/ih,{W})':"
-    f"h='if(gt(iw/ih,{W}/{H}),{H},{W}*ih/iw)',"
-    # Round to even (libx264 requirement)
-    f"scale=trunc(iw/2)*2:trunc(ih/2)*2,"
-    # 2. Center crop to exact target
-    f"crop={W}:{H}"
-)
-
 
 def _ffmpeg_has_filter(name: str) -> bool:
     try:
@@ -60,25 +39,67 @@ async def run_ffmpeg(cmd: list[str]) -> None:
 async def normalize_scene(input_path: str, output_path: str) -> str:
     """
     Re-encode a scene MP4 to ensure clean, consistent audio/video streams.
-    Fixes broken AAC from stock Pexels clips and timestamp issues.
     Forces: stereo, 44100 Hz, clean AAC, consistent video timebase.
     """
     await run_ffmpeg([
         "ffmpeg", "-y",
         "-i", input_path,
-        "-c:v", "libx264",
-        "-preset", "fast",
-        "-crf", "23",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "aac",
-        "-ar", "44100",
-        "-ac", "2",
-        "-b:a", "128k",
+        "-c:v", "libx264", "-preset", "fast", "-crf", "23", "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
         "-avoid_negative_ts", "make_zero",
         "-fflags", "+genpts",
         output_path,
     ])
     return output_path
+
+
+def _build_filter_complex(subtitle_text: str | None, subtitle_style: str) -> str:
+    """
+    Build the filter_complex string that handles BOTH video scaling and
+    audio resampling in a single unified filtergraph.
+
+    WHY filter_complex for everything:
+    FFmpeg 7.x deadlocks when -vf and -af are used simultaneously with
+    -map and -stream_loop. The encoders wait on each other for PTS sync
+    that never arrives, writing frame=0 before timing out.
+    Putting all filters in one filter_complex forces a single init path
+    that resolves correctly.
+    """
+    # Video: scale to fill 1080x1920, crop center, normalize SAR and fps
+    # trunc(X/2)*2 ensures even pixel dimensions — libx264 hard requirement
+    scale_f = (
+        f"scale="
+        f"w='if(gt(iw/ih,{W}/{H}),trunc({H}*iw/ih/2)*2,{W})':"
+        f"h='if(gt(iw/ih,{W}/{H}),{H},trunc({W}*ih/iw/2)*2)',"
+        f"crop={W}:{H},"
+        f"setsar=1,"
+        f"fps=30"
+    )
+
+    # Audio: resample ElevenLabs 24000 Hz mono → 44100 Hz stereo
+    audio_f = "aresample=44100,aformat=channel_layouts=stereo"
+
+    if subtitle_text and _HAS_DRAWTEXT:
+        # Escape characters that break FFmpeg drawtext parsing
+        safe = (
+            subtitle_text
+            .replace("\\", "\\\\")
+            .replace("'",  "\u2019")   # right single quote — visually identical, safe
+            .replace(":",  "\\:")
+            .replace("%",  "\\%")
+            .replace("[",  "\\[")
+            .replace("]",  "\\]")
+        )
+        style_map = {
+            "viral":   f"fontsize=52:fontcolor=white:borderw=4:bordercolor=black:x=(w-text_w)/2:y=h*0.80",
+            "minimal": f"fontsize=40:fontcolor=white:borderw=1:bordercolor=black@0.4:x=(w-text_w)/2:y=h*0.85",
+            "karaoke": f"fontsize=48:fontcolor=yellow:borderw=3:bordercolor=black:x=(w-text_w)/2:y=h*0.82",
+        }
+        style = style_map.get(subtitle_style, style_map["viral"])
+        draw_f = f"drawtext=text='{safe}':{style}"
+        return f"[0:v]{scale_f},{draw_f}[vout];[1:a]{audio_f}[aout]"
+    else:
+        return f"[0:v]{scale_f}[vout];[1:a]{audio_f}[aout]"
 
 
 async def render_scene(
@@ -90,19 +111,24 @@ async def render_scene(
     is_image: bool = False,
 ) -> str:
     """
-    Render one scene: scale visual to 1080x1920, overlay TTS audio,
-    optional subtitle drawtext.
+    Render one scene: scale visual to 1080x1920, mix in TTS audio,
+    optional subtitle overlay.
 
-    FIXES vs original:
-    1. aresample filter on audio input — ElevenLabs outputs 24000 Hz mono MP3.
-       Without explicit resampling, AAC encoder stalls (frame=0, time=N/A).
-    2. Explicit -ar 44100 -ac 2 output flags for consistent stream params.
-    3. -shortest added so output duration = min(video, audio) instead of
-       stream_loop running forever when audio is shorter than video.
-    4. Even-safe SCALE_VF that handles odd intermediate dimensions.
+    Root cause of the frame=0 crash (fixed here):
+    -----------------------------------------------
+    FFmpeg 7.x deadlocks when -vf and -af are both specified alongside
+    -map and -stream_loop. The muxer initialises correctly (stream mapping
+    shows in the log, output stream shows 44100 Hz AAC) but the encoder
+    loop never starts — it waits for PTS synchronisation between the two
+    separate filtergraphs that never resolves.
+
+    Fix: merge ALL filters (video scale + audio resample + optional drawtext)
+    into a single -filter_complex. Remove -vf and -af entirely. Map the
+    named outputs [vout] and [aout] from the filter_complex.
     """
-    # ── Build video filter chain ──────────────────────────────────────────────
-    if subtitle_style != "none" and _HAS_DRAWTEXT:
+    # Build subtitle text from first 2 lines of scene text
+    subtitle_text = None
+    if subtitle_style != "none" and _HAS_DRAWTEXT and hasattr(scene, "text"):
         words = scene.text.replace("\n", " ").split()
         lines, current = [], []
         for word in words:
@@ -112,66 +138,39 @@ async def render_scene(
                 current = []
         if current:
             lines.append(" ".join(current))
-        subtitle_display = "\n".join(lines[:2])
-        safe = (
-            subtitle_display
-            .replace("\\", "\\\\")
-            .replace("'",  "\u2019")   # typographic apostrophe — safe in drawtext
-            .replace(":",  "\\:")
-            .replace("%",  "\\%")
-            .replace("[",  "\\[")
-            .replace("]",  "\\]")
-        )
-        style_map = {
-            "viral":   "fontsize=52:fontcolor=white:borderw=4:bordercolor=black:x=(w-text_w)/2:y=h*0.80",
-            "minimal": "fontsize=40:fontcolor=white:borderw=1:bordercolor=black@0.4:x=(w-text_w)/2:y=h*0.85",
-            "karaoke": "fontsize=48:fontcolor=yellow:borderw=3:bordercolor=black:x=(w-text_w)/2:y=h*0.82",
-        }
-        style = style_map.get(subtitle_style, style_map["viral"])
-        vf = f"{SCALE_VF},drawtext=text='{safe}':{style}"
-    else:
-        vf = SCALE_VF
+        subtitle_text = "\n".join(lines[:2])
 
-    # ── Audio filter: resample to 44100 Hz stereo ─────────────────────────────
-    # CRITICAL FIX: ElevenLabs TTS outputs 24000 Hz mono MP3.
-    # FFmpeg's AAC encoder requires 44100 Hz. Without aresample, the mux
-    # initialises correctly (shows stream mapping) but encodes 0 frames
-    # because the encoder rejects the sample rate mismatch silently.
-    # This is the root cause of every "frame=0 time=N/A" crash in the logs.
-    af = "aresample=44100,aformat=channel_layouts=stereo"
+    fc = _build_filter_complex(subtitle_text, subtitle_style)
 
-    # ── Build command ──────────────────────────────────────────────────────────
     cmd = [
         "ffmpeg", "-y",
-        # Input 0: visual (loop image or video)
+        # Input 0: visual
+        # -loop 1 for images, -stream_loop -1 for videos
+        # IMPORTANT: loop flag must come BEFORE -i
         *(["-loop", "1"] if is_image else ["-stream_loop", "-1"]),
         "-i", visual_path,
         # Input 1: TTS audio
         "-i", audio_path,
-        # Explicit stream mapping — video from input 0, audio from input 1
-        # (never rely on FFmpeg's auto-selection with multiple inputs)
-        "-map", "0:v:0",
-        "-map", "1:a:0",
-        # Video filters
-        "-vf", vf,
-        # Audio filters (inline — simpler than filter_complex for single audio)
-        "-af", af,
+        # Single unified filtergraph — NO -vf or -af flags
+        "-filter_complex", fc,
+        # Map from filter outputs — not raw stream indices
+        "-map", "[vout]",
+        "-map", "[aout]",
         # Video encode
         "-c:v", "libx264",
         "-preset", "fast",
         "-crf", "23",
         "-pix_fmt", "yuv420p",
-        # Audio encode — explicit rate/channels regardless of source format
+        # Audio encode — explicit params as belt-and-suspenders
         "-c:a", "aac",
+        "-b:a", "128k",
         "-ar", "44100",
         "-ac", "2",
-        "-b:a", "128k",
-        # Duration: trim to scene duration
-        # -shortest alone isn't enough when stream_loop makes video infinite
+        # Trim to exact scene duration
         "-t", str(scene.duration),
-        # Timestamp fixes
+        # Timestamp hygiene
         "-avoid_negative_ts", "make_zero",
-        # Fast web streaming
+        # Optimise for streaming / fast open
         "-movflags", "+faststart",
         output_path,
     ]
@@ -183,9 +182,8 @@ async def render_scene(
 
 async def concat_scenes(scene_files: list[str], output_path: str) -> str:
     """
-    Concatenate scene MP4s.
-    Normalises each scene first to guarantee consistent stream parameters,
-    then uses the concat demuxer with stream copy (fast, no re-encode).
+    Normalise each scene then concat with stream copy.
+    Normalisation guarantees consistent codec params so stream copy works.
     """
     output_dir = Path(output_path).parent
     normalized: list[str] = []
@@ -203,8 +201,7 @@ async def concat_scenes(scene_files: list[str], output_path: str) -> str:
 
     await run_ffmpeg([
         "ffmpeg", "-y",
-        "-f", "concat",
-        "-safe", "0",
+        "-f", "concat", "-safe", "0",
         "-i", concat_list,
         "-c", "copy",
         "-movflags", "+faststart",
@@ -243,9 +240,7 @@ async def add_background_music(
         "-map", "0:v",
         "-map", "[a]",
         "-c:v", "copy",
-        "-c:a", "aac",
-        "-ar", "44100",
-        "-ac", "2",
+        "-c:a", "aac", "-ar", "44100", "-ac", "2",
         "-shortest",
         output_path,
     ])
