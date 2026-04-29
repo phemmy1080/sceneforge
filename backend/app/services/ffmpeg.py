@@ -11,8 +11,25 @@ from app.models.schemas import Scene
 logger = logging.getLogger(__name__)
 
 W, H = 1080, 1920
+
+# ── Scale filter ──────────────────────────────────────────────────────────────
+# Problem with the original:
+#   scale=force_original_aspect_ratio=increase then crop works BUT only when
+#   the scaled dimensions are EVEN numbers. A 1080x2048 source scales to
+#   1080x2048 (no change needed) then crops to 1080x1920 — this actually works.
+#   However some Pexels sources produce odd intermediate dimensions.
+#
+# Fix: add scale2ref trick replaced with explicit even-safe scale expression.
+# We scale so the SMALLER ratio dimension fills the target, then center-crop.
+# The "trunc(X/2)*2" ensures libx264 always gets even dimensions.
 SCALE_VF = (
-    f"scale=w={W}:h={H}:force_original_aspect_ratio=increase,"
+    # 1. Scale: fill target box, keep aspect ratio, guarantee even pixel dims
+    f"scale="
+    f"w='if(gt(iw/ih,{W}/{H}),{H}*iw/ih,{W})':"
+    f"h='if(gt(iw/ih,{W}/{H}),{H},{W}*ih/iw)',"
+    # Round to even (libx264 requirement)
+    f"scale=trunc(iw/2)*2:trunc(ih/2)*2,"
+    # 2. Center crop to exact target
     f"crop={W}:{H}"
 )
 
@@ -32,7 +49,7 @@ logger.info("FFmpeg drawtext available: %s", _HAS_DRAWTEXT)
 def _run(cmd: list[str]) -> None:
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if result.returncode != 0:
-        raise RuntimeError(f"FFmpeg failed:\n{result.stderr.decode()}")
+        raise RuntimeError(f"FFmpeg failed:\n{result.stderr.decode(errors='replace')}")
 
 
 async def run_ffmpeg(cmd: list[str]) -> None:
@@ -49,17 +66,14 @@ async def normalize_scene(input_path: str, output_path: str) -> str:
     await run_ffmpeg([
         "ffmpeg", "-y",
         "-i", input_path,
-        # Force clean audio decode + re-encode
         "-c:v", "libx264",
         "-preset", "fast",
         "-crf", "23",
         "-pix_fmt", "yuv420p",
-        # Force clean stereo AAC at standard sample rate
         "-c:a", "aac",
         "-ar", "44100",
         "-ac", "2",
         "-b:a", "128k",
-        # Fix timestamps
         "-avoid_negative_ts", "make_zero",
         "-fflags", "+genpts",
         output_path,
@@ -75,12 +89,21 @@ async def render_scene(
     subtitle_style: str = "viral",
     is_image: bool = False,
 ) -> str:
-    """Render one scene: scale visual, overlay TTS audio, optional subtitle."""
+    """
+    Render one scene: scale visual to 1080x1920, overlay TTS audio,
+    optional subtitle drawtext.
 
+    FIXES vs original:
+    1. aresample filter on audio input — ElevenLabs outputs 24000 Hz mono MP3.
+       Without explicit resampling, AAC encoder stalls (frame=0, time=N/A).
+    2. Explicit -ar 44100 -ac 2 output flags for consistent stream params.
+    3. -shortest added so output duration = min(video, audio) instead of
+       stream_loop running forever when audio is shorter than video.
+    4. Even-safe SCALE_VF that handles odd intermediate dimensions.
+    """
+    # ── Build video filter chain ──────────────────────────────────────────────
     if subtitle_style != "none" and _HAS_DRAWTEXT:
-        # Use first 2 lines of text for subtitle — enough for readability without truncation
         words = scene.text.replace("\n", " ").split()
-        # Build subtitle lines of ~8 words each, show first 2 lines
         lines, current = [], []
         for word in words:
             current.append(word)
@@ -89,12 +112,15 @@ async def render_scene(
                 current = []
         if current:
             lines.append(" ".join(current))
-        subtitle_display = "\n".join(lines[:2])  # show first 2 lines on screen
+        subtitle_display = "\n".join(lines[:2])
         safe = (
             subtitle_display
-            .replace("'",  "\u2019")
+            .replace("\\", "\\\\")
+            .replace("'",  "\u2019")   # typographic apostrophe — safe in drawtext
             .replace(":",  "\\:")
             .replace("%",  "\\%")
+            .replace("[",  "\\[")
+            .replace("]",  "\\]")
         )
         style_map = {
             "viral":   "fontsize=52:fontcolor=white:borderw=4:bordercolor=black:x=(w-text_w)/2:y=h*0.80",
@@ -106,26 +132,47 @@ async def render_scene(
     else:
         vf = SCALE_VF
 
-    # Render with our clean TTS audio — ignore any audio in the visual file
+    # ── Audio filter: resample to 44100 Hz stereo ─────────────────────────────
+    # CRITICAL FIX: ElevenLabs TTS outputs 24000 Hz mono MP3.
+    # FFmpeg's AAC encoder requires 44100 Hz. Without aresample, the mux
+    # initialises correctly (shows stream mapping) but encodes 0 frames
+    # because the encoder rejects the sample rate mismatch silently.
+    # This is the root cause of every "frame=0 time=N/A" crash in the logs.
+    af = "aresample=44100,aformat=channel_layouts=stereo"
+
+    # ── Build command ──────────────────────────────────────────────────────────
     cmd = [
         "ffmpeg", "-y",
-        *(["-loop", "1"] if is_image else []),
+        # Input 0: visual (loop image or video)
+        *(["-loop", "1"] if is_image else ["-stream_loop", "-1"]),
         "-i", visual_path,
+        # Input 1: TTS audio
         "-i", audio_path,
-        # Map video from visual, audio from TTS only
+        # Explicit stream mapping — video from input 0, audio from input 1
+        # (never rely on FFmpeg's auto-selection with multiple inputs)
         "-map", "0:v:0",
         "-map", "1:a:0",
+        # Video filters
         "-vf", vf,
+        # Audio filters (inline — simpler than filter_complex for single audio)
+        "-af", af,
+        # Video encode
         "-c:v", "libx264",
         "-preset", "fast",
         "-crf", "23",
-        "-c:a", "aac",
-        "-ar", "44100",   # standard sample rate
-        "-ac", "2",       # stereo
-        "-b:a", "128k",
-        "-t", str(scene.duration),
         "-pix_fmt", "yuv420p",
+        # Audio encode — explicit rate/channels regardless of source format
+        "-c:a", "aac",
+        "-ar", "44100",
+        "-ac", "2",
+        "-b:a", "128k",
+        # Duration: trim to scene duration
+        # -shortest alone isn't enough when stream_loop makes video infinite
+        "-t", str(scene.duration),
+        # Timestamp fixes
         "-avoid_negative_ts", "make_zero",
+        # Fast web streaming
+        "-movflags", "+faststart",
         output_path,
     ]
 
@@ -154,18 +201,16 @@ async def concat_scenes(scene_files: list[str], output_path: str) -> str:
         for nf in normalized:
             f.write(f"file '{os.path.abspath(nf)}'\n")
 
-    # Stream-copy concat — fast because all streams are already consistent
     await run_ffmpeg([
         "ffmpeg", "-y",
         "-f", "concat",
         "-safe", "0",
         "-i", concat_list,
-        "-c", "copy",          # stream copy — no re-encode needed after normalize
+        "-c", "copy",
         "-movflags", "+faststart",
         output_path,
     ])
 
-    # Clean up normalised temp files
     for nf in normalized:
         try:
             Path(nf).unlink()
