@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import Response
 
 from app.config import get_settings
 
@@ -39,15 +40,16 @@ app = FastAPI(
 # CORS — allow Vercel frontend and localhost dev
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://sceneforge-alpha.vercel.app",
-        "http://localhost:5173",
-        "http://localhost:3000",
-    ],
+    allow_origins=["*"],  # TEMP: open for debugging
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.options("/{rest_of_path:path}")
+async def preflight_handler(rest_of_path: str):
+    return Response(status_code=200)
 
 # Rate limiting (optional — graceful if slowapi not installed)
 try:
