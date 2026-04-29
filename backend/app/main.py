@@ -10,6 +10,16 @@ from fastapi.responses import Response
 
 from app.config import get_settings
 
+from app.api.auth import router as auth_router
+from app.api.generate import router as generate_router
+from app.api.render import router as render_router
+from app.api.export import router as export_router
+from app.api.payments import router as payments_router
+from app.api.admin import router as admin_router
+from app.api.admin_auth_api import router as admin_auth_router
+from app.api.niches import router as niches_router
+from app.api.projects import router as projects_router
+
 settings = get_settings()
 
 logging.basicConfig(
@@ -51,7 +61,7 @@ app.add_middleware(
 async def preflight_handler(rest_of_path: str):
     return Response(status_code=200)
 
-from fastapi.responses import Response
+
 
 @app.options("/{path:path}")
 async def options_handler(path: str):
@@ -78,15 +88,7 @@ async def options_handler(path: str):
 #    logger.warning("Rate limiting not available: %s", e)
 
 # Routers
-from app.api.auth import router as auth_router
-from app.api.generate import router as generate_router
-from app.api.render import router as render_router
-from app.api.export import router as export_router
-from app.api.payments import router as payments_router
-from app.api.admin import router as admin_router
-from app.api.admin_auth_api import router as admin_auth_router
-from app.api.niches import router as niches_router
-from app.api.projects import router as projects_router
+
 
 app.include_router(auth_router,       prefix="/api/auth",       tags=["Auth"])
 app.include_router(generate_router,   prefix="/api/generate",   tags=["Generate"])
