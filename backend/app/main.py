@@ -51,24 +51,31 @@ app.add_middleware(
 async def preflight_handler(rest_of_path: str):
     return Response(status_code=200)
 
-# Rate limiting (optional — graceful if slowapi not installed)
-try:
-    from app.middleware.rate_limit import limiter, RATE_LIMITING_ENABLED
-    app.state.limiter = limiter
-    if RATE_LIMITING_ENABLED:
-        from slowapi.errors import RateLimitExceeded
-        from slowapi.middleware import SlowAPIMiddleware
-        from fastapi.responses import JSONResponse
+from fastapi.responses import Response
 
-        @app.exception_handler(RateLimitExceeded)
-        async def rate_limit_handler(request, exc):
-            return JSONResponse(
-                status_code=429,
-                content={"error": "rate_limit_exceeded", "message": "Too many requests."}
-            )
-        app.add_middleware(SlowAPIMiddleware)
-except Exception as e:
-    logger.warning("Rate limiting not available: %s", e)
+@app.options("/{path:path}")
+async def options_handler(path: str):
+    return Response(status_code=200)
+
+# Rate limiting (optional — graceful if slowapi not installed)
+
+#try:
+  #  from app.middleware.rate_limit import limiter, RATE_LIMITING_ENABLED
+   # app.state.limiter = limiter
+    #if RATE_LIMITING_ENABLED:
+    #    from slowapi.errors import RateLimitExceeded
+     #   from slowapi.middleware import SlowAPIMiddleware
+     #   from fastapi.responses import JSONResponse
+
+     #   @app.exception_handler(RateLimitExceeded)
+     #   async def rate_limit_handler(request, exc):
+    #        return JSONResponse(
+     #           status_code=429,
+     #           content={"error": "rate_limit_exceeded", "message": "Too many requests."}
+    #        )
+    #    app.add_middleware(SlowAPIMiddleware)
+#except Exception as e:
+#    logger.warning("Rate limiting not available: %s", e)
 
 # Routers
 from app.api.auth import router as auth_router
