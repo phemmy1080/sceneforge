@@ -55,40 +55,15 @@ def _build_filter_complex(
     subtitle_style: str,
     is_image: bool,
 ) -> str:
-    """
-    Build a single unified filter_complex.
 
-    VIDEO LOOPING HISTORY — why we use the loop filter here:
-    ---------------------------------------------------------
-    Attempt 1: -stream_loop -1 on input + output -t
-      → frame=0. FFmpeg 7 filtergraph never gets EOF from looped stream.
-
-    Attempt 2: -stream_loop -1 + filter_complex + output -t
-      → frame=0. Same deadlock, -t on output ignored when filtergraph
-        has no EOF.
-
-    Attempt 3: -t before each -i (input-side) + -stream_loop + filter_complex
-      → frame=0 again. The second "-t -i audio" caused FFmpeg 7 to drop
-        the [1:a] → aresample connection entirely. Stream mapping showed
-        "aresample:default -> Stream #0:1 (aac)" with NO input feeding it.
-        Audio encoder stalled → -shortest stalled video → frame=0.
-
-    SOLUTION: Use the 'loop' VIDEO FILTER inside filter_complex.
-    - No -stream_loop on the input at all.
-    - No -t before any -i.
-    - loop filter runs inside the filtergraph, completely isolated from
-      the demuxer and has zero effect on audio input mapping.
-    - Standard output-side -t trims to scene duration normally.
-    - All 5 stream mapping lines appear correctly in FFmpeg output.
-    """
+    # ALWAYS apply loop — no exceptions
     if is_image:
-        # Images: loop a single frame indefinitely
         loop_f = "loop=loop=-1:size=1:start=0,"
     else:
-        # Videos: loop up to 32767 frames (~18min at 30fps — more than enough)
         loop_f = "loop=loop=-1:size=32767:start=0,"
 
     scale_f = (
+        f"{loop_f}"
         f"scale="
         f"w='if(gt(iw/ih,{W}/{H}),trunc({H}*iw/ih/2)*2,{W})':"
         f"h='if(gt(iw/ih,{W}/{H}),{H},trunc({W}*ih/iw/2)*2)',"
@@ -97,30 +72,35 @@ def _build_filter_complex(
         f"fps=30"
     )
 
-    # Resample ElevenLabs 24000 Hz mono → 44100 Hz stereo for AAC encoder
     audio_f = "aresample=44100,aformat=channel_layouts=stereo"
 
+    # ALWAYS produce BOTH outputs explicitly
     if subtitle_text and _HAS_DRAWTEXT:
         safe = (
             subtitle_text
             .replace("\\", "\\\\")
-            .replace("'",  "\u2019")
-            .replace(":",  "\\:")
-            .replace("%",  "\\%")
-            .replace("[",  "\\[")
-            .replace("]",  "\\]")
+            .replace("'", "\u2019")
+            .replace(":", "\\:")
+            .replace("%", "\\%")
+            .replace("[", "\\[")
+            .replace("]", "\\]")
         )
-        style_map = {
+
+        style = {
             "viral":   "fontsize=52:fontcolor=white:borderw=4:bordercolor=black:x=(w-text_w)/2:y=h*0.80",
             "minimal": "fontsize=40:fontcolor=white:borderw=1:bordercolor=black@0.4:x=(w-text_w)/2:y=h*0.85",
             "karaoke": "fontsize=48:fontcolor=yellow:borderw=3:bordercolor=black:x=(w-text_w)/2:y=h*0.82",
-        }
-        style = style_map.get(subtitle_style, style_map["viral"])
-        draw_f = f",drawtext=text='{safe}':{style}"
-        return f"[0:v]{loop_f}{scale_f}{draw_f}[vout];[1:a]{audio_f}[aout]"
-    else:
-        return f"[0:v]{loop_f}{scale_f}[vout];[1:a]{audio_f}[aout]"
+        }.get(subtitle_style, "fontsize=52:fontcolor=white:borderw=4:bordercolor=black:x=(w-text_w)/2:y=h*0.80")
 
+        return (
+            f"[0:v]{scale_f},drawtext=text='{safe}':{style}[vout];"
+            f"[1:a]{audio_f}[aout]"
+        )
+
+    return (
+        f"[0:v]{scale_f}[vout];"
+        f"[1:a]{audio_f}[aout]"
+    )
 
 async def render_scene(
     scene: Scene,
@@ -178,35 +158,30 @@ async def render_scene(
     )
 
     cmd = [
-        "ffmpeg", "-y",
+    "ffmpeg", "-y",
+    "-i", visual_path,
+    "-i", audio_path,
 
-        # 👇 THIS is the correct looping approach
-        "-stream_loop", "-1" if is_image else "0",
-        "-i", visual_path,
+    "-filter_complex", fc,
+    "-map", "[vout]",
+    "-map", "[aout]",
 
-        "-i", audio_path,
+    "-c:v", "libx264",
+    "-preset", "fast",
+    "-crf", "23",
+    "-pix_fmt", "yuv420p",
 
-        "-filter_complex", filter_complex,
-        "-map", "[vout]",
-        "-map", "[aout]",
+    "-c:a", "aac",
+    "-b:a", "128k",
+    "-ar", "44100",
+    "-ac", "2",
 
-        "-c:v", "libx264",
-        "-preset", "fast",
-        "-crf", "23",
-        "-pix_fmt", "yuv420p",
+    "-t", str(scene.duration),
+    "-shortest",  # 🔥 ADD THIS
 
-        "-c:a", "aac",
-        "-b:a", "128k",
-        "-ar", "44100",
-        "-ac", "2",
-
-        # ✅ CRITICAL FIXES
-        "-shortest",   # stop when audio ends
-        "-t", str(scene.duration),  # safety cap
-
-        "-movflags", "+faststart",
-        output_path,
-    ]
+    "-movflags", "+faststart",
+    output_path,
+]
 
     await run_ffmpeg(cmd)
     logger.info("Rendered scene %s → %s", scene.id, Path(output_path).name)
