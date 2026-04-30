@@ -130,19 +130,7 @@ async def render_scene(
     subtitle_style: str = "viral",
     is_image: bool = False,
 ) -> str:
-    """
-    Render one scene to 1080x1920 MP4 with TTS audio and optional subtitle.
 
-    See _build_filter_complex docstring for the full history of why
-    video looping is done with the loop filter inside filter_complex.
-
-    Expected stream mapping in FFmpeg output (all 5 lines must appear):
-      Stream #0:0 (h264) -> loop:default
-      loop:default -> scale:default
-      [drawtext:default -> Stream #0:0] (if subtitle)
-      Stream #1:0 (mp3float) -> aresample:default   ← key indicator
-      aformat:default -> Stream #0:1 (aac)
-    """
     subtitle_text = None
     if subtitle_style != "none" and _HAS_DRAWTEXT and hasattr(scene, "text"):
         words = scene.text.replace("\n", " ").split()
@@ -156,47 +144,74 @@ async def render_scene(
             lines.append(" ".join(current))
         subtitle_text = "\n".join(lines[:2])
 
-    fc = _build_filter_complex(subtitle_text, subtitle_style, is_image)
+    # ✅ NO LOOP FILTER
+    scale_f = (
+        f"scale="
+        f"w='if(gt(iw/ih,{W}/{H}),trunc({H}*iw/ih/2)*2,{W})':"
+        f"h='if(gt(iw/ih,{W}/{H}),{H},trunc({W}*ih/iw/2)*2)',"
+        f"crop={W}:{H},setsar=1,fps=30"
+    )
+
+    audio_f = "aresample=44100,aformat=channel_layouts=stereo"
+
+    draw_f = ""
+    if subtitle_text and _HAS_DRAWTEXT:
+        safe = (
+            subtitle_text
+            .replace("\\", "\\\\")
+            .replace("'", "\u2019")
+            .replace(":", "\\:")
+            .replace("%", "\\%")
+            .replace("[", "\\[")
+            .replace("]", "\\]")
+        )
+
+        draw_f = (
+            f",drawtext=text='{safe}':"
+            "fontsize=52:fontcolor=white:borderw=4:bordercolor=black:"
+            "x=(w-text_w)/2:y=h*0.80"
+        )
+
+    filter_complex = (
+        f"[0:v]{scale_f}{draw_f}[vout];"
+        f"[1:a]{audio_f}[aout]"
+    )
 
     cmd = [
         "ffmpeg", "-y",
 
-        # Input 0: visual — plain -i, NO -stream_loop, NO -t before it
-        # Looping is handled by the loop filter inside filter_complex
+        # 👇 THIS is the correct looping approach
+        "-stream_loop", "-1" if is_image else "0",
         "-i", visual_path,
 
-        # Input 1: TTS audio — plain -i, NO -t before it
         "-i", audio_path,
 
-        # Unified filter graph — video loop + scale + audio resample
-        "-filter_complex", fc,
+        "-filter_complex", filter_complex,
         "-map", "[vout]",
         "-map", "[aout]",
 
-        # Video encode
         "-c:v", "libx264",
         "-preset", "fast",
         "-crf", "23",
         "-pix_fmt", "yuv420p",
 
-        # Audio encode
         "-c:a", "aac",
         "-b:a", "128k",
         "-ar", "44100",
         "-ac", "2",
 
-        # Output duration trim — works correctly now that filtergraph
-        # gets proper EOF from the loop filter when combined with -t
-        "-t", str(scene.duration),
-        "-avoid_negative_ts", "make_zero",
+        # ✅ CRITICAL FIXES
+        "-shortest",   # stop when audio ends
+        "-t", str(scene.duration),  # safety cap
+
         "-movflags", "+faststart",
         output_path,
     ]
 
     await run_ffmpeg(cmd)
     logger.info("Rendered scene %s → %s", scene.id, Path(output_path).name)
-    return output_path
 
+    return output_path
 
 async def concat_scenes(scene_files: list[str], output_path: str) -> str:
     """Normalise each scene then concat with stream copy."""
