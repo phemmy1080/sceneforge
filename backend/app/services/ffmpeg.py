@@ -55,134 +55,129 @@ async def normalize_scene(input_path: str, output_path: str) -> str:
 
 def _build_filter_complex(subtitle_text: str | None, subtitle_style: str) -> str:
     """
-    Build the filter_complex string that handles BOTH video scaling and
-    audio resampling in a single unified filtergraph.
+    Build a single unified filter_complex for video + audio.
 
-    WHY filter_complex for everything:
-    FFmpeg 7.x deadlocks when -vf and -af are used simultaneously with
-    -map and -stream_loop. The encoders wait on each other for PTS sync
-    that never arrives, writing frame=0 before timing out.
-    Putting all filters in one filter_complex forces a single init path
-    that resolves correctly.
+    All filters must be in one filter_complex — separate -vf and -af deadlock
+    in FFmpeg 7.x when combined with -stream_loop and -map.
     """
-    # Video: scale to fill 1080x1920, crop center, normalize SAR and fps
-    # trunc(X/2)*2 ensures even pixel dimensions — libx264 hard requirement
     scale_f = (
         f"scale="
         f"w='if(gt(iw/ih,{W}/{H}),trunc({H}*iw/ih/2)*2,{W})':"
         f"h='if(gt(iw/ih,{W}/{H}),{H},trunc({W}*ih/iw/2)*2)',"
-        f"crop={W}:{H},"
-        f"setsar=1,"
-        f"fps=30"
+        f"crop={W}:{H},setsar=1,fps=30"
     )
-
-    # Audio: resample ElevenLabs 24000 Hz mono → 44100 Hz stereo
-   # audio_f = "aresample=44100,aformat=channel_layouts=stereo"
-    audio_f = "aresample=44100,aformat=channel_layouts=stereo,apad"
+    audio_f = "aresample=44100,aformat=channel_layouts=stereo"
 
     if subtitle_text and _HAS_DRAWTEXT:
-        # Escape characters that break FFmpeg drawtext parsing
         safe = (
             subtitle_text
             .replace("\\", "\\\\")
-            .replace("'",  "\u2019")   # right single quote — visually identical, safe
+            .replace("'",  "\u2019")
             .replace(":",  "\\:")
             .replace("%",  "\\%")
             .replace("[",  "\\[")
             .replace("]",  "\\]")
         )
         style_map = {
-            "viral":   f"fontsize=52:fontcolor=white:borderw=4:bordercolor=black:x=(w-text_w)/2:y=h*0.80",
-            "minimal": f"fontsize=40:fontcolor=white:borderw=1:bordercolor=black@0.4:x=(w-text_w)/2:y=h*0.85",
-            "karaoke": f"fontsize=48:fontcolor=yellow:borderw=3:bordercolor=black:x=(w-text_w)/2:y=h*0.82",
+            "viral":   "fontsize=52:fontcolor=white:borderw=4:bordercolor=black:x=(w-text_w)/2:y=h*0.80",
+            "minimal": "fontsize=40:fontcolor=white:borderw=1:bordercolor=black@0.4:x=(w-text_w)/2:y=h*0.85",
+            "karaoke": "fontsize=48:fontcolor=yellow:borderw=3:bordercolor=black:x=(w-text_w)/2:y=h*0.82",
         }
         style = style_map.get(subtitle_style, style_map["viral"])
-        draw_f = f"drawtext=text='{safe}':{style}"
-        return f"[0:v]{scale_f},{draw_f}[vout];[1:a]{audio_f}[aout]"
+        return f"[0:v]{scale_f},drawtext=text='{safe}':{style}[vout];[1:a]{audio_f}[aout]"
     else:
         return f"[0:v]{scale_f}[vout];[1:a]{audio_f}[aout]"
 
 
-import asyncio
-import os
-import subprocess
-from typing import List, Dict
-
-
-async def run_ffmpeg(cmd: List[str]) -> None:
-    """
-    Execute FFmpeg safely in async environment.
-    """
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-
-    stdout, stderr = await process.communicate()
-
-    if process.returncode != 0:
-        raise RuntimeError(f"FFmpeg failed:\n{stderr.decode(errors='replace')}")
-
-
 async def render_scene(
-    scene_id: int,
-    video_path: str,
+    scene: Scene,
+    visual_path: str,
     audio_path: str,
     output_path: str,
-    text_overlay: str,
-    font_path: str = None
-):
+    subtitle_style: str = "viral",
+    is_image: bool = False,
+) -> str:
     """
-    Render a single scene (video + audio + text overlay)
-    Safe for Railway / Vercel deployment.
-    """
+    Render one scene to MP4.
 
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    THE ROOT CAUSE OF frame=0 (solved here)
+    =========================================
+    In FFmpeg 7.x, when -stream_loop is active and -filter_complex is used,
+    the filtergraph never receives an EOF signal from the looped stream.
+    Without EOF, the filtergraph never flushes its buffer.
+    Without a flush, the encoders never start writing frames.
+    Result: frame=0, time=N/A, non-zero exit.
+
+    The output-side -t flag does NOT fix this — it tells the MUXER to stop
+    after N seconds, but the muxer only runs after the encoders produce frames,
+    which never happens if the filtergraph never flushes.
+
+    THE FIX: Place -t BEFORE each -i as an INPUT option.
+    Input-side -t tells the DEMUXER to stop reading after N seconds.
+    The demuxer sends EOF to the filtergraph after N seconds.
+    The filtergraph flushes, the encoders start, frames are written.
+    -shortest is added as a safety net to stop at whichever stream ends first.
+    """
+    subtitle_text = None
+    if subtitle_style != "none" and _HAS_DRAWTEXT and hasattr(scene, "text"):
+        words = scene.text.replace("\n", " ").split()
+        lines, current = [], []
+        for word in words:
+            current.append(word)
+            if len(current) >= 8:
+                lines.append(" ".join(current))
+                current = []
+        if current:
+            lines.append(" ".join(current))
+        subtitle_text = "\n".join(lines[:2])
+
+    fc = _build_filter_complex(subtitle_text, subtitle_style)
+    duration = scene.duration
 
     cmd = [
-        "ffmpeg",
+        "ffmpeg", "-y",
 
-        # 🔥 important fixes for cloud environments
-        "-y",                 # overwrite output
-        "-nostdin",          # prevent hanging waiting for input
-        "-hide_banner",
-        "-loglevel", "error",
+        # ── Input 0: visual ───────────────────────────────────────────────
+        # -t BEFORE -i = INPUT option = demuxer stops sending frames after
+        # `duration` seconds, which sends EOF into the filtergraph.
+        # This is what allows filter_complex to flush and encode to start.
+        # Without this, -stream_loop -1 never terminates → frame=0.
+        "-t", str(duration),
+        *(["-loop", "1"] if is_image else ["-stream_loop", "-1"]),
+        "-i", visual_path,
 
-        # input files
-        "-i", video_path,
+        # ── Input 1: TTS audio ────────────────────────────────────────────
+        # -t here too so audio demuxer also has a hard stop
+        "-t", str(duration),
         "-i", audio_path,
 
-        # video filter (text overlay)
-        "-vf", (
-            f"drawtext=text='{text_overlay}':"
-            f"x=(w-text_w)/2:y=h*0.8:"
-            f"fontsize=48:fontcolor=white"
-            + (f":fontfile={font_path}" if font_path else "")
-        ),
+        # ── Filters: everything in one graph ─────────────────────────────
+        "-filter_complex", fc,
+        "-map", "[vout]",
+        "-map", "[aout]",
 
-        # audio handling
-        "-c:a", "aac",
-
-        # video encoding
+        # ── Video encode ──────────────────────────────────────────────────
         "-c:v", "libx264",
-        "-preset", "veryfast",
+        "-preset", "fast",
         "-crf", "23",
-
-        # 🔥 fix deprecated vsync issue
-        "-fps_mode", "cfr",
-
-        # 🔥 prevents hanging when audio is shorter than video
-        "-shortest",
-
-        # ensure compatibility
         "-pix_fmt", "yuv420p",
 
-        output_path
+        # ── Audio encode ──────────────────────────────────────────────────
+        "-c:a", "aac",
+        "-b:a", "128k",
+        "-ar", "44100",
+        "-ac", "2",
+
+        # ── Output control ────────────────────────────────────────────────
+        # -shortest: stop encoding when the shorter stream ends
+        # (belt-and-suspenders alongside the input -t flags)
+        "-shortest",
+        "-avoid_negative_ts", "make_zero",
+        "-movflags", "+faststart",
+        output_path,
     ]
 
     await run_ffmpeg(cmd)
-    
     logger.info("Rendered scene %s → %s", scene.id, Path(output_path).name)
     return output_path
 
@@ -190,7 +185,6 @@ async def render_scene(
 async def concat_scenes(scene_files: list[str], output_path: str) -> str:
     """
     Normalise each scene then concat with stream copy.
-    Normalisation guarantees consistent codec params so stream copy works.
     """
     output_dir = Path(output_path).parent
     normalized: list[str] = []
