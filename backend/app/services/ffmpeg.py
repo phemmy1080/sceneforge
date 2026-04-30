@@ -103,83 +103,86 @@ def _build_filter_complex(subtitle_text: str | None, subtitle_style: str) -> str
         return f"[0:v]{scale_f}[vout];[1:a]{audio_f}[aout]"
 
 
+import asyncio
+import os
+import subprocess
+from typing import List, Dict
+
+
+async def run_ffmpeg(cmd: List[str]) -> None:
+    """
+    Execute FFmpeg safely in async environment.
+    """
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+
+    stdout, stderr = await process.communicate()
+
+    if process.returncode != 0:
+        raise RuntimeError(f"FFmpeg failed:\n{stderr.decode(errors='replace')}")
+
+
 async def render_scene(
-    scene: Scene,
-    visual_path: str,
+    scene_id: int,
+    video_path: str,
     audio_path: str,
     output_path: str,
-    subtitle_style: str = "viral",
-    is_image: bool = False,
-) -> str:
+    text_overlay: str,
+    font_path: str = None
+):
     """
-    Render one scene: scale visual to 1080x1920, mix in TTS audio,
-    optional subtitle overlay.
-
-    Root cause of the frame=0 crash (fixed here):
-    -----------------------------------------------
-    FFmpeg 7.x deadlocks when -vf and -af are both specified alongside
-    -map and -stream_loop. The muxer initialises correctly (stream mapping
-    shows in the log, output stream shows 44100 Hz AAC) but the encoder
-    loop never starts — it waits for PTS synchronisation between the two
-    separate filtergraphs that never resolves.
-
-    Fix: merge ALL filters (video scale + audio resample + optional drawtext)
-    into a single -filter_complex. Remove -vf and -af entirely. Map the
-    named outputs [vout] and [aout] from the filter_complex.
+    Render a single scene (video + audio + text overlay)
+    Safe for Railway / Vercel deployment.
     """
-    # Build subtitle text from first 2 lines of scene text
-    subtitle_text = None
-    if subtitle_style != "none" and _HAS_DRAWTEXT and hasattr(scene, "text"):
-        words = scene.text.replace("\n", " ").split()
-        lines, current = [], []
-        for word in words:
-            current.append(word)
-            if len(current) >= 8:
-                lines.append(" ".join(current))
-                current = []
-        if current:
-            lines.append(" ".join(current))
-        subtitle_text = "\n".join(lines[:2])
 
-    fc = _build_filter_complex(subtitle_text, subtitle_style)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     cmd = [
-    "ffmpeg", "-y",
+        "ffmpeg",
 
-    "-fflags", "+genpts",
-    "-i", visual_path,
+        # 🔥 important fixes for cloud environments
+        "-y",                 # overwrite output
+        "-nostdin",          # prevent hanging waiting for input
+        "-hide_banner",
+        "-loglevel", "error",
 
-    "-fflags", "+genpts",
-    "-i", audio_path,
+        # input files
+        "-i", video_path,
+        "-i", audio_path,
 
-    "-filter_complex", fc,
+        # video filter (text overlay)
+        "-vf", (
+            f"drawtext=text='{text_overlay}':"
+            f"x=(w-text_w)/2:y=h*0.8:"
+            f"fontsize=48:fontcolor=white"
+            + (f":fontfile={font_path}" if font_path else "")
+        ),
 
-    "-map", "[vout]",
-    "-map", "[aout]",
+        # audio handling
+        "-c:a", "aac",
 
-    "-c:v", "libx264",
-    "-preset", "fast",
-    "-crf", "23",
-    "-pix_fmt", "yuv420p",
+        # video encoding
+        "-c:v", "libx264",
+        "-preset", "veryfast",
+        "-crf", "23",
 
-    "-c:a", "aac",
-    "-b:a", "128k",
-    "-ar", "44100",
-    "-ac", "2",
+        # 🔥 fix deprecated vsync issue
+        "-fps_mode", "cfr",
 
-    "-vsync", "2",
-    "-async", "1",
+        # 🔥 prevents hanging when audio is shorter than video
+        "-shortest",
 
-    "-shortest",
+        # ensure compatibility
+        "-pix_fmt", "yuv420p",
 
-    "-avoid_negative_ts", "make_zero",
-    "-movflags", "+faststart",
-
-    output_path,
-]
-
+        output_path
+    ]
 
     await run_ffmpeg(cmd)
+    
     logger.info("Rendered scene %s → %s", scene.id, Path(output_path).name)
     return output_path
 
