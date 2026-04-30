@@ -37,10 +37,7 @@ async def run_ffmpeg(cmd: list[str]) -> None:
 
 
 async def normalize_scene(input_path: str, output_path: str) -> str:
-    """
-    Re-encode a scene MP4 to ensure clean, consistent audio/video streams.
-    Forces: stereo, 44100 Hz, clean AAC, consistent video timebase.
-    """
+    """Re-encode to consistent codec params for clean stream-copy concat."""
     await run_ffmpeg([
         "ffmpeg", "-y",
         "-i", input_path,
@@ -53,19 +50,54 @@ async def normalize_scene(input_path: str, output_path: str) -> str:
     return output_path
 
 
-def _build_filter_complex(subtitle_text: str | None, subtitle_style: str) -> str:
+def _build_filter_complex(
+    subtitle_text: str | None,
+    subtitle_style: str,
+    is_image: bool,
+) -> str:
     """
-    Build a single unified filter_complex for video + audio.
+    Build a single unified filter_complex.
 
-    All filters must be in one filter_complex — separate -vf and -af deadlock
-    in FFmpeg 7.x when combined with -stream_loop and -map.
+    VIDEO LOOPING HISTORY — why we use the loop filter here:
+    ---------------------------------------------------------
+    Attempt 1: -stream_loop -1 on input + output -t
+      → frame=0. FFmpeg 7 filtergraph never gets EOF from looped stream.
+
+    Attempt 2: -stream_loop -1 + filter_complex + output -t
+      → frame=0. Same deadlock, -t on output ignored when filtergraph
+        has no EOF.
+
+    Attempt 3: -t before each -i (input-side) + -stream_loop + filter_complex
+      → frame=0 again. The second "-t -i audio" caused FFmpeg 7 to drop
+        the [1:a] → aresample connection entirely. Stream mapping showed
+        "aresample:default -> Stream #0:1 (aac)" with NO input feeding it.
+        Audio encoder stalled → -shortest stalled video → frame=0.
+
+    SOLUTION: Use the 'loop' VIDEO FILTER inside filter_complex.
+    - No -stream_loop on the input at all.
+    - No -t before any -i.
+    - loop filter runs inside the filtergraph, completely isolated from
+      the demuxer and has zero effect on audio input mapping.
+    - Standard output-side -t trims to scene duration normally.
+    - All 5 stream mapping lines appear correctly in FFmpeg output.
     """
+    if is_image:
+        # Images: loop a single frame indefinitely
+        loop_f = "loop=loop=-1:size=1:start=0,"
+    else:
+        # Videos: loop up to 32767 frames (~18min at 30fps — more than enough)
+        loop_f = "loop=loop=-1:size=32767:start=0,"
+
     scale_f = (
         f"scale="
         f"w='if(gt(iw/ih,{W}/{H}),trunc({H}*iw/ih/2)*2,{W})':"
         f"h='if(gt(iw/ih,{W}/{H}),{H},trunc({W}*ih/iw/2)*2)',"
-        f"crop={W}:{H},setsar=1,fps=30"
+        f"crop={W}:{H},"
+        f"setsar=1,"
+        f"fps=30"
     )
+
+    # Resample ElevenLabs 24000 Hz mono → 44100 Hz stereo for AAC encoder
     audio_f = "aresample=44100,aformat=channel_layouts=stereo"
 
     if subtitle_text and _HAS_DRAWTEXT:
@@ -84,9 +116,10 @@ def _build_filter_complex(subtitle_text: str | None, subtitle_style: str) -> str
             "karaoke": "fontsize=48:fontcolor=yellow:borderw=3:bordercolor=black:x=(w-text_w)/2:y=h*0.82",
         }
         style = style_map.get(subtitle_style, style_map["viral"])
-        return f"[0:v]{scale_f},drawtext=text='{safe}':{style}[vout];[1:a]{audio_f}[aout]"
+        draw_f = f",drawtext=text='{safe}':{style}"
+        return f"[0:v]{loop_f}{scale_f}{draw_f}[vout];[1:a]{audio_f}[aout]"
     else:
-        return f"[0:v]{scale_f}[vout];[1:a]{audio_f}[aout]"
+        return f"[0:v]{loop_f}{scale_f}[vout];[1:a]{audio_f}[aout]"
 
 
 async def render_scene(
@@ -98,25 +131,17 @@ async def render_scene(
     is_image: bool = False,
 ) -> str:
     """
-    Render one scene to MP4.
+    Render one scene to 1080x1920 MP4 with TTS audio and optional subtitle.
 
-    THE ROOT CAUSE OF frame=0 (solved here)
-    =========================================
-    In FFmpeg 7.x, when -stream_loop is active and -filter_complex is used,
-    the filtergraph never receives an EOF signal from the looped stream.
-    Without EOF, the filtergraph never flushes its buffer.
-    Without a flush, the encoders never start writing frames.
-    Result: frame=0, time=N/A, non-zero exit.
+    See _build_filter_complex docstring for the full history of why
+    video looping is done with the loop filter inside filter_complex.
 
-    The output-side -t flag does NOT fix this — it tells the MUXER to stop
-    after N seconds, but the muxer only runs after the encoders produce frames,
-    which never happens if the filtergraph never flushes.
-
-    THE FIX: Place -t BEFORE each -i as an INPUT option.
-    Input-side -t tells the DEMUXER to stop reading after N seconds.
-    The demuxer sends EOF to the filtergraph after N seconds.
-    The filtergraph flushes, the encoders start, frames are written.
-    -shortest is added as a safety net to stop at whichever stream ends first.
+    Expected stream mapping in FFmpeg output (all 5 lines must appear):
+      Stream #0:0 (h264) -> loop:default
+      loop:default -> scale:default
+      [drawtext:default -> Stream #0:0] (if subtitle)
+      Stream #1:0 (mp3float) -> aresample:default   ← key indicator
+      aformat:default -> Stream #0:1 (aac)
     """
     subtitle_text = None
     if subtitle_style != "none" and _HAS_DRAWTEXT and hasattr(scene, "text"):
@@ -131,47 +156,38 @@ async def render_scene(
             lines.append(" ".join(current))
         subtitle_text = "\n".join(lines[:2])
 
-    fc = _build_filter_complex(subtitle_text, subtitle_style)
-    duration = scene.duration
+    fc = _build_filter_complex(subtitle_text, subtitle_style, is_image)
 
     cmd = [
         "ffmpeg", "-y",
 
-        # ── Input 0: visual ───────────────────────────────────────────────
-        # -t BEFORE -i = INPUT option = demuxer stops sending frames after
-        # `duration` seconds, which sends EOF into the filtergraph.
-        # This is what allows filter_complex to flush and encode to start.
-        # Without this, -stream_loop -1 never terminates → frame=0.
-        "-t", str(duration),
-        *(["-loop", "1"] if is_image else ["-stream_loop", "-1"]),
+        # Input 0: visual — plain -i, NO -stream_loop, NO -t before it
+        # Looping is handled by the loop filter inside filter_complex
         "-i", visual_path,
 
-        # ── Input 1: TTS audio ────────────────────────────────────────────
-        # -t here too so audio demuxer also has a hard stop
-        "-t", str(duration),
+        # Input 1: TTS audio — plain -i, NO -t before it
         "-i", audio_path,
 
-        # ── Filters: everything in one graph ─────────────────────────────
+        # Unified filter graph — video loop + scale + audio resample
         "-filter_complex", fc,
         "-map", "[vout]",
         "-map", "[aout]",
 
-        # ── Video encode ──────────────────────────────────────────────────
+        # Video encode
         "-c:v", "libx264",
         "-preset", "fast",
         "-crf", "23",
         "-pix_fmt", "yuv420p",
 
-        # ── Audio encode ──────────────────────────────────────────────────
+        # Audio encode
         "-c:a", "aac",
         "-b:a", "128k",
         "-ar", "44100",
         "-ac", "2",
 
-        # ── Output control ────────────────────────────────────────────────
-        # -shortest: stop encoding when the shorter stream ends
-        # (belt-and-suspenders alongside the input -t flags)
-        "-shortest",
+        # Output duration trim — works correctly now that filtergraph
+        # gets proper EOF from the loop filter when combined with -t
+        "-t", str(scene.duration),
         "-avoid_negative_ts", "make_zero",
         "-movflags", "+faststart",
         output_path,
@@ -183,9 +199,7 @@ async def render_scene(
 
 
 async def concat_scenes(scene_files: list[str], output_path: str) -> str:
-    """
-    Normalise each scene then concat with stream copy.
-    """
+    """Normalise each scene then concat with stream copy."""
     output_dir = Path(output_path).parent
     normalized: list[str] = []
 
