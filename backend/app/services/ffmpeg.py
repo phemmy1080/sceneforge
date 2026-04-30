@@ -143,37 +143,38 @@ async def render_scene(
     fc = _build_filter_complex(subtitle_text, subtitle_style)
 
     cmd = [
-        "ffmpeg", "-y",
-        # Input 0: visual
-        # -loop 1 for images, -stream_loop -1 for videos
-        # IMPORTANT: loop flag must come BEFORE -i
-        *(["-loop", "1"] if is_image else ["-stream_loop", "-1"]),
-        "-i", visual_path,
-        # Input 1: TTS audio
-        "-i", audio_path,
-        # Single unified filtergraph — NO -vf or -af flags
-        "-filter_complex", fc,
-        # Map from filter outputs — not raw stream indices
-        "-map", "[vout]",
-        "-map", "[aout]",
-        # Video encode
-        "-c:v", "libx264",
-        "-preset", "fast",
-        "-crf", "23",
-        "-pix_fmt", "yuv420p",
-        # Audio encode — explicit params as belt-and-suspenders
-        "-c:a", "aac",
-        "-b:a", "128k",
-        "-ar", "44100",
-        "-ac", "2",
-        # Trim to exact scene duration
-        "-t", str(scene.duration),
-        # Timestamp hygiene
-        "-avoid_negative_ts", "make_zero",
-        # Optimise for streaming / fast open
-        "-movflags", "+faststart",
-        output_path,
-    ]
+    "ffmpeg", "-y",
+
+    # Input 0 (video)
+    "-i", visual_path,
+
+    # Input 1 (audio)
+    "-i", audio_path,
+
+    "-filter_complex", fc,
+
+    "-map", "[vout]",
+    "-map", "[aout]",
+
+    "-c:v", "libx264",
+    "-preset", "fast",
+    "-crf", "23",
+    "-pix_fmt", "yuv420p",
+
+    "-c:a", "aac",
+    "-b:a", "128k",
+    "-ar", "44100",
+    "-ac", "2",
+
+    "-vsync", "2",
+    "-shortest",
+
+    "-avoid_negative_ts", "make_zero",
+    "-movflags", "+faststart",
+
+    output_path,
+]
+
 
     await run_ffmpeg(cmd)
     logger.info("Rendered scene %s → %s", scene.id, Path(output_path).name)
