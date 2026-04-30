@@ -77,7 +77,8 @@ def _build_filter_complex(subtitle_text: str | None, subtitle_style: str) -> str
     )
 
     # Audio: resample ElevenLabs 24000 Hz mono → 44100 Hz stereo
-    audio_f = "aresample=44100,aformat=channel_layouts=stereo"
+   # audio_f = "aresample=44100,aformat=channel_layouts=stereo"
+    audio_f = "aresample=44100,aformat=channel_layouts=stereo,apad"
 
     if subtitle_text and _HAS_DRAWTEXT:
         # Escape characters that break FFmpeg drawtext parsing
@@ -145,17 +146,16 @@ async def render_scene(
     cmd = [
     "ffmpeg", "-y",
 
-    *(["-loop", "1"] if is_image else []),  #
-
+    "-fflags", "+genpts",
     "-i", visual_path,
+
+    "-fflags", "+genpts",
     "-i", audio_path,
 
     "-filter_complex", fc,
 
     "-map", "[vout]",
     "-map", "[aout]",
-
-    "-r", "30",
 
     "-c:v", "libx264",
     "-preset", "fast",
@@ -167,8 +167,12 @@ async def render_scene(
     "-ar", "44100",
     "-ac", "2",
 
+    "-vsync", "2",
+    "-async", "1",
+
     "-shortest",
 
+    "-avoid_negative_ts", "make_zero",
     "-movflags", "+faststart",
 
     output_path,
