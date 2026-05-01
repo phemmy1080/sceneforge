@@ -38,7 +38,8 @@ async def signup(req: SignupWithCouponRequest, redis=Depends(get_redis)):
         # Send verification OTP
         try:
             from app.services.email import send_verification_otp
-            otp = await auth_service.create_verification_otp(redis, user.id)
+            otp = auth_service.generate_otp()
+            await auth_service.store_otp(redis, user.email, otp)
             asyncio.create_task(send_verification_otp(user.email, user.full_name, otp))
             logger.info("Verification OTP sent to %s", user.email)
         except Exception as email_err:
