@@ -5,12 +5,13 @@ import type React from 'react'
 
 interface LoginProps {
   onForgot?: () => void
+  onVerify?: (email: string) => void
   onSuccess: () => void
   onSignup: () => void
   onLanding: () => void
 }
 
-export default function Login({ onSuccess, onSignup, onLanding, onForgot }: LoginProps) {
+export default function Login({ onSuccess, onSignup, onLanding, onForgot, onVerify }: LoginProps) {
   const setAuth = useAuthStore((s) => s.setAuth)
 
   const [email, setEmail] = useState('')
@@ -28,7 +29,15 @@ export default function Login({ onSuccess, onSignup, onLanding, onForgot }: Logi
       setAuth(res.user, res.access_token)
       onSuccess()
     } catch (err: any) {
-      setError(err.response?.data?.detail ?? 'Login failed. Please check your credentials.')
+      const status = err.response?.status
+      const detail = err.response?.data?.detail ?? 'Login failed. Please check your credentials.'
+      if (status === 403 && detail.includes('verify')) {
+        // Redirect to verify screen — store email so they can resend OTP
+        sessionStorage.setItem('verify_email', email)
+        onVerify?.(email)
+        return
+      }
+      setError(detail)
     } finally {
       setLoading(false)
     }
