@@ -51,9 +51,17 @@ logger.info("FFmpeg drawtext available: %s (font: %s)", _HAS_DRAWTEXT, _FONT_PAT
 
 
 def _run(cmd: list[str]) -> None:
+    logger.info("FFmpeg CMD: %s", " ".join(cmd))
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout = result.stdout.decode(errors="replace")
+    stderr = result.stderr.decode(errors="replace")
+    logger.debug("FFmpeg stdout: %s", stdout[-2000:] if stdout else "(empty)")
+    logger.debug("FFmpeg stderr: %s", stderr[-2000:] if stderr else "(empty)")
     if result.returncode != 0:
-        raise RuntimeError(f"FFmpeg failed:\n{result.stderr.decode()}")
+        # Log the full error at ERROR level so it's visible in Railway
+        logger.error("FFmpeg FAILED (code %d):\nCMD: %s\nSTDERR: %s", 
+                     result.returncode, " ".join(cmd), stderr[-3000:])
+        raise RuntimeError(f"FFmpeg failed (code {result.returncode}):\n{stderr[-2000:]}")
 
 
 async def run_ffmpeg(cmd: list[str]) -> None:
@@ -144,12 +152,13 @@ async def render_scene(
         "-ar", "44100",   # standard sample rate
         "-ac", "2",       # stereo
         "-b:a", "128k",
-        "-t", str(max(float(scene.duration or 10), 3.0)),
+        "-t", str(max(float(scene.duration or 10), 3.0)),  # duration logged below
         "-pix_fmt", "yuv420p",
         "-avoid_negative_ts", "make_zero",
         output_path,
     ]
 
+    logger.info("Scene %s duration=%s visual=%s audio=%s", scene.id, scene.duration, visual_path, audio_path)
     await run_ffmpeg(cmd)
     logger.info("Rendered scene %s → %s", scene.id, Path(output_path).name)
     return output_path
