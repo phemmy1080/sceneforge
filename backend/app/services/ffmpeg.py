@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 W, H = 1080, 1920
 
 
+# -------------------------------------------------
+# FFmpeg capability check
+# -------------------------------------------------
 def _ffmpeg_has_filter(name: str) -> bool:
     try:
         r = subprocess.run(["ffmpeg", "-filters"], capture_output=True, text=True)
@@ -25,7 +28,11 @@ _HAS_DRAWTEXT = _ffmpeg_has_filter("drawtext")
 logger.info("FFmpeg drawtext available: %s", _HAS_DRAWTEXT)
 
 
+# -------------------------------------------------
+# Runner
+# -------------------------------------------------
 def _run(cmd: list[str]) -> None:
+    logger.debug("FFmpeg CMD: %s", " ".join(cmd))
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if result.returncode != 0:
         raise RuntimeError(f"FFmpeg failed:\n{result.stderr.decode(errors='replace')}")
@@ -36,8 +43,10 @@ async def run_ffmpeg(cmd: list[str]) -> None:
     await loop.run_in_executor(None, _run, cmd)
 
 
+# -------------------------------------------------
+# Normalize scenes before concat
+# -------------------------------------------------
 async def normalize_scene(input_path: str, output_path: str) -> str:
-    """Re-encode to consistent codec params for clean stream-copy concat."""
     await run_ffmpeg([
         "ffmpeg", "-y",
         "-i", input_path,
@@ -50,31 +59,27 @@ async def normalize_scene(input_path: str, output_path: str) -> str:
     return output_path
 
 
+# -------------------------------------------------
+# Filter builder (tpad-based)
+# -------------------------------------------------
 def _build_filter_complex(
     subtitle_text: str | None,
     subtitle_style: str,
-    is_image: bool,
 ) -> str:
 
-    # ALWAYS apply loop — no exceptions
-    if is_image:
-        loop_f = "loop=loop=-1:size=1:start=0,"
-    else:
-        loop_f = "loop=loop=-1:size=32767:start=0,"
-
-    scale_f = (
-        f"{loop_f}"
+    scale_chain = (
         f"scale="
         f"w='if(gt(iw/ih,{W}/{H}),trunc({H}*iw/ih/2)*2,{W})':"
         f"h='if(gt(iw/ih,{W}/{H}),{H},trunc({W}*ih/iw/2)*2)',"
         f"crop={W}:{H},"
         f"setsar=1,"
-        f"fps=30"
+        f"fps=30,"
+        # 🔥 tpad replaces ALL looping logic
+        f"tpad=stop_mode=clone:stop_duration=1000"
     )
 
-    audio_f = "aresample=44100,aformat=channel_layouts=stereo"
+    audio_chain = "aresample=44100,aformat=channel_layouts=stereo"
 
-    # ALWAYS produce BOTH outputs explicitly
     if subtitle_text and _HAS_DRAWTEXT:
         safe = (
             subtitle_text
@@ -86,22 +91,25 @@ def _build_filter_complex(
             .replace("]", "\\]")
         )
 
-        style = {
+        style_map = {
             "viral":   "fontsize=52:fontcolor=white:borderw=4:bordercolor=black:x=(w-text_w)/2:y=h*0.80",
             "minimal": "fontsize=40:fontcolor=white:borderw=1:bordercolor=black@0.4:x=(w-text_w)/2:y=h*0.85",
             "karaoke": "fontsize=48:fontcolor=yellow:borderw=3:bordercolor=black:x=(w-text_w)/2:y=h*0.82",
-        }.get(subtitle_style, "fontsize=52:fontcolor=white:borderw=4:bordercolor=black:x=(w-text_w)/2:y=h*0.80")
+        }
+
+        style = style_map.get(subtitle_style, style_map["viral"])
 
         return (
-            f"[0:v]{scale_f},drawtext=text='{safe}':{style}[vout];"
-            f"[1:a]{audio_f}[aout]"
+            f"[0:v]{scale_chain},drawtext=text='{safe}':{style}[vout];"
+            f"[1:a]{audio_chain}[aout]"
         )
 
-    return (
-        f"[0:v]{scale_f}[vout];"
-        f"[1:a]{audio_f}[aout]"
-    )
+    return f"[0:v]{scale_chain}[vout];[1:a]{audio_chain}[aout]"
 
+
+# -------------------------------------------------
+# Scene renderer
+# -------------------------------------------------
 async def render_scene(
     scene: Scene,
     visual_path: str,
@@ -111,6 +119,9 @@ async def render_scene(
     is_image: bool = False,
 ) -> str:
 
+    # -----------------------------
+    # Subtitle preparation
+    # -----------------------------
     subtitle_text = None
     if subtitle_style != "none" and _HAS_DRAWTEXT and hasattr(scene, "text"):
         words = scene.text.replace("\n", " ").split()
@@ -124,82 +135,81 @@ async def render_scene(
             lines.append(" ".join(current))
         subtitle_text = "\n".join(lines[:2])
 
-    # ✅ NO LOOP FILTER
-    scale_f = (
-        f"scale="
-        f"w='if(gt(iw/ih,{W}/{H}),trunc({H}*iw/ih/2)*2,{W})':"
-        f"h='if(gt(iw/ih,{W}/{H}),{H},trunc({W}*ih/iw/2)*2)',"
-        f"crop={W}:{H},setsar=1,fps=30"
-    )
+    # -----------------------------
+    # Build filter safely
+    # -----------------------------
+    fc = None
 
-    audio_f = "aresample=44100,aformat=channel_layouts=stereo"
-
-    draw_f = ""
-    if subtitle_text and _HAS_DRAWTEXT:
-        safe = (
-            subtitle_text
-            .replace("\\", "\\\\")
-            .replace("'", "\u2019")
-            .replace(":", "\\:")
-            .replace("%", "\\%")
-            .replace("[", "\\[")
-            .replace("]", "\\]")
+    if is_image:
+        fc = (
+            f"[0:v]scale="
+            f"w='if(gt(iw/ih,{W}/{H}),trunc({H}*iw/ih/2)*2,{W})':"
+            f"h='if(gt(iw/ih,{W}/{H}),{H},trunc({W}*ih/iw/2)*2)',"
+            f"crop={W}:{H},setsar=1,fps=30"
         )
 
-        draw_f = (
-            f",drawtext=text='{safe}':"
-            "fontsize=52:fontcolor=white:borderw=4:bordercolor=black:"
-            "x=(w-text_w)/2:y=h*0.80"
-        )
+        if subtitle_text and _HAS_DRAWTEXT:
+            safe = (
+                subtitle_text
+                .replace("\\", "\\\\")
+                .replace("'", "\u2019")
+                .replace(":", "\\:")
+                .replace("%", "\\%")
+                .replace("[", "\\[")
+                .replace("]", "\\]")
+            )
 
-    filter_complex = (
-        f"[0:v]{scale_f}{draw_f}[vout];"
-        f"[1:a]{audio_f}[aout]"
-    )
+            fc += f",drawtext=text='{safe}':fontsize=52:fontcolor=white:borderw=4:bordercolor=black:x=(w-text_w)/2:y=h*0.80"
 
+        fc += "[vout];[1:a]aresample=44100,aformat=channel_layouts=stereo[aout]"
+
+        video_input_flags = ["-loop", "1", "-i", visual_path]
+
+    else:
+        fc = _build_filter_complex(subtitle_text, subtitle_style)
+        video_input_flags = ["-i", visual_path]
+
+    if not fc:
+        raise RuntimeError("Failed to build filter_complex")
+
+    # -----------------------------
+    # FFmpeg command
+    # -----------------------------
     cmd = [
-    "ffmpeg", "-y",
-    "-i", visual_path,
-    "-i", audio_path,
-
-    "-filter_complex", fc,
-    "-map", "[vout]",
-    "-map", "[aout]",
-
-    "-c:v", "libx264",
-    "-preset", "fast",
-    "-crf", "23",
-    "-pix_fmt", "yuv420p",
-
-    "-c:a", "aac",
-    "-b:a", "128k",
-    "-ar", "44100",
-    "-ac", "2",
-
-    "-t", str(scene.duration),
-    "-shortest",  # 🔥 ADD THIS
-
-    "-movflags", "+faststart",
-    output_path,
-]
+        "ffmpeg", "-y",
+        *video_input_flags,
+        "-i", audio_path,
+        "-filter_complex", fc,
+        "-map", "[vout]",
+        "-map", "[aout]",
+        "-c:v", "libx264", "-preset", "fast", "-crf", "23", "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+        "-t", str(scene.duration),
+        "-avoid_negative_ts", "make_zero",
+        "-movflags", "+faststart",
+        output_path,
+    ]
 
     await run_ffmpeg(cmd)
     logger.info("Rendered scene %s → %s", scene.id, Path(output_path).name)
 
     return output_path
 
+
+# -------------------------------------------------
+# Concatenation
+# -------------------------------------------------
 async def concat_scenes(scene_files: list[str], output_path: str) -> str:
-    """Normalise each scene then concat with stream copy."""
     output_dir = Path(output_path).parent
-    normalized: list[str] = []
+    normalized = []
 
     for i, sf in enumerate(scene_files):
         norm_path = str(output_dir / f"norm_{i+1:02d}.mp4")
-        logger.info("Normalising scene %d/%d…", i + 1, len(scene_files))
         await normalize_scene(sf, norm_path)
         normalized.append(norm_path)
 
     concat_list = str(output_dir / "concat_list.txt")
+
     with open(concat_list, "w") as f:
         for nf in normalized:
             f.write(f"file '{os.path.abspath(nf)}'\n")
@@ -213,26 +223,19 @@ async def concat_scenes(scene_files: list[str], output_path: str) -> str:
         output_path,
     ])
 
-    for nf in normalized:
-        try:
-            Path(nf).unlink()
-        except Exception:
-            pass
-    try:
-        Path(concat_list).unlink()
-    except Exception:
-        pass
-
-    logger.info("Concatenated %d scenes → %s", len(scene_files), Path(output_path).name)
     return output_path
 
 
+# -------------------------------------------------
+# Background music
+# -------------------------------------------------
 async def add_background_music(
     video_path: str,
     music_path: str,
     output_path: str,
     music_volume: float = 0.15,
 ) -> str:
+
     await run_ffmpeg([
         "ffmpeg", "-y",
         "-i", video_path,
@@ -249,9 +252,13 @@ async def add_background_music(
         "-shortest",
         output_path,
     ])
+
     return output_path
 
 
+# -------------------------------------------------
+# Full pipeline
+# -------------------------------------------------
 async def render_full_pipeline(
     scenes: list[Scene],
     audio_files: list[str],
@@ -261,11 +268,13 @@ async def render_full_pipeline(
     music_path: str = None,
     on_progress=None,
 ) -> dict:
+
     scene_outputs = []
 
     for i, (scene, audio, visual) in enumerate(zip(scenes, audio_files, visual_files)):
         scene_out = str(Path(output_dir) / f"scene_{i+1:02d}.mp4")
-        is_image = getattr(visual, "media_type", "video") == "image"
+
+        is_image = str(getattr(visual, "media_type", "video")).lower() == "image"
 
         await render_scene(
             scene=scene,
@@ -275,21 +284,14 @@ async def render_full_pipeline(
             subtitle_style=subtitle_style,
             is_image=is_image,
         )
+
         scene_outputs.append(scene_out)
 
-        if on_progress:
-            pct = int(55 + (i / len(scenes)) * 25)
-            await on_progress(f"Rendered scene {i+1}/{len(scenes)}", pct)
-
-    if on_progress:
-        await on_progress("Normalising and concatenating scenes...", 82)
-
     final_path = str(Path(output_dir) / "final_video.mp4")
+
     await concat_scenes(scene_outputs, final_path)
 
     if music_path and music_path != "none":
-        if on_progress:
-            await on_progress("Mixing background music...", 95)
         mixed_path = str(Path(output_dir) / "final_video_music.mp4")
         await add_background_music(final_path, music_path, mixed_path)
         final_path = mixed_path
