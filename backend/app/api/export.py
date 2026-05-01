@@ -10,9 +10,8 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
 
 from app.config import get_settings
-from app.dependencies import get_redis
-from fastapi import Depends
 import os
+import httpx
 
 settings = get_settings()
 router = APIRouter()
@@ -28,12 +27,26 @@ def _job_dir(job_id: str) -> Path:
     return p
 
 
-def _worker_redirect(job_id: str, path: str):
-    """If WORKER_BASE_URL is set, redirect file downloads to the worker service."""
-    if WORKER_BASE_URL:
-        from fastapi.responses import RedirectResponse
-        return RedirectResponse(url=f"{WORKER_BASE_URL}/renders/{job_id}/{path}")
+async def _proxy_from_worker(job_id: str, path: str, filename: str, media_type: str):
+    """Proxy file download from worker service if WORKER_BASE_URL is set."""
+    if not WORKER_BASE_URL:
+        return None
+    url = f"{WORKER_BASE_URL}/renders/{job_id}/{path}"
+    try:
+        async with httpx.AsyncClient(timeout=120) as client:
+            resp = await client.get(url)
+            if resp.status_code == 200:
+                from fastapi.responses import Response
+                return Response(
+                    content=resp.content,
+                    media_type=media_type,
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+                )
+    except Exception as e:
+        logger.warning("Worker proxy failed for %s/%s: %s", job_id, path, e)
     return None
+
+logger = __import__("logging").getLogger(__name__)
 
 
 def _safe_filename(title: str, suffix: str) -> str:
@@ -148,22 +161,44 @@ async def export_voice(
 ):
     """
     Extract and download the voiceover audio track from the final rendered video.
-    Uses FFmpeg to strip the audio — no re-encoding quality loss for MP3.
     """
     import subprocess, tempfile, os
+    from pathlib import Path as _Path
 
-    job_dir = _job_dir(job_id)
-
-    # Find the final video
-    video_path = None
-    for name in ("final_video_music.mp4", "final_video.mp4"):
-        p = job_dir / name
-        if p.exists():
-            video_path = str(p)
-            break
-
-    if not video_path:
-        raise HTTPException(status_code=404, detail="Video not rendered yet")
+    # If worker is configured, download video from worker first
+    if WORKER_BASE_URL:
+        import tempfile as _tmp
+        tmp_dir = _Path(settings.renders_dir) / job_id
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+        video_path = None
+        for name in ("final_video_music.mp4", "final_video.mp4"):
+            local = tmp_dir / name
+            if local.exists():
+                video_path = str(local)
+                break
+            # Try downloading from worker
+            try:
+                async with httpx.AsyncClient(timeout=120) as client:
+                    resp = await client.get(f"{WORKER_BASE_URL}/renders/{job_id}/{name}")
+                    if resp.status_code == 200:
+                        local.write_bytes(resp.content)
+                        video_path = str(local)
+                        break
+            except Exception:
+                pass
+        if not video_path:
+            raise HTTPException(status_code=404, detail="Video not rendered yet")
+        job_dir = tmp_dir
+    else:
+        job_dir = _job_dir(job_id)
+        video_path = None
+        for name in ("final_video_music.mp4", "final_video.mp4"):
+            p = job_dir / name
+            if p.exists():
+                video_path = str(p)
+                break
+        if not video_path:
+            raise HTTPException(status_code=404, detail="Video not rendered yet")
 
     fmt = "wav" if format == "wav" else "mp3"
     suffix = f"_voiceover.{fmt}"
