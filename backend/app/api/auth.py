@@ -164,8 +164,6 @@ async def verify_email(
         raise HTTPException(status_code=401, detail="Invalid token")
 
     # Get user email
-    
-
     raw = await redis.get(f"user:{user_id}")
     if not raw:
         raise HTTPException(status_code=404, detail="User not found")
@@ -192,8 +190,6 @@ async def resend_otp(
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    import asyncio
-import json
     raw = await redis.get(f"user:{user_id}")
     if not raw:
         raise HTTPException(status_code=404, detail="User not found")
