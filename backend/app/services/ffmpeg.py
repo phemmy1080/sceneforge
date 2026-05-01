@@ -130,76 +130,90 @@ async def render_scene(
     if subtitle_style != "none" and _HAS_DRAWTEXT and hasattr(scene, "text"):
         words = scene.text.replace("\n", " ").split()
         lines, current = [], []
+
         for word in words:
             current.append(word)
             if len(current) >= 8:
                 lines.append(" ".join(current))
                 current = []
+
         if current:
             lines.append(" ".join(current))
+
         subtitle_text = "\n".join(lines[:2])
 
     # -----------------------------
-    # Build filter safely
+    # Safe subtitle text
     # -----------------------------
-    fc = None
-
-    if is_image:
-        fc = (
-            f"[0:v]scale="
-            f"w='if(gt(iw/ih,{W}/{H}),trunc({H}*iw/ih/2)*2,{W})':"
-            f"h='if(gt(iw/ih,{W}/{H}),{H},trunc({W}*ih/iw/2)*2)',"
-            f"crop={W}:{H},setsar=1,fps=30"
+    safe = ""
+    if subtitle_text:
+        safe = (
+            subtitle_text
+            .replace("\\", "\\\\")
+            .replace("'", "\u2019")
+            .replace(":", "\\:")
+            .replace("%", "\\%")
+            .replace("[", "\\[")
+            .replace("]", "\\]")
         )
 
-        if subtitle_text and _HAS_DRAWTEXT:
-            safe = (
-                subtitle_text
-                .replace("\\", "\\\\")
-                .replace("'", "\u2019")
-                .replace(":", "\\:")
-                .replace("%", "\\%")
-                .replace("[", "\\[")
-                .replace("]", "\\]")
-            )
+    # -----------------------------
+    # Subtitle style
+    # -----------------------------
+    style_map = {
+        "viral":   "fontsize=52:fontcolor=white:borderw=4:bordercolor=black:x=(w-text_w)/2:y=h*0.80",
+        "minimal": "fontsize=40:fontcolor=white:borderw=1:bordercolor=black@0.4:x=(w-text_w)/2:y=h*0.85",
+        "karaoke": "fontsize=48:fontcolor=yellow:borderw=3:bordercolor=black:x=(w-text_w)/2:y=h*0.82",
+    }
 
-            fc += f",drawtext=text='{safe}':fontsize=52:fontcolor=white:borderw=4:bordercolor=black:x=(w-text_w)/2:y=h*0.80"
-
-        fc += "[vout];[1:a]aresample=44100,aformat=channel_layouts=stereo[aout]"
-
-        video_input_flags = ["-loop", "1", "-i", visual_path]
-
-    else:
-        #fc = _build_filter_complex(subtitle_text, subtitle_style)
-        fc = _build_filter_complex(subtitle_text, subtitle_style, scene.duration)
-        video_input_flags = ["-i", visual_path]
-
-    if not fc:
-        raise RuntimeError("Failed to build filter_complex")
+    style = style_map.get(subtitle_style, style_map["viral"])
 
     # -----------------------------
-    # FFmpeg command
+    # Filter (NO TPAD!)
+    # -----------------------------
+    fc = (
+        f"[0:v]scale="
+        f"w='if(gt(iw/ih,{W}/{H}),trunc({H}*iw/ih/2)*2,{W})':"
+        f"h='if(gt(iw/ih,{W}/{H}),{H},trunc({W}*ih/iw/2)*2)',"
+        f"crop={W}:{H},setsar=1,fps=30"
+    )
+
+    if subtitle_text and _HAS_DRAWTEXT:
+        fc += f",drawtext=text='{safe}':{style}"
+
+    fc += "[vout];[1:a]aresample=44100,aformat=channel_layouts=stereo[aout]"
+
+    # -----------------------------
+    # Input strategy (KEY PART)
+    # -----------------------------
+    if is_image:
+        video_flags = ["-loop", "1", "-i", visual_path]
+    else:
+        video_flags = ["-stream_loop", "-1", "-i", visual_path]
+
+    # -----------------------------
+    # FFmpeg command (CLEAN)
     # -----------------------------
     cmd = [
-    "ffmpeg", "-y",
-    *video_input_flags,
-    "-i", audio_path,
-    "-filter_complex", fc,
-    "-map", "[vout]",
-    "-map", "[aout]",
-    "-c:v", "libx264",
-    "-preset", "fast",
-    "-crf", "23",
-    "-pix_fmt", "yuv420p",
-    "-c:a", "aac",
-    "-b:a", "128k",
-    "-ar", "44100",
-    "-ac", "2",
-    "-t", str(scene.duration), 
-    "-avoid_negative_ts", "make_zero",
-    "-movflags", "+faststart",
-    output_path,
-]
+        "ffmpeg", "-y",
+        *video_flags,
+        "-i", audio_path,
+        "-filter_complex", fc,
+        "-map", "[vout]",
+        "-map", "[aout]",
+        "-c:v", "libx264",
+        "-preset", "fast",
+        "-crf", "23",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-b:a", "128k",
+        "-ar", "44100",
+        "-ac", "2",
+        "-shortest",  # 🔥 CRITICAL
+        "-movflags", "+faststart",
+        output_path,
+    ]
+
     await run_ffmpeg(cmd)
     logger.info("Rendered scene %s → %s", scene.id, Path(output_path).name)
 
