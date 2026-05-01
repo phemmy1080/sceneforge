@@ -46,7 +46,7 @@ def _find_font() -> str | None:
 _HAS_DRAWTEXT = _ffmpeg_has_filter("drawtext")
 _FONT_PATH = _find_font()
 # Only use drawtext if we have both the filter AND a font file
-_HAS_DRAWTEXT = _HAS_DRAWTEXT and _FONT_PATH is not None
+_HAS_DRAWTEXT = False  # Disabled to reduce memory usage on Railway free tier
 logger.info("FFmpeg drawtext available: %s (font: %s)", _HAS_DRAWTEXT, _FONT_PATH)
 
 
@@ -80,14 +80,15 @@ async def normalize_scene(input_path: str, output_path: str) -> str:
         "-i", input_path,
         # Force clean audio decode + re-encode
         "-c:v", "libx264",
-        "-preset", "fast",
-        "-crf", "23",
+        "-preset", "ultrafast",
+        "-crf", "28",
+        "-threads", "2",
         "-pix_fmt", "yuv420p",
         # Force clean stereo AAC at standard sample rate
         "-c:a", "aac",
         "-ar", "44100",
         "-ac", "2",
-        "-b:a", "128k",
+        "-b:a", "96k",
         # Fix timestamps
         "-avoid_negative_ts", "make_zero",
         "-fflags", "+genpts",
@@ -146,12 +147,13 @@ async def render_scene(
         "-map", "1:a:0",
         "-vf", vf,
         "-c:v", "libx264",
-        "-preset", "fast",
-        "-crf", "23",
+        "-preset", "ultrafast",
+        "-crf", "28",
+        "-threads", "2",
         "-c:a", "aac",
         "-ar", "44100",   # standard sample rate
         "-ac", "2",       # stereo
-        "-b:a", "128k",
+        "-b:a", "96k",
         "-t", str(max(float(scene.duration or 10), 3.0)),  # duration logged below
         "-pix_fmt", "yuv420p",
         "-avoid_negative_ts", "make_zero",
