@@ -80,7 +80,7 @@ function Root() {
   function handleLogout() { logout(); setScreen('landing') }
 
   if (screen === 'landing') return <Landing onLogin={() => setScreen('login')} onSignup={() => setScreen('signup')} />
-  if (screen === 'login')   return <Login onSuccess={() => setScreen('app')} onSignup={() => setScreen('signup')} onLanding={() => setScreen('landing')} onForgot={() => setScreen('forgot')} />
+  if (screen === 'login')   return <Login onSuccess={() => setScreen('app')} onSignup={() => setScreen('signup')} onLanding={() => setScreen('landing')} onForgot={() => setScreen('forgot')} onVerify={(email) => { setPendingEmail(email); setScreen('verify') }} />
   if (screen === 'verify')  return <VerifyEmail email={pendingEmail} onVerified={() => setScreen('app')} />
   if (screen === 'forgot')  return <ForgotPassword onBack={() => setScreen('login')} />
   if (screen === 'signup')  return <Signup onSuccess={(email?: string) => { if (email) { setPendingEmail(email); setScreen('verify') } else { setScreen('app') } }} onLogin={() => setScreen('login')} />
