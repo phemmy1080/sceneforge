@@ -10,9 +10,15 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
 
 from app.config import get_settings
+from app.dependencies import get_redis
+from fastapi import Depends
+import os
 
 settings = get_settings()
 router = APIRouter()
+
+# Worker base URL — set this env var to your worker's Railway domain
+WORKER_BASE_URL = os.environ.get("WORKER_BASE_URL", "")
 
 
 def _job_dir(job_id: str) -> Path:
@@ -20,6 +26,14 @@ def _job_dir(job_id: str) -> Path:
     if not p.exists():
         raise HTTPException(status_code=404, detail="Render job not found")
     return p
+
+
+def _worker_redirect(job_id: str, path: str):
+    """If WORKER_BASE_URL is set, redirect file downloads to the worker service."""
+    if WORKER_BASE_URL:
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url=f"{WORKER_BASE_URL}/renders/{job_id}/{path}")
+    return None
 
 
 def _safe_filename(title: str, suffix: str) -> str:
@@ -39,6 +53,12 @@ async def export_full_video(
     title: str = Query(default="", description="Project title for the filename"),
 ):
     """Download the final stitched MP4 with a meaningful filename."""
+    # Try redirect to worker first if configured
+    for name in ("final_video_music.mp4", "final_video.mp4"):
+        redirect = _worker_redirect(job_id, name)
+        if redirect:
+            return redirect
+
     job_dir = _job_dir(job_id)
     filename = _safe_filename(title, ".mp4") if title else "sceneforge_video.mp4"
 
