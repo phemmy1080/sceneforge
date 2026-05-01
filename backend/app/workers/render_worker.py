@@ -5,6 +5,7 @@ ARQ background worker.
 Run with:  python -m arq app.workers.render_worker.WorkerSettings
 """
 import json
+import os
 import logging
 from pathlib import Path
 
@@ -176,7 +177,7 @@ async def render_video(ctx: dict, job_id: str, request_data: dict):
             "stage": "Done",
             "pct": 100,
             "job_id": job_id,
-            "video_url": video_url or f"/renders/{job_id}/final_video.mp4",
+            "video_url": video_url or f"{os.environ.get('WORKER_BASE_URL', '')}/renders/{job_id}/final_video.mp4",
             "scene_count": len(req.scenes),
             "total_duration": sum(s.duration for s in req.scenes),
             "tokens_remaining": tokens_remaining,
