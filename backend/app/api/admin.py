@@ -404,7 +404,7 @@ async def revenue_chart(redis=Depends(get_redis), _=Depends(_require_admin)):
 @router.post("/broadcast")
 async def broadcast_email(req: BroadcastRequest, redis=Depends(get_redis), _=Depends(_require_admin)):
     """Send an email to all registered users."""
-    from app.services.email import send_token_confirmation
+    from app.services.email import _send
     import asyncio
 
     users = await _all_users(redis)
@@ -413,7 +413,7 @@ async def broadcast_email(req: BroadcastRequest, redis=Depends(get_redis), _=Dep
     if not emails:
         raise HTTPException(status_code=404, detail="No active users found")
 
-    # Store broadcast record
+    # Store broadcast record (import already at top of function)
     rec = {
         "id": uuid.uuid4().hex[:8],
         "subject": req.subject,
@@ -424,13 +424,8 @@ async def broadcast_email(req: BroadcastRequest, redis=Depends(get_redis), _=Dep
     await redis.lpush(BROADCAST_KEY, json.dumps(rec))
     await redis.ltrim(BROADCAST_KEY, 0, 49)  # keep last 50
 
-    # Send emails asynchronously (fire and forget with basic batching)
-    from app.services.email import _send
-    import asyncio
-
     sent = 0
     errors = 0
-    loop = asyncio.get_event_loop()
 
     html = f"""
 <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#111118;color:#F0F0FF;border-radius:12px">
@@ -445,9 +440,10 @@ async def broadcast_email(req: BroadcastRequest, redis=Depends(get_redis), _=Dep
 
     for email in emails:
         try:
-            await loop.run_in_executor(None, _send, email, req.subject, html, req.message)
+            await _send(email, req.subject, html, req.message)
             sent += 1
-        except Exception:
+        except Exception as e:
+            logger.error("Broadcast failed for %s: %s", email, e)
             errors += 1
 
     await _log_action(redis, "broadcast", subject=req.subject, sent=sent, errors=errors, reason="Admin broadcast")
@@ -754,67 +750,6 @@ async def export_users_csv(
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=sceneforge_users.csv"},
     )
-
-
-# ─── Email broadcast ──────────────────────────────────────────────────────────
-
-class BroadcastRequest(BaseModel):
-    subject: str
-    message: str
-
-
-@router.post("/broadcast")
-async def broadcast_email(
-    req: BroadcastRequest,
-    redis=Depends(get_redis),
-    _=Depends(_require_admin),
-):
-    """Send an email to all users. Runs synchronously — use for small user bases."""
-    import asyncio
-    from app.config import get_settings as _gs
-    _settings = _gs()
-
-    users = await _all_users(redis)
-    sent = 0
-    failed = 0
-
-    for user in users:
-        email = user.get("email")
-        name  = user.get("full_name", "Creator")
-        if not email:
-            continue
-        try:
-            html = f"""<div style="font-family:sans-serif;max-width:580px;margin:0 auto;background:#111118;color:#F0F0FF;padding:32px;border-radius:12px">
-              <h1 style="font-size:22px;font-weight:800;margin:0 0 6px">Scene<span style="color:#A78BFA">Forge</span></h1>
-              <p style="color:rgba(255,255,255,0.5);font-size:13px;margin:0 0 24px">News from the team</p>
-              <p style="font-size:14px;margin-bottom:16px">Hi {name},</p>
-              <div style="font-size:14px;line-height:1.7;color:rgba(255,255,255,0.8)">{req.message.replace(chr(10), '<br>')}</div>
-              <p style="margin-top:28px;font-size:12px;color:rgba(255,255,255,0.3)">— The SceneForge Team</p>
-            </div>"""
-            import smtplib
-            from email.mime.multipart import MIMEMultipart
-            from email.mime.text import MIMEText
-            msg = MIMEMultipart("alternative")
-            msg["Subject"] = req.subject
-            msg["From"] = f"SceneForge <{_settings.smtp_user}>"
-            msg["To"] = email
-            msg.attach(MIMEText(req.message, "plain"))
-            msg.attach(MIMEText(html, "html"))
-            def _send():
-                with smtplib.SMTP(_settings.smtp_host, _settings.smtp_port) as s:
-                    s.ehlo(); s.starttls()
-                    s.login(_settings.smtp_user, _settings.smtp_password)
-                    s.sendmail(_settings.smtp_user, email, msg.as_string())
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, _send)
-            sent += 1
-        except Exception as e:
-            logger.error("Broadcast failed for %s: %s", email, e)
-            failed += 1
-
-    return {"sent": sent, "failed": failed, "total": len(users)}
-
-
 # ─── Coupons ──────────────────────────────────────────────────────────────────
 
 class CreateCouponRequest(BaseModel):
