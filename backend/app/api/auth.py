@@ -34,6 +34,16 @@ async def signup(req: SignupWithCouponRequest, redis=Depends(get_redis)):
                             user.id, req.coupon_code, coupon["tokens"])
             except ValueError as ce:
                 logger.warning("Invalid coupon at signup | code=%s | %s", req.coupon_code, ce)
+
+        # Send verification OTP
+        try:
+            from app.services.email import send_verification_otp
+            otp = await auth_service.create_verification_otp(redis, user.id)
+            asyncio.create_task(send_verification_otp(user.email, user.full_name, otp))
+            logger.info("Verification OTP sent to %s", user.email)
+        except Exception as email_err:
+            logger.error("Failed to send verification OTP at signup: %s", email_err)
+
         token = auth_service.issue_token(user.id)
         return TokenResponse(access_token=token, user=user)
     except ValueError as e:
@@ -47,6 +57,8 @@ async def login(req: LoginRequest, redis=Depends(get_redis)):
     user = await auth_service.authenticate_user(redis, req.email, req.password)
     if not user:
         raise HTTPException(status_code=401, detail="Incorrect email or password.")
+    if not user.email_verified:
+        raise HTTPException(status_code=403, detail="Please verify your email before logging in. Check your inbox or request a new code.")
     token = auth_service.issue_token(user.id)
     return TokenResponse(access_token=token, user=user)
 
