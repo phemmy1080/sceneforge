@@ -144,7 +144,7 @@ async def render_scene(
         "-ar", "44100",   # standard sample rate
         "-ac", "2",       # stereo
         "-b:a", "128k",
-        "-t", str(scene.duration),
+        "-t", str(max(float(scene.duration or 10), 3.0)),
         "-pix_fmt", "yuv420p",
         "-avoid_negative_ts", "make_zero",
         output_path,
