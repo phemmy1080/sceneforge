@@ -65,6 +65,7 @@ async def normalize_scene(input_path: str, output_path: str) -> str:
 def _build_filter_complex(
     subtitle_text: str | None,
     subtitle_style: str,
+    duration: float,
 ) -> str:
 
     scale_chain = (
@@ -75,7 +76,10 @@ def _build_filter_complex(
         f"setsar=1,"
         f"fps=30,"
         # 🔥 tpad replaces ALL looping logic
-        f"tpad=stop_mode=clone:stop_duration=1000"
+        #f"tpad=stop_mode=clone:stop_duration=1000"
+
+        f"tpad=stop_duration={duration}:stop_mode=clone"
+        
     )
 
     audio_chain = "aresample=44100,aformat=channel_layouts=stereo"
@@ -166,7 +170,8 @@ async def render_scene(
         video_input_flags = ["-loop", "1", "-i", visual_path]
 
     else:
-        fc = _build_filter_complex(subtitle_text, subtitle_style)
+        #fc = _build_filter_complex(subtitle_text, subtitle_style)
+        fc = _build_filter_complex(subtitle_text, subtitle_style, scene.duration)
         video_input_flags = ["-i", visual_path]
 
     if not fc:
@@ -176,20 +181,25 @@ async def render_scene(
     # FFmpeg command
     # -----------------------------
     cmd = [
-        "ffmpeg", "-y",
-        *video_input_flags,
-        "-i", audio_path,
-        "-filter_complex", fc,
-        "-map", "[vout]",
-        "-map", "[aout]",
-        "-c:v", "libx264", "-preset", "fast", "-crf", "23", "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
-        "-t", str(scene.duration),
-        "-avoid_negative_ts", "make_zero",
-        "-movflags", "+faststart",
-        output_path,
-    ]
-
+    "ffmpeg", "-y",
+    *video_input_flags,
+    "-i", audio_path,
+    "-filter_complex", fc,
+    "-map", "[vout]",
+    "-map", "[aout]",
+    "-c:v", "libx264",
+    "-preset", "fast",
+    "-crf", "23",
+    "-pix_fmt", "yuv420p",
+    "-c:a", "aac",
+    "-b:a", "128k",
+    "-ar", "44100",
+    "-ac", "2",
+    "-t", str(scene.duration), 
+    "-avoid_negative_ts", "make_zero",
+    "-movflags", "+faststart",
+    output_path,
+]
     await run_ffmpeg(cmd)
     logger.info("Rendered scene %s → %s", scene.id, Path(output_path).name)
 
