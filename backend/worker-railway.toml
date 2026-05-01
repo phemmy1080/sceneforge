@@ -1,2 +1,2 @@
 [deploy]
-startCommand = "python -m arq app.workers.render_worker.WorkerSettings & uvicorn app.worker_server:app --host 0.0.0.0 --port $PORT"
+startCommand = ""
