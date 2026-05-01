@@ -26,6 +26,7 @@ class UserOut(BaseModel):
     tokens_remaining: int = 1000   # credits remaining
     tokens_total: int = 1000       # original allocation
     created_at: str
+    email_verified: bool = False
 
 
 class TokenResponse(BaseModel):
