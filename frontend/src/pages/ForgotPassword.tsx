@@ -52,7 +52,7 @@ export default function ForgotPassword({ onBack }: Props) {
       </div>
 
       {/* Body */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 16px' }}>
         <div style={{ width: '100%', maxWidth: 420 }}>
 
           {!sent ? (
