@@ -181,7 +181,7 @@ export default function SceneEditor() {
             </div>
 
             {/* Duration + Type */}
-            <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
               <div>
                 <label className="block text-[12px] font-medium text-white/50 mb-1.5">
                   Duration (seconds)
