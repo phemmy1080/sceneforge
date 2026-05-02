@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useStore } from '../store'
 import { getTokenBalance, startRender, type TokenBalance } from '../lib/api'
 import { Button, Card, CardTitle, Chip, PageHeader } from '../components/ui'
+import VoiceSamplePlayer from '../components/VoiceSamplePlayer'
 
 const VOICES = [
   { name: 'Marcus', desc: 'Deep, authoritative' },
@@ -90,19 +91,21 @@ export default function VoiceVisuals() {
       <Card className="mb-4">
         <CardTitle>Voice</CardTitle>
         <div className="grid grid-cols-3 gap-2 mb-4">
-          {VOICES.map((v) => (
-            <button
-              key={v.name}
-              onClick={() => setVoiceConfig({ voice_name: v.name })}
-              className={`p-3 rounded-xl border text-center transition-all
-                ${voiceConfig.voice_name === v.name
-                  ? 'bg-violet-500/12 border-violet-500/35'
-                  : 'bg-[#1A1A24] border-white/[0.07] hover:border-white/15'}`}
-            >
-              <p className="text-[13px] font-medium text-white mb-0.5">{v.name}</p>
-              <p className="text-[11px] text-white/40">{v.desc}</p>
-            </button>
-          ))}
+           {VOICES.map((v) => (
+              <button
+                key={v.name}
+                onClick={() => setVoiceConfig({ voice_name: v.name })}
+                className={`... ${selected === v.name ? 'active styles' : 'inactive styles'}`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-[14px] font-semibold truncate">{v.name}</p>
+                    <p className="text-[11px] text-white/45 mt-0.5">{v.description}</p>
+                  </div>
+                  <VoiceSamplePlayer voiceName={v.name} />
+                </div>
+              </button>
+            ))}
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
