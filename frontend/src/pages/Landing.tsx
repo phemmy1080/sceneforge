@@ -9,7 +9,7 @@ const FEATURES = [
   {
     icon: '◈',
     title: 'AI idea generation',
-    desc: 'SceneForge generates 6 viral content ideas from your niche and style in seconds.',
+    desc: 'Claude generates 6 viral content ideas from your niche and style in seconds.',
   },
   {
     icon: '◎',
@@ -40,7 +40,7 @@ const FEATURES = [
 
 const STEPS = [
   { num: '01', label: 'Pick niche & style' },
-  { num: '02', label: 'SceneForge writes the script' },
+  { num: '02', label: 'AI writes the script' },
   { num: '03', label: 'Edit scenes visually' },
   { num: '04', label: 'Render & export' },
 ]
@@ -62,7 +62,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '20px 48px',
+          padding: '16px clamp(16px, 4vw, 48px)',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
           position: 'sticky',
           top: 0,
@@ -84,7 +84,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
       <section
         style={{
           textAlign: 'center',
-          padding: '100px 24px 80px',
+          padding: 'clamp(60px,10vw,100px) 20px clamp(50px,8vw,80px)',
           position: 'relative',
         }}
       >
@@ -96,7 +96,21 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
           pointerEvents: 'none',
         }} />
 
-
+        <div style={{
+          display: 'inline-block',
+          background: 'rgba(124,92,255,0.12)',
+          border: '1px solid rgba(124,92,255,0.3)',
+          borderRadius: 20,
+          padding: '5px 16px',
+          fontSize: 12,
+          fontWeight: 600,
+          color: '#A78BFA',
+          marginBottom: 28,
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+        }}>
+          Powered by Claude · ElevenLabs · FFmpeg
+        </div>
 
         <h1 style={{
           fontFamily: "'Syne', sans-serif",
@@ -105,7 +119,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
           lineHeight: 1.05,
           letterSpacing: '-2px',
           margin: '0 0 24px',
-          maxWidth: 860,
+          maxWidth: 860, width: "100%",
           marginLeft: 'auto',
           marginRight: 'auto',
         }}>
@@ -122,11 +136,11 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
         <p style={{
           fontSize: 18,
           color: 'rgba(255,255,255,0.5)',
-          maxWidth: 540,
+          maxWidth: 540, width: "100%",
           margin: '0 auto 44px',
           lineHeight: 1.7,
         }}>
-          Pick your niche. SceneForge writes the script, breaks it into scenes,
+          Pick your niche. AI writes the script, breaks it into scenes,
           sources visuals, synthesises voice, and renders your video — all in one flow.
         </p>
 
@@ -145,7 +159,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
       </section>
 
       {/* ── HOW IT WORKS ──────────────────────────────────────── */}
-      <section style={{ padding: '60px 48px', maxWidth: 1000, margin: '0 auto' }}>
+      <section style={{ padding: 'clamp(36px,6vw,60px) clamp(16px,4vw,48px)', maxWidth: 1000, width: "100%", margin: '0 auto' }}>
         <p style={sectionLabel}>How it works</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 2 }}>
           {STEPS.map((step, i) => (
@@ -182,7 +196,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
       </section>
 
       {/* ── FEATURES ──────────────────────────────────────────── */}
-      <section style={{ padding: '40px 48px 80px', maxWidth: 1000, margin: '0 auto' }}>
+      <section style={{ padding: 'clamp(28px,5vw,40px) clamp(16px,4vw,48px) clamp(48px,8vw,80px)', maxWidth: 1000, width: "100%", margin: '0 auto' }}>
         <p style={sectionLabel}>Everything included</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
           {FEATURES.map((f, i) => (
@@ -215,7 +229,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
         background: 'linear-gradient(135deg, rgba(124,92,255,0.15) 0%, rgba(45,212,191,0.1) 100%)',
         border: '1px solid rgba(124,92,255,0.25)',
         borderRadius: 24,
-        padding: '52px 48px',
+        padding: 'clamp(32px,5vw,52px) clamp(16px,4vw,48px)',
         textAlign: 'center',
       }}>
         <h2 style={{
@@ -238,7 +252,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
       {/* ── FOOTER ────────────────────────────────────────────── */}
       <footer style={{
         borderTop: '1px solid rgba(255,255,255,0.06)',
-        padding: '24px 48px',
+        padding: 'clamp(16px,3vw,24px) clamp(16px,4vw,48px)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
