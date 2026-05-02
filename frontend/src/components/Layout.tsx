@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useStore, type AppStep } from '../store'
 import StepNav from './StepNav'
 import UserMenu from './UserMenu'
@@ -42,11 +42,9 @@ function TokenGateBar({ onUpgrade }: { onUpgrade: () => void }) {
   }, [])
 
   if (!balance) return null
-
   const pct = Math.min(100, Math.round((balance.tokens_remaining / balance.tokens_total) * 100))
   const empty = balance.tokens_remaining === 0
-  const low   = balance.tokens_remaining < 200 && !empty
-
+  const low = balance.tokens_remaining < 200 && !empty
   if (!empty && !low) return null
 
   return (
@@ -72,11 +70,10 @@ function TokenGateBar({ onUpgrade }: { onUpgrade: () => void }) {
   )
 }
 
-export default function Layout({ children, onLogout, onNewProject }: LayoutProps) {
+function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => void; onNewProject: () => void; onClose?: () => void }) {
   const currentStep    = useStore((s) => s.currentStep)
   const completedSteps = useStore((s) => s.completedSteps)
   const setStep        = useStore((s) => s.setStep)
-  const config         = useStore((s) => s.config)
   const scenes         = useStore((s) => s.scenes)
   const renderStatus   = useStore((s) => s.renderStatus)
   const projects       = useStore((s) => s.projects)
@@ -86,7 +83,162 @@ export default function Layout({ children, onLogout, onNewProject }: LayoutProps
   const toggleFolder   = useStore((s) => s.toggleFolder)
   const openProject    = useStore((s) => s.openProject)
 
+  const activeProject = projects.find((p) => p.id === activeProjectId)
+  const dotColor: Record<string, string> = { active: '#A78BFA', exported: '#2DD4BF', draft: '#F59E0B' }
+
+  function handleOpenProject(id: string) {
+    openProject(id)
+    setStep('setup')
+    onClose?.()
+  }
+
+  function handleSetStep(step: AppStep) {
+    setStep(step)
+    onClose?.()
+  }
+
+  return (
+    <>
+      {/* Top */}
+      <div className="p-3.5 border-b border-white/[0.07] flex-shrink-0">
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="font-display text-[17px] font-extrabold tracking-tight px-1">
+            Scene<span className="text-violet-400">Forge</span>
+          </div>
+          {onClose && (
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/8 text-white/40 hover:text-white/70 transition-colors">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M3 3l10 10M13 3L3 13"/>
+              </svg>
+            </button>
+          )}
+        </div>
+        {activeProject ? (
+          <div className="w-full rounded-lg overflow-hidden border border-violet-500/25 bg-violet-500/8">
+            <div className="px-3 py-2 flex items-center gap-2 min-w-0">
+              <div className="w-2 h-2 rounded-full bg-violet-400 flex-shrink-0 animate-pulse" />
+              <span className="text-[12px] font-semibold text-violet-300 truncate flex-1">{activeProject.name}</span>
+            </div>
+            <button
+              onClick={() => { onNewProject(); onClose?.() }}
+              className="w-full flex items-center justify-center gap-1.5 py-1.5 border-t border-violet-500/15 text-violet-400/60 text-[11px] font-medium hover:text-violet-300 hover:bg-violet-500/10 transition-all"
+            >
+              <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 1v10M1 6h10"/></svg>
+              New project
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => { onNewProject(); onClose?.() }}
+            className="w-full flex items-center justify-center gap-2 py-2 bg-violet-500/15 border border-dashed border-violet-500/35 rounded-lg text-violet-300 text-[12px] font-semibold hover:bg-violet-500/22 hover:border-violet-400/50 transition-all"
+          >
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 1v10M1 6h10"/></svg>
+            New project
+          </button>
+        )}
+      </div>
+
+      {/* Scrollable nav */}
+      <div className="flex-1 overflow-y-auto p-2 scrollbar-thin">
+        <p className="text-[9.5px] font-bold text-white/25 uppercase tracking-widest px-2 pt-2 pb-1">Workflow</p>
+        {STEPS.map((step) => {
+          const isActive = currentStep === step.id
+          const isDone   = completedSteps.has(step.id)
+          return (
+            <button
+              key={step.id}
+              onClick={() => handleSetStep(step.id)}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-lg text-[13px] font-medium transition-all mb-0.5 text-left border
+                ${isActive ? 'bg-violet-500/15 text-violet-300 border-violet-500/20'
+                  : isDone ? 'text-teal-400 border-transparent hover:bg-white/4'
+                  : 'text-white/45 border-transparent hover:bg-white/4 hover:text-white/75'}`}
+            >
+              <span className={isActive ? 'text-violet-400' : isDone ? 'text-teal-400' : 'text-white/30'}>
+                {ICONS[step.id]}
+              </span>
+              {step.label}
+              {isDone && !isActive && (
+                <svg className="ml-auto w-3 h-3 text-teal-400" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M2 6l3 3 5-5"/></svg>
+              )}
+            </button>
+          )
+        })}
+
+        <div className="flex items-center justify-between px-2 pt-3 pb-1">
+          <p className="text-[9.5px] font-bold text-white/25 uppercase tracking-widest">Projects</p>
+          <button onClick={() => { onNewProject(); onClose?.() }} className="text-white/25 hover:text-white/55 text-[14px] leading-none px-1 transition-colors">+</button>
+        </div>
+
+        {Object.keys(folders).map((folder) => {
+          const folderProjects = folders[folder]
+            .map((id) => projects.find((p) => p.id === id))
+            .filter(Boolean) as typeof projects
+          if (folderProjects.length === 0) return null
+          const isOpen = folderOpen[folder] !== false
+          return (
+            <div key={folder} className="mb-0.5">
+              <button
+                onClick={() => toggleFolder(folder)}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/4 transition-colors text-left"
+              >
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5"
+                  className={`text-white/30 flex-shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`}>
+                  <path d="M3 4l3 4 3-4"/>
+                </svg>
+                <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="rgba(167,139,250,0.4)" strokeWidth="1.3" className="flex-shrink-0">
+                  <path d="M1 4a1 1 0 0 1 1-1h3l2 2h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4z"/>
+                </svg>
+                <span className="text-[12px] font-semibold text-white/55 flex-1 truncate">{folder}</span>
+                <span className="text-[10px] bg-white/7 text-white/30 px-1.5 py-0.5 rounded-full">{folderProjects.length}</span>
+              </button>
+              {isOpen && (
+                <div className="pl-4">
+                  {folderProjects.map((proj) => (
+                    <button
+                      key={proj.id}
+                      onClick={() => handleOpenProject(proj.id)}
+                      className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left transition-all mb-0.5 ${
+                        proj.id === activeProjectId ? 'bg-violet-500/12 text-violet-300' : 'text-white/50 hover:bg-white/4 hover:text-white/75'
+                      }`}
+                    >
+                      <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: dotColor[proj.status] || '#F59E0B' }} />
+                      <span className="text-[11.5px] flex-1 truncate">{proj.name}</span>
+                      <span className="text-[9.5px] text-white/25">
+                        {proj.duration > 0 ? proj.duration + 's' : proj.sceneCount > 0 ? proj.sceneCount + 'sc' : proj.step}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Active project status */}
+      {activeProject && (
+        <div className="mx-2 mb-2 bg-violet-500/10 border border-violet-500/20 rounded-xl p-2.5 flex-shrink-0">
+          <p className="text-[9.5px] font-semibold text-violet-400 uppercase tracking-widest mb-1">Active</p>
+          <p className="text-[11.5px] text-white/75 font-medium leading-snug truncate">{activeProject.name}</p>
+          <div className="flex flex-wrap gap-1.5 mt-1.5">
+            {scenes.length > 0 && <span className="text-[9.5px] bg-teal-500/15 text-teal-400 px-1.5 py-0.5 rounded-full">{scenes.length} scenes</span>}
+            {renderStatus === 'complete' && <span className="text-[9.5px] bg-teal-500/15 text-teal-400 px-1.5 py-0.5 rounded-full">Ready to export</span>}
+          </div>
+        </div>
+      )}
+
+      <TokenGateBar onUpgrade={() => useStore.getState().setStep('upgrade')} />
+      <UserMenu onLogout={onLogout} />
+    </>
+  )
+}
+
+export default function Layout({ children, onLogout, onNewProject }: LayoutProps) {
+  const setStep = useStore((s) => s.setStep)
+  const currentStep = useStore((s) => s.currentStep)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [upgradePrompt, setUpgradePrompt] = useState<{ reason: string; max?: number } | null>(null)
+  const overlayRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const handler = (e: CustomEvent) => setUpgradePrompt(e.detail)
@@ -94,149 +246,74 @@ export default function Layout({ children, onLogout, onNewProject }: LayoutProps
     return () => document.removeEventListener('show-upgrade-prompt', handler as EventListener)
   }, [])
 
-  const activeProject = projects.find((p) => p.id === activeProjectId)
-  const dotColor: Record<string, string> = { active: '#A78BFA', exported: '#2DD4BF', draft: '#F59E0B' }
+  // Close sidebar on resize to desktop
+  useEffect(() => {
+    const handler = () => { if (window.innerWidth >= 768) setSidebarOpen(false) }
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
 
-  function handleOpenProject(id: string) {
-    openProject(id)
-    setStep('setup')
+  const STEP_LABELS: Record<string, string> = {
+    setup: 'Setup', ideas: 'Ideas', script: 'Script',
+    scenes: 'Scenes', voice: 'Voice & Visuals', export: 'Export',
+    plans: 'Plans', upgrade: 'Upgrade',
   }
 
   return (
     <>
       <div className="flex min-h-screen bg-[#0A0A0F] text-[#F0F0FF]">
-        {/* Sidebar */}
-        <aside className="w-56 shrink-0 bg-[#111118] border-r border-white/[0.07] flex flex-col sticky top-0 h-screen overflow-hidden">
-          {/* Top */}
-          <div className="p-3.5 border-b border-white/[0.07] flex-shrink-0">
-            <div className="font-display text-[17px] font-extrabold tracking-tight mb-2.5 px-1">
-              Scene<span className="text-violet-400">Forge</span>
-            </div>
-            {activeProject ? (
-              <div className="w-full rounded-lg overflow-hidden border border-violet-500/25 bg-violet-500/8">
-                <div className="px-3 py-2 flex items-center gap-2 min-w-0">
-                  <div className="w-2 h-2 rounded-full bg-violet-400 flex-shrink-0 animate-pulse" />
-                  <span className="text-[12px] font-semibold text-violet-300 truncate flex-1">{activeProject.name}</span>
-                </div>
-                <button
-                  onClick={onNewProject}
-                  className="w-full flex items-center justify-center gap-1.5 py-1.5 border-t border-violet-500/15 text-violet-400/60 text-[11px] font-medium hover:text-violet-300 hover:bg-violet-500/10 transition-all"
-                >
-                  <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 1v10M1 6h10"/></svg>
-                  New project
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={onNewProject}
-                className="w-full flex items-center justify-center gap-2 py-2 bg-violet-500/15 border border-dashed border-violet-500/35 rounded-lg text-violet-300 text-[12px] font-semibold hover:bg-violet-500/22 hover:border-violet-400/50 transition-all"
-              >
-                <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 1v10M1 6h10"/></svg>
-                New project
-              </button>
-            )}
-          </div>
 
-          {/* Scrollable nav */}
-          <div className="flex-1 overflow-y-auto p-2 scrollbar-thin">
-            <p className="text-[9.5px] font-bold text-white/25 uppercase tracking-widest px-2 pt-2 pb-1">Workflow</p>
-            {STEPS.map((step) => {
-              const isActive = currentStep === step.id
-              const isDone   = completedSteps.has(step.id)
-              return (
-                <button
-                  key={step.id}
-                  onClick={() => setStep(step.id)}
-                  className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12.5px] font-medium transition-all mb-0.5 text-left border
-                    ${isActive ? 'bg-violet-500/15 text-violet-300 border-violet-500/20'
-                      : isDone ? 'text-teal-400 border-transparent hover:bg-white/4'
-                      : 'text-white/45 border-transparent hover:bg-white/4 hover:text-white/75'}`}
-                >
-                  <span className={isActive ? 'text-violet-400' : isDone ? 'text-teal-400' : 'text-white/30'}>
-                    {ICONS[step.id]}
-                  </span>
-                  {step.label}
-                  {isDone && !isActive && (
-                    <svg className="ml-auto w-3 h-3 text-teal-400" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M2 6l3 3 5-5"/></svg>
-                  )}
-                </button>
-              )
-            })}
-
-            <div className="flex items-center justify-between px-2 pt-3 pb-1">
-              <p className="text-[9.5px] font-bold text-white/25 uppercase tracking-widest">Projects</p>
-              <button onClick={onNewProject} className="text-white/25 hover:text-white/55 text-[14px] leading-none px-1 transition-colors">+</button>
-            </div>
-
-            {Object.keys(folders).map((folder) => {
-              const folderProjects = folders[folder]
-                .map((id) => projects.find((p) => p.id === id))
-                .filter(Boolean) as typeof projects
-              if (folderProjects.length === 0) return null
-              const isOpen = folderOpen[folder] !== false
-              return (
-                <div key={folder} className="mb-0.5">
-                  <button
-                    onClick={() => toggleFolder(folder)}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/4 transition-colors text-left"
-                  >
-                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5"
-                      className={`text-white/30 flex-shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`}>
-                      <path d="M3 4l3 4 3-4"/>
-                    </svg>
-                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="rgba(167,139,250,0.4)" strokeWidth="1.3" className="flex-shrink-0">
-                      <path d="M1 4a1 1 0 0 1 1-1h3l2 2h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4z"/>
-                    </svg>
-                    <span className="text-[12px] font-semibold text-white/55 flex-1 truncate">{folder}</span>
-                    <span className="text-[10px] bg-white/7 text-white/30 px-1.5 py-0.5 rounded-full">{folderProjects.length}</span>
-                  </button>
-                  {isOpen && (
-                    <div className="pl-4">
-                      {folderProjects.map((proj) => (
-                        <button
-                          key={proj.id}
-                          onClick={() => handleOpenProject(proj.id)}
-                          className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-all mb-0.5 ${
-                            proj.id === activeProjectId ? 'bg-violet-500/12 text-violet-300' : 'text-white/50 hover:bg-white/4 hover:text-white/75'
-                          }`}
-                        >
-                          <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: dotColor[proj.status] || '#F59E0B' }} />
-                          <span className="text-[11.5px] flex-1 truncate">{proj.name}</span>
-                          <span className="text-[9.5px] text-white/25">
-                            {proj.duration > 0 ? proj.duration + 's' : proj.sceneCount > 0 ? proj.sceneCount + 'sc' : proj.step}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Active project status */}
-          {activeProject && (
-            <div className="mx-2 mb-2 bg-violet-500/10 border border-violet-500/20 rounded-xl p-2.5 flex-shrink-0">
-              <p className="text-[9.5px] font-semibold text-violet-400 uppercase tracking-widest mb-1">Active</p>
-              <p className="text-[11.5px] text-white/75 font-medium leading-snug truncate">{activeProject.name}</p>
-              <div className="flex flex-wrap gap-1.5 mt-1.5">
-                {scenes.length > 0 && <span className="text-[9.5px] bg-teal-500/15 text-teal-400 px-1.5 py-0.5 rounded-full">{scenes.length} scenes</span>}
-                {renderStatus === 'complete' && <span className="text-[9.5px] bg-teal-500/15 text-teal-400 px-1.5 py-0.5 rounded-full">Ready to export</span>}
-              </div>
-            </div>
-          )}
-
-          <TokenGateBar onUpgrade={() => useStore.getState().setStep('upgrade')} />
-          <UserMenu onLogout={onLogout} />
+        {/* ── Desktop Sidebar ── */}
+        <aside className="hidden md:flex w-56 shrink-0 bg-[#111118] border-r border-white/[0.07] flex-col sticky top-0 h-screen overflow-hidden">
+          <SidebarContent onLogout={onLogout} onNewProject={onNewProject} />
         </aside>
 
-        {/* Main */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-5xl mx-auto px-8 py-8">
-            <StepNav />
-            {children}
-          </div>
-        </main>
+        {/* ── Mobile: overlay + drawer ── */}
+        {sidebarOpen && (
+          <div
+            ref={overlayRef}
+            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+        <aside className={`fixed top-0 left-0 h-full w-72 max-w-[85vw] bg-[#111118] border-r border-white/[0.07] flex flex-col z-50 md:hidden transition-transform duration-300 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}>
+          <SidebarContent onLogout={onLogout} onNewProject={onNewProject} onClose={() => setSidebarOpen(false)} />
+        </aside>
+
+        {/* ── Main content ── */}
+        <div className="flex-1 flex flex-col min-w-0">
+
+          {/* Mobile top bar */}
+          <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-[#111118] border-b border-white/[0.07] sticky top-0 z-30">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-2 rounded-lg hover:bg-white/8 text-white/60 hover:text-white/90 transition-colors flex-shrink-0"
+              aria-label="Open menu"
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <path d="M2 4h14M2 9h14M2 14h14"/>
+              </svg>
+            </button>
+            <div className="font-display text-[15px] font-extrabold tracking-tight">
+              Scene<span className="text-violet-400">Forge</span>
+            </div>
+            <div className="flex-1 text-center">
+              <span className="text-[12px] font-medium text-white/40">{STEP_LABELS[currentStep] || ''}</span>
+            </div>
+            {/* Spacer to balance hamburger */}
+            <div className="w-9 flex-shrink-0" />
+          </header>
+
+          {/* Page content */}
+          <main className="flex-1 overflow-y-auto">
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 md:px-8 py-5 md:py-8">
+              <StepNav />
+              {children}
+            </div>
+          </main>
+        </div>
       </div>
 
       {/* Upgrade prompt modal */}
@@ -246,11 +323,11 @@ export default function Layout({ children, onLogout, onNewProject }: LayoutProps
           onClick={() => setUpgradePrompt(null)}
         >
           <div
-            style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 18, padding: 32, maxWidth: 420, width: '100%', textAlign: 'center' }}
+            style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 18, padding: '28px 24px', maxWidth: 420, width: '100%', textAlign: 'center' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ fontSize: 40, marginBottom: 16 }}>🚀</div>
-            <h2 style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px', margin: '0 0 10px', color: '#F0F0FF' }}>
+            <h2 style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.5px', margin: '0 0 10px', color: '#F0F0FF' }}>
               Upgrade to unlock this
             </h2>
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', margin: '0 0 8px', lineHeight: 1.6 }}>
