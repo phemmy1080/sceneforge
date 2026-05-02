@@ -96,23 +96,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
           pointerEvents: 'none',
         }} />
 
-        <!--
-        <div style={{
-          display: 'inline-block',
-          background: 'rgba(124,92,255,0.12)',
-          border: '1px solid rgba(124,92,255,0.3)',
-          borderRadius: 20,
-          padding: '5px 16px',
-          fontSize: 12,
-          fontWeight: 600,
-          color: '#A78BFA',
-          marginBottom: 28,
-          letterSpacing: '0.06em',
-          textTransform: 'uppercase',
-        }}>
-          Powered by Claude · ElevenLabs · FFmpeg
-        </div>
--->
+
         <h1 style={{
           fontFamily: "'Syne', sans-serif",
           fontSize: 'clamp(40px, 7vw, 78px)',
