@@ -144,7 +144,7 @@ export default function VoiceVisuals() {
       </Card>
 
       {/* Subtitle + music */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <Card className="mb-0">
           <CardTitle>Subtitle style</CardTitle>
           <div className="flex flex-wrap gap-2">
