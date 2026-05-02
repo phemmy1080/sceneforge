@@ -10,17 +10,16 @@ const STEPS: { id: AppStep; label: string }[] = [
 ]
 
 export default function StepNav() {
-  const currentStep = useStore((s) => s.currentStep)
+  const currentStep    = useStore((s) => s.currentStep)
   const completedSteps = useStore((s) => s.completedSteps)
-  const setStep = useStore((s) => s.setStep)
-
-  const currentIndex = STEPS.findIndex((s) => s.id === currentStep)
+  const setStep        = useStore((s) => s.setStep)
+  const currentIndex   = STEPS.findIndex((s) => s.id === currentStep)
 
   return (
-    <div className="flex items-center gap-0 mb-8">
+    <div className="flex items-center gap-0 mb-6 md:mb-8">
       {STEPS.map((step, i) => {
-        const isActive = step.id === currentStep
-        const isDone = completedSteps.has(step.id)
+        const isActive    = step.id === currentStep
+        const isDone      = completedSteps.has(step.id)
         const isReachable = isDone || i <= currentIndex
 
         return (
@@ -28,35 +27,30 @@ export default function StepNav() {
             <button
               onClick={() => isReachable && setStep(step.id)}
               disabled={!isReachable}
-              className={`
-                flex flex-col items-center gap-1 w-full transition-all
-                ${isReachable ? 'cursor-pointer' : 'cursor-default'}
-              `}
+              className={`flex flex-col items-center gap-1 w-full transition-all ${isReachable ? 'cursor-pointer' : 'cursor-default'}`}
             >
               {/* Dot */}
               <div className={`
-                w-6 h-6 rounded-full border-2 flex items-center justify-center
-                text-[10px] font-bold transition-all
-                ${isActive
-                  ? 'bg-violet-600 border-violet-500 text-white'
-                  : isDone
-                  ? 'bg-teal-500/20 border-teal-500 text-teal-400'
+                w-5 h-5 md:w-6 md:h-6 rounded-full border-2 flex items-center justify-center
+                text-[9px] md:text-[10px] font-bold transition-all
+                ${isActive  ? 'bg-violet-600 border-violet-500 text-white'
+                  : isDone  ? 'bg-teal-500/20 border-teal-500 text-teal-400'
                   : 'bg-transparent border-white/15 text-white/25'}
               `}>
                 {isDone && !isActive
-                  ? <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 6l3 3 5-5"/></svg>
+                  ? <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 6l3 3 5-5"/></svg>
                   : i + 1
                 }
               </div>
-              {/* Label */}
-              <span className={`text-[10px] font-medium ${isActive ? 'text-violet-300' : isDone ? 'text-teal-400' : 'text-white/25'}`}>
+              {/* Label — hidden on very small screens */}
+              <span className={`hidden sm:block text-[10px] font-medium ${isActive ? 'text-violet-300' : isDone ? 'text-teal-400' : 'text-white/25'}`}>
                 {step.label}
               </span>
             </button>
 
             {/* Connector line */}
             {i < STEPS.length - 1 && (
-              <div className="flex-1 h-px mx-1 mb-4">
+              <div className="flex-1 h-px mx-0.5 md:mx-1 mb-0 sm:mb-4">
                 <div className={`h-full transition-all ${isDone ? 'bg-teal-500/40' : 'bg-white/8'}`} />
               </div>
             )}
