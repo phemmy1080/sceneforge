@@ -96,6 +96,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
           pointerEvents: 'none',
         }} />
 
+        <!--
         <div style={{
           display: 'inline-block',
           background: 'rgba(124,92,255,0.12)',
@@ -111,7 +112,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
         }}>
           Powered by Claude · ElevenLabs · FFmpeg
         </div>
-
+-->
         <h1 style={{
           fontFamily: "'Syne', sans-serif",
           fontSize: 'clamp(40px, 7vw, 78px)',
