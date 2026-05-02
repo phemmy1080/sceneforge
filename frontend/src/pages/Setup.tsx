@@ -155,7 +155,7 @@ export default function Setup() {
       {/* Platform & details */}
       <Card className="mb-6">
         <CardTitle>Platform & details</CardTitle>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Select label="Target platform" value={config.platform} onChange={(v) => setConfig({ platform: v })} options={PLATFORMS} />
           <Select label="Tone" value={config.tone} onChange={(v) => setConfig({ tone: v })} options={TONES} />
           <TextInput label="Target audience" value={config.audience} onChange={(v) => setConfig({ audience: v })} placeholder="e.g. beginner investors aged 20–35" />
@@ -163,7 +163,7 @@ export default function Setup() {
         </div>
       </Card>
 
-      <div className="flex gap-3">
+      <div className="flex flex-col sm:flex-row gap-3">
         <Button variant="primary" onClick={handleContinue} disabled={!canContinue}>
           Generate ideas →
         </Button>
