@@ -87,7 +87,7 @@ export default function VerifyEmail({ email, onVerified }: Props) {
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: '#080810', fontFamily: "'DM Sans', system-ui, sans-serif", padding: '20px',
     }}>
-      <div style={{ width: '100%', maxWidth: 440, width: "100%", textAlign: 'center' }}>
+      <div style={{ width: '100%', maxWidth: 440, textAlign: 'center' }}>
 
         {/* Icon */}
         <div style={{
