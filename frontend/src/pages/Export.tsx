@@ -111,7 +111,7 @@ export default function Export() {
 
           {/* Video downloads */}
           <p className="text-[11px] text-white/35 uppercase tracking-widest font-semibold mb-3">Downloads</p>
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
             {[
               { type: 'full'   as const, icon: '🎬', title: 'Full video',      desc: 'Single MP4 — voice, visuals, subtitles', badge: 'MP4 · H.264',       color: 'teal'   as const },
               { type: 'scenes' as const, icon: '🗂',  title: 'Scene bundle',    desc: 'Per-scene MP4 clips + JSON',              badge: 'ZIP · scenes + JSON', color: 'purple' as const },
@@ -133,7 +133,7 @@ export default function Export() {
 
           {/* ── Voice extraction ── */}
           <p className="text-[11px] text-white/35 uppercase tracking-widest font-semibold mb-3">Extract voice</p>
-          <div className="flex gap-3 mb-2">
+          <div className="flex flex-col sm:flex-row gap-3 mb-2">
             {(['mp3', 'wav'] as const).map((fmt) => (
               <a
                 key={fmt}
