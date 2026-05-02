@@ -188,7 +188,7 @@ const backBtn: React.CSSProperties = {
 
 const card: React.CSSProperties = {
   width: '100%',
-  maxWidth: 440, width: "100%",
+  maxWidth: 440,
   padding: '0 24px',
 }
 
