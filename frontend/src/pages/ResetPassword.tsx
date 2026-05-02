@@ -68,7 +68,7 @@ export default function ResetPassword({ onSuccess }: Props) {
         </div>
       </div>
 
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 16px' }}>
         <div style={{ width: '100%', maxWidth: 420 }}>
 
           {/* Loading */}
