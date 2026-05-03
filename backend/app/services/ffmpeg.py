@@ -10,12 +10,36 @@ from app.models.schemas import Scene
 
 logger = logging.getLogger(__name__)
 
-W, H = 1080, 1920
+#W, H = 1080, 1920
+W, H = _dims(platform)
 SCALE_VF = (
-    f"scale=w={W}:h={H}:force_original_aspect_ratio=increase,"
-    f"crop={W}:{H}"
+   f"scale=w={W}:h={H}:force_original_aspect_ratio=increase,"
+   f"crop={W}:{H}"
 )
 
+PLATFORM_DIMS: dict[str, tuple[int, int]] = {
+    # 9:16 vertical
+    "tiktok":            (1080, 1920),
+    "youtube_shorts":    (1080, 1920),
+    "instagram_reels":   (1080, 1920),
+    "reels":             (1080, 1920),
+    "shorts":            (1080, 1920),
+    # 16:9 horizontal
+    "youtube":           (1920, 1080),
+    "youtube_landscape": (1920, 1080),
+    # 1:1 square
+    "linkedin":          (1080, 1080),
+    "facebook":          (1080, 1080),
+}
+
+def _dims(platform: str | None) -> tuple[int, int]:
+    if not platform:
+        return (1080, 1920)
+    key = (platform or "").lower().replace(" ", "_").replace("-", "_")
+    for k, d in PLATFORM_DIMS.items():
+        if k in key or key in k:
+            return d
+    return (1080, 1920)
 
 def _ffmpeg_has_filter(name: str) -> bool:
     try:
@@ -104,6 +128,7 @@ async def render_scene(
     output_path: str,
     subtitle_style: str = "viral",
     is_image: bool = False,
+    platform: str | None = None,
 ) -> str:
     """Render one scene: scale visual, overlay TTS audio, optional subtitle."""
 
@@ -247,6 +272,7 @@ async def render_full_pipeline(
     subtitle_style: str = "viral",
     music_path: str = None,
     on_progress=None,
+    platform: str | None = None,
 ) -> dict:
     scene_outputs = []
 
