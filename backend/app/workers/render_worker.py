@@ -106,6 +106,7 @@ async def render_video(ctx: dict, job_id: str, request_data: dict):
             output_dir=str(output_dir),
             subtitle_style=req.subtitle_style,
             on_progress=ffmpeg_progress,
+            platform=req.platform,
         )
 
         # ── Stage 4: Manifests ────────────────────────────────────────────
