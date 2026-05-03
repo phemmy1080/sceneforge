@@ -10,24 +10,15 @@ from app.models.schemas import Scene
 
 logger = logging.getLogger(__name__)
 
-#W, H = 1080, 1920
-W, H = _dims(platform)
-SCALE_VF = (
-   f"scale=w={W}:h={H}:force_original_aspect_ratio=increase,"
-   f"crop={W}:{H}"
-)
-
+# ── Platform-aware dimensions ─────────────────────────────────────────────────
 PLATFORM_DIMS: dict[str, tuple[int, int]] = {
-    # 9:16 vertical
     "tiktok":            (1080, 1920),
     "youtube_shorts":    (1080, 1920),
     "instagram_reels":   (1080, 1920),
     "reels":             (1080, 1920),
     "shorts":            (1080, 1920),
-    # 16:9 horizontal
     "youtube":           (1920, 1080),
     "youtube_landscape": (1920, 1080),
-    # 1:1 square
     "linkedin":          (1080, 1080),
     "facebook":          (1080, 1080),
 }
@@ -41,6 +32,15 @@ def _dims(platform: str | None) -> tuple[int, int]:
             return d
     return (1080, 1920)
 
+# Default dimensions (overridden per-render via platform param)
+W, H = 1080, 1920
+SCALE_VF = (
+    f"scale=w={W}:h={H}:force_original_aspect_ratio=increase,"
+    f"crop={W}:{H}"
+)
+
+
+# ── FFmpeg capability checks ──────────────────────────────────────────────────
 def _ffmpeg_has_filter(name: str) -> bool:
     try:
         r = subprocess.run(["ffmpeg", "-filters"], capture_output=True, text=True)
@@ -50,7 +50,6 @@ def _ffmpeg_has_filter(name: str) -> bool:
 
 
 def _find_font() -> str | None:
-    """Find a usable font file on this system."""
     candidates = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
@@ -69,21 +68,17 @@ def _find_font() -> str | None:
 
 _HAS_DRAWTEXT = _ffmpeg_has_filter("drawtext")
 _FONT_PATH = _find_font()
-# Only use drawtext if we have both the filter AND a font file
 _HAS_DRAWTEXT = False  # Disabled to reduce memory usage on Railway free tier
 logger.info("FFmpeg drawtext available: %s (font: %s)", _HAS_DRAWTEXT, _FONT_PATH)
 
 
+# ── Runner ────────────────────────────────────────────────────────────────────
 def _run(cmd: list[str]) -> None:
     logger.info("FFmpeg CMD: %s", " ".join(cmd))
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout = result.stdout.decode(errors="replace")
     stderr = result.stderr.decode(errors="replace")
-    logger.debug("FFmpeg stdout: %s", stdout[-2000:] if stdout else "(empty)")
-    logger.debug("FFmpeg stderr: %s", stderr[-2000:] if stderr else "(empty)")
     if result.returncode != 0:
-        # Log the full error at ERROR level so it's visible in Railway
-        logger.error("FFmpeg FAILED (code %d):\nCMD: %s\nSTDERR: %s", 
+        logger.error("FFmpeg FAILED (code %d):\nCMD: %s\nSTDERR: %s",
                      result.returncode, " ".join(cmd), stderr[-3000:])
         raise RuntimeError(f"FFmpeg failed (code {result.returncode}):\n{stderr[-2000:]}")
 
@@ -93,27 +88,14 @@ async def run_ffmpeg(cmd: list[str]) -> None:
     await loop.run_in_executor(None, _run, cmd)
 
 
+# ── Normalize ─────────────────────────────────────────────────────────────────
 async def normalize_scene(input_path: str, output_path: str) -> str:
-    """
-    Re-encode a scene MP4 to ensure clean, consistent audio/video streams.
-    Fixes broken AAC from stock Pexels clips and timestamp issues.
-    Forces: stereo, 44100 Hz, clean AAC, consistent video timebase.
-    """
     await run_ffmpeg([
         "ffmpeg", "-y",
         "-i", input_path,
-        # Force clean audio decode + re-encode
-        "-c:v", "libx264",
-        "-preset", "ultrafast",
-        "-crf", "28",
-        "-threads", "2",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "-threads", "2",
         "-pix_fmt", "yuv420p",
-        # Force clean stereo AAC at standard sample rate
-        "-c:a", "aac",
-        "-ar", "44100",
-        "-ac", "2",
-        "-b:a", "96k",
-        # Fix timestamps
+        "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "96k",
         "-avoid_negative_ts", "make_zero",
         "-fflags", "+genpts",
         output_path,
@@ -121,6 +103,7 @@ async def normalize_scene(input_path: str, output_path: str) -> str:
     return output_path
 
 
+# ── Scene renderer ────────────────────────────────────────────────────────────
 async def render_scene(
     scene: Scene,
     visual_path: str,
@@ -128,14 +111,17 @@ async def render_scene(
     output_path: str,
     subtitle_style: str = "viral",
     is_image: bool = False,
-    platform=platform,
+    platform: str | None = None,
 ) -> str:
-    """Render one scene: scale visual, overlay TTS audio, optional subtitle."""
+    # Resolve dimensions for this platform
+    w, h = _dims(platform)
+    scale_vf = (
+        f"scale=w={w}:h={h}:force_original_aspect_ratio=increase,"
+        f"crop={w}:{h}"
+    )
 
     if subtitle_style != "none" and _HAS_DRAWTEXT:
-        # Use first 2 lines of text for subtitle — enough for readability without truncation
         words = scene.text.replace("\n", " ").split()
-        # Build subtitle lines of ~8 words each, show first 2 lines
         lines, current = [], []
         for word in words:
             current.append(word)
@@ -144,9 +130,8 @@ async def render_scene(
                 current = []
         if current:
             lines.append(" ".join(current))
-        subtitle_display = "\n".join(lines[:2])  # show first 2 lines on screen
         safe = (
-            subtitle_display
+            "\n".join(lines[:2])
             .replace("'",  "\u2019")
             .replace(":",  "\\:")
             .replace("%",  "\\%")
@@ -157,17 +142,15 @@ async def render_scene(
             "karaoke": "fontsize=48:fontcolor=yellow:borderw=3:bordercolor=black:x=(w-text_w)/2:y=h*0.82",
         }
         style = style_map.get(subtitle_style, style_map["viral"])
-        vf = f"{SCALE_VF},drawtext=fontfile='{_FONT_PATH}':text='{safe}':{style}"
+        vf = f"{scale_vf},drawtext=fontfile='{_FONT_PATH}':text='{safe}':{style}"
     else:
-        vf = SCALE_VF
+        vf = scale_vf
 
-    # Render with our clean TTS audio — ignore any audio in the visual file
     cmd = [
         "ffmpeg", "-y",
         *(["-loop", "1"] if is_image else []),
         "-i", visual_path,
         "-i", audio_path,
-        # Map video from visual, audio from TTS only
         "-map", "0:v:0",
         "-map", "1:a:0",
         "-vf", vf,
@@ -176,27 +159,24 @@ async def render_scene(
         "-crf", "28",
         "-threads", "2",
         "-c:a", "aac",
-        "-ar", "44100",   # standard sample rate
-        "-ac", "2",       # stereo
+        "-ar", "44100",
+        "-ac", "2",
         "-b:a", "96k",
-        "-t", str(max(float(scene.duration or 10), 3.0)),  # duration logged below
+        "-t", str(max(float(scene.duration or 10), 3.0)),
         "-pix_fmt", "yuv420p",
         "-avoid_negative_ts", "make_zero",
         output_path,
     ]
 
-    logger.info("Scene %s duration=%s visual=%s audio=%s", scene.id, scene.duration, visual_path, audio_path)
+    logger.info("Scene %s | platform=%s | dims=%dx%d | duration=%s",
+                scene.id, platform, w, h, scene.duration)
     await run_ffmpeg(cmd)
     logger.info("Rendered scene %s → %s", scene.id, Path(output_path).name)
     return output_path
 
 
+# ── Concatenation ─────────────────────────────────────────────────────────────
 async def concat_scenes(scene_files: list[str], output_path: str) -> str:
-    """
-    Concatenate scene MP4s.
-    Normalises each scene first to guarantee consistent stream parameters,
-    then uses the concat demuxer with stream copy (fast, no re-encode).
-    """
     output_dir = Path(output_path).parent
     normalized: list[str] = []
 
@@ -211,32 +191,26 @@ async def concat_scenes(scene_files: list[str], output_path: str) -> str:
         for nf in normalized:
             f.write(f"file '{os.path.abspath(nf)}'\n")
 
-    # Stream-copy concat — fast because all streams are already consistent
     await run_ffmpeg([
         "ffmpeg", "-y",
-        "-f", "concat",
-        "-safe", "0",
+        "-f", "concat", "-safe", "0",
         "-i", concat_list,
-        "-c", "copy",          # stream copy — no re-encode needed after normalize
+        "-c", "copy",
         "-movflags", "+faststart",
         output_path,
     ])
 
-    # Clean up normalised temp files
     for nf in normalized:
-        try:
-            Path(nf).unlink()
-        except Exception:
-            pass
-    try:
-        Path(concat_list).unlink()
-    except Exception:
-        pass
+        try: Path(nf).unlink()
+        except: pass
+    try: Path(concat_list).unlink()
+    except: pass
 
     logger.info("Concatenated %d scenes → %s", len(scene_files), Path(output_path).name)
     return output_path
 
 
+# ── Background music ──────────────────────────────────────────────────────────
 async def add_background_music(
     video_path: str,
     music_path: str,
@@ -248,22 +222,19 @@ async def add_background_music(
         "-i", video_path,
         "-i", music_path,
         "-filter_complex",
-        (
-            f"[1:a]volume={music_volume},aloop=loop=-1:size=2e+09[music];"
-            "[0:a][music]amix=inputs=2:duration=first[a]"
-        ),
+        f"[1:a]volume={music_volume},aloop=loop=-1:size=2e+09[music];"
+        "[0:a][music]amix=inputs=2:duration=first[a]",
         "-map", "0:v",
         "-map", "[a]",
         "-c:v", "copy",
-        "-c:a", "aac",
-        "-ar", "44100",
-        "-ac", "2",
+        "-c:a", "aac", "-ar", "44100", "-ac", "2",
         "-shortest",
         output_path,
     ])
     return output_path
 
 
+# ── Full pipeline ─────────────────────────────────────────────────────────────
 async def render_full_pipeline(
     scenes: list[Scene],
     audio_files: list[str],
@@ -287,6 +258,7 @@ async def render_full_pipeline(
             output_path=scene_out,
             subtitle_style=subtitle_style,
             is_image=is_image,
+            platform=platform,
         )
         scene_outputs.append(scene_out)
 
