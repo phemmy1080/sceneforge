@@ -128,7 +128,7 @@ async def render_scene(
     output_path: str,
     subtitle_style: str = "viral",
     is_image: bool = False,
-    platform: str | None = None,
+    platform=platform,
 ) -> str:
     """Render one scene: scale visual, overlay TTS audio, optional subtitle."""
 
