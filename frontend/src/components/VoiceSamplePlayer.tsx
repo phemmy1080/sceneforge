@@ -1,8 +1,16 @@
 import { useState, useRef, useEffect } from 'react'
 
-// Use same base URL as the rest of the app
-const BASE = (import.meta as any).env?.VITE_API_BASE_URL 
-  || 'https://sceneforge-production-8d19.up.railway.app'
+const BASE = 'https://sceneforge-production-8d19.up.railway.app'
+
+// Read token the same way streamScript does in api.ts
+function getToken(): string {
+  try {
+    const s = JSON.parse(localStorage.getItem('sceneforge-auth') || '{}')
+    return s?.state?.token || ''
+  } catch {
+    return ''
+  }
+}
 
 interface Props {
   voiceName: string
@@ -44,12 +52,7 @@ export default function VoiceSamplePlayer({ voiceName, className = '' }: Props) 
     if (playing) { stopAudio(); return }
     setLoading(true)
 
-    // Get token from wherever your app stores it
-    const token = localStorage.getItem('token')
-      || localStorage.getItem('sf_token')
-      || localStorage.getItem('access_token')
-      || ''
-
+    const token = getToken()
     const url = `${BASE}/api/voice/sample/${encodeURIComponent(voiceName)}`
     const audio = new Audio()
     audioRef.current = audio
