@@ -34,22 +34,31 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     os.makedirs(settings.renders_dir, exist_ok=True)
+
     if settings.groq_api_key:
         logger.info("Groq key loaded — model: %s", settings.groq_model)
     else:
         logger.error("No AI key found. Add GROQ_API_KEY to your environment.")
+
     if not settings.elevenlabs_api_key:
         logger.warning("ELEVENLABS_API_KEY not set — voice synthesis disabled")
 
-    # Pre-generate voice samples so first Preview click is instant
-    try:
-        import redis.asyncio as aioredis
-        from app.services.voice_samples import warm_sample_cache
-        _redis = await aioredis.from_url(settings.redis_url, decode_responses=True)
-        asyncio.create_task(warm_sample_cache(_redis))
-        logger.info("Voice sample cache warm task started")
-    except Exception as e:
-        logger.warning("Voice sample cache warm skipped: %s", e)
+    # Pre-generate voice samples in background so first Preview click is instant
+    # Creates its own Redis connection directly (can't use Depends() outside a request)
+    async def _warm_voices():
+        redis = None
+        try:
+            import redis.asyncio as aioredis
+            from app.services.voice_samples import warm_sample_cache
+            redis = await aioredis.from_url(settings.redis_url, decode_responses=True)
+            await warm_sample_cache(redis)
+        except Exception as e:
+            logger.warning("Voice sample cache warm failed: %s", e)
+        finally:
+            if redis:
+                await redis.aclose()
+
+    asyncio.create_task(_warm_voices())
 
     yield
 
@@ -101,16 +110,16 @@ except Exception as e:
 
 
 # Routers
-app.include_router(auth_router,          prefix="/api/auth",       tags=["Auth"])
-app.include_router(generate_router,      prefix="/api/generate",   tags=["Generate"])
-app.include_router(render_router,        prefix="/api/render",     tags=["Render"])
-app.include_router(export_router,        prefix="/api/export",     tags=["Export"])
-app.include_router(payments_router,      prefix="/api/payments",   tags=["Payments"])
-app.include_router(admin_router,         prefix="/api/admin",      tags=["Admin"])
-app.include_router(admin_auth_router,    prefix="/api/admin-auth", tags=["AdminAuth"])
-app.include_router(niches_router,        prefix="/api/niches",     tags=["Niches"])
-app.include_router(projects_router,      prefix="/api/projects",   tags=["Projects"])
-app.include_router(voice_sample_router,  prefix="/api/voice",      tags=["Voice"])
+app.include_router(auth_router,         prefix="/api/auth",       tags=["Auth"])
+app.include_router(generate_router,     prefix="/api/generate",   tags=["Generate"])
+app.include_router(render_router,       prefix="/api/render",     tags=["Render"])
+app.include_router(export_router,       prefix="/api/export",     tags=["Export"])
+app.include_router(payments_router,     prefix="/api/payments",   tags=["Payments"])
+app.include_router(admin_router,        prefix="/api/admin",      tags=["Admin"])
+app.include_router(admin_auth_router,   prefix="/api/admin-auth", tags=["AdminAuth"])
+app.include_router(niches_router,       prefix="/api/niches",     tags=["Niches"])
+app.include_router(projects_router,     prefix="/api/projects",   tags=["Projects"])
+app.include_router(voice_sample_router, prefix="/api/voice",      tags=["Voice"])
 
 if os.path.exists(settings.renders_dir):
     app.mount("/renders", StaticFiles(directory=settings.renders_dir), name="renders")
