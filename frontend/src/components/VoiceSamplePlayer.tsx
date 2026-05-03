@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 
-const BASE = import.meta.env.VITE_API_BASE_URL || 'https://sceneforge-production-8d19.up.railway.app'
+// Use same base URL as the rest of the app
+const BASE = (import.meta as any).env?.VITE_API_BASE_URL 
+  || 'https://sceneforge-production-8d19.up.railway.app'
 
 interface Props {
   voiceName: string
@@ -15,7 +17,6 @@ export default function VoiceSamplePlayer({ voiceName, className = '' }: Props) 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const animRef  = useRef<number | null>(null)
 
-  // Stop audio when voice changes
   useEffect(() => { return () => stopAudio() }, [voiceName])
 
   function stopAudio() {
@@ -38,16 +39,16 @@ export default function VoiceSamplePlayer({ voiceName, className = '' }: Props) 
   }
 
   async function togglePlay(e: React.MouseEvent) {
-    e.stopPropagation()  // don't select the voice card
+    e.stopPropagation()
     setError(false)
-
     if (playing) { stopAudio(); return }
-
     setLoading(true)
 
-    // Get auth token for the API call
-    const token = localStorage.getItem('sf_token') || 
-                  sessionStorage.getItem('sf_token') || ''
+    // Get token from wherever your app stores it
+    const token = localStorage.getItem('token')
+      || localStorage.getItem('sf_token')
+      || localStorage.getItem('access_token')
+      || ''
 
     const url = `${BASE}/api/voice/sample/${encodeURIComponent(voiceName)}`
     const audio = new Audio()
@@ -62,7 +63,6 @@ export default function VoiceSamplePlayer({ voiceName, className = '' }: Props) 
       animRef.current = requestAnimationFrame(tick)
     }
 
-    // Fetch with auth header, create object URL
     try {
       const resp = await fetch(url, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
