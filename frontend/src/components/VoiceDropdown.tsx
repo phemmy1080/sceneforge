@@ -211,7 +211,7 @@ export default function VoiceDropdown({ selectedVoiceId, onChange }: Props) {
               px-3 py-2 flex items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold text-amber-400">Free plan — 6 voices</p>
-                <p className="text-[10.5px] text-white/35 mt-0.5">Upgrade to access {voices.length > freeCount ? `${VOICES.length - freeCount} more voices` : 'all voices'} including British, Australian & more</p>
+                <p className="text-[10.5px] text-white/35 mt-0.5">Upgrade to access {voices.length > freeCount ? `${24 - freeCount} more voices` : 'all voices'} including British, Australian & more</p>
               </div>
               <button
                 onClick={() => { setOpen(false); document.dispatchEvent(new CustomEvent('show-upgrade-prompt', { detail: { reason: 'voice_limit' } })) }}
