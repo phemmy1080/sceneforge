@@ -152,19 +152,37 @@ async def get_voice_sample(redis, voice_name: str, user_plan: str = "free") -> O
 
 
 async def warm_sample_cache(redis) -> None:
-    """Pre-generate free tier voice samples at startup."""
-    logger.info("Warming voice sample cache...")
+    """
+    Pre-generate free tier voice samples at startup.
+    Skips entirely if already warmed — avoids burning Redis requests on every deploy.
+    """
+    WARM_FLAG = "voice_samples:warmed"
+
+    # Check if already warmed — single Redis call
+    try:
+        already = await redis.get(WARM_FLAG)
+        if already:
+            logger.info("Voice samples already cached — skipping warm")
+            return
+    except Exception:
+        pass
+
+    logger.info("Warming voice sample cache (first time)...")
     tasks = []
     for name in FREE_VOICES:
-        if not await _get_cached(redis, name, "edge_tts"):
+        cached = await _get_cached(redis, name, "edge_tts")
+        if not cached:
             tasks.append(_warm_one(redis, name))
+
     if tasks:
         await asyncio.gather(*tasks, return_exceptions=True)
         logger.info("Warmed %d voice samples", len(tasks))
-    else:
-        logger.info("Voice cache already warm")
 
-
+    # Set flag so future startups skip this — TTL 25 days
+    try:
+        await redis.set(WARM_FLAG, "1", ex=60 * 60 * 24 * 25)
+    except Exception:
+        pass
 async def _warm_one(redis, voice_name: str) -> None:
     audio = await _generate_edge_tts_sample(voice_name)
     if audio:
