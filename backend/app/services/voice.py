@@ -15,12 +15,32 @@ logger = logging.getLogger(__name__)
 # Maps SceneForge voice names → Edge TTS voice IDs
 # All free — no API key, no account required
 VOICE_MAP: dict[str, str] = {
-    "Marcus": "en-US-GuyNeural",          # Deep, authoritative
-    "Sophie": "en-US-JennyNeural",        # Warm, friendly
-    "Alex":   "en-US-ChristopherNeural",  # Energetic
-    "Jordan": "en-GB-RyanNeural",         # Professional, British
-    "Luna":   "en-US-AriaNeural",         # Calm, storytelling
-    "Kai":    "en-AU-WilliamNeural",      # Casual, Australian
+    # Free tier
+    "Marcus":   "en-US-GuyNeural",
+    "Sophie":   "en-US-JennyNeural",
+    "Alex":     "en-US-ChristopherNeural",
+    "Jordan":   "en-GB-RyanNeural",
+    "Luna":     "en-US-AriaNeural",
+    "Kai":      "en-AU-WilliamNeural",
+    # Paid tier
+    "Andrew":   "en-US-AndrewNeural",
+    "Brian":    "en-US-BrianNeural",
+    "Emma":     "en-US-EmmaNeural",
+    "Ava":      "en-US-AvaNeural",
+    "Steffan":  "en-US-SteffanNeural",
+    "Michelle": "en-US-MichelleNeural",
+    "Libby":    "en-GB-LibbyNeural",
+    "Maisie":   "en-GB-MaisieNeural",
+    "Sonia":    "en-GB-SoniaNeural",
+    "Natasha":  "en-AU-NatashaNeural",
+    "Clara":    "en-CA-ClaraNeural",
+    "Liam":     "en-CA-LiamNeural",
+    "Connor":   "en-IE-ConnorNeural",
+    "Emily":    "en-IE-EmilyNeural",
+    "Neerja":   "en-IN-NeerjaNeural",
+    "Prabhat":  "en-IN-PrabhatNeural",
+    "Mitchell": "en-NZ-MitchellNeural",
+    "Leah":     "en-ZA-LeahNeural",
 }
 
 # Speed is expressed as a rate string e.g. "+10%" or "-5%"
