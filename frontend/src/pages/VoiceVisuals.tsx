@@ -69,11 +69,10 @@ export default function VoiceVisuals() {
     }
   }
 
-  const speedValue = parseFloat(voiceConfig.voice_speed.toString())
-  const canRender  = !tokenBalance || tokenBalance.tokens_remaining >= (tokenBalance.cost_per_video ?? 100)
-
-  // Resolve the voice ID for the dropdown from the stored voice name
-  const selectedVoiceId = getVoiceByName(voiceConfig.voice_name)?.id || 'en-US-GuyNeural'
+  // Resolve the Edge TTS voice ID from the stored voice name
+  const selectedVoiceId = getVoiceByName(voiceConfig.voice_name)?.id ?? 'en-US-GuyNeural'
+  const speedValue      = parseFloat(voiceConfig.voice_speed.toString())
+  const canRender       = !tokenBalance || tokenBalance.tokens_remaining >= (tokenBalance.cost_per_video ?? 100)
 
   return (
     <div>
@@ -94,13 +93,13 @@ export default function VoiceVisuals() {
           />
         </div>
 
-        {/* Speed + Stability */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-[12px] font-medium text-white/50 mb-2">Speed</label>
             <div className="flex items-center gap-3">
               <input
-                type="range" min="0.8" max="1.2" step="0.1" value={speedValue}
+                type="range" min="0.8" max="1.2" step="0.1"
+                value={speedValue}
                 onChange={(e) => setVoiceConfig({ voice_speed: parseFloat(e.target.value) })}
                 className="flex-1 accent-violet-500"
               />
@@ -133,7 +132,8 @@ export default function VoiceVisuals() {
         <div className="flex flex-wrap gap-2">
           {VISUAL_SOURCES.map((s) => (
             <Chip
-              key={s.value} label={s.label}
+              key={s.value}
+              label={s.label}
               selected={voiceConfig.visual_source === s.value}
               onClick={() => setVoiceConfig({ visual_source: s.value as any })}
             />
@@ -141,7 +141,7 @@ export default function VoiceVisuals() {
         </div>
       </Card>
 
-      {/* ── Subtitle + Music ── */}
+      {/* ── Subtitle + music ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <Card className="mb-0">
           <CardTitle>Subtitle style</CardTitle>
@@ -178,7 +178,7 @@ export default function VoiceVisuals() {
           <span><span className="text-white/80 font-medium">{scenes.length}</span> scenes</span>
           <span>
             <span className="text-white/80 font-medium">
-              {scenes.reduce((s, sc) => s + sc.duration, 0)}s
+              {scenes.reduce((acc, sc) => acc + sc.duration, 0)}s
             </span> total
           </span>
           <span>Voice: <span className="text-white/80 font-medium">{voiceConfig.voice_name}</span></span>
@@ -204,7 +204,7 @@ export default function VoiceVisuals() {
               style={{
                 width: `${Math.min(100, Math.round((tokenBalance.tokens_remaining / tokenBalance.tokens_total) * 100))}%`,
                 background: tokenBalance.tokens_remaining < 200 ? '#FF6B6B'
-                  : tokenBalance.tokens_remaining < 500 ? '#F59E0B' : '#2DD4BF',
+                          : tokenBalance.tokens_remaining < 500 ? '#F59E0B' : '#2DD4BF',
               }}
             />
           </div>
