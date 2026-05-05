@@ -159,7 +159,7 @@ export default function UploadScript() {
           <textarea
             value={scriptText}
             onChange={(e) => { setScriptText(e.target.value); setScriptFileName('') }}
-            placeholder={`Paste your voiceover script here…\n\nYou can use section labels like:\n[HOOK]\n[INTRO]\n[MAIN]\n[CTA]\n\nOr just paste plain text — AI will structure it into scenes automatically.`}
+            placeholder={`Paste your voiceover script here…\n\nYou can use section labels like:\n[HOOK]\n[INTRO]\n[MAIN]\n[CTA]\n\nOr just paste plain text — SceneForge will structure it into scenes automatically.`}
             className="w-full bg-[#1A1A24] rounded-lg text-[13px] text-white/85 px-4 py-3 outline-none resize-none min-h-[240px] placeholder-white/20 leading-relaxed"
           />
         </div>
@@ -245,7 +245,7 @@ export default function UploadScript() {
         <p className="text-[11.5px] font-semibold text-white/40 uppercase tracking-widest mb-2">How it works</p>
         <div className="space-y-1.5 text-[12.5px] text-white/40 leading-relaxed">
           <p>1. Paste or upload your script in any format — plain text, formatted, or with section labels</p>
-          <p>2. AI reads your script and splits it into {mode === 'script-and-voice' ? '6–12 timed scenes' : 'scenes with visual descriptions and keywords'}</p>
+          <p>2. SceneForge reads your script and splits it into {mode === 'script-and-voice' ? '6–12 timed scenes' : 'scenes with visual descriptions and keywords'}</p>
           {mode === 'script-and-voice'
             ? <p>3. Your uploaded voiceover is mapped to each scene by timing — no AI voice generation needed</p>
             : <p>3. SceneForge generates a voiceover for each scene using your selected voice from the next step</p>}
