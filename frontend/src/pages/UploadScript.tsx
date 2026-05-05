@@ -110,7 +110,7 @@ export default function UploadScript() {
       {/* Mode selector */}
       <div className="flex gap-3 mb-6">
         {[
-          { id: 'script-only' as UploadMode, label: 'Script only', desc: 'AI generates voice from your script', icon: '◎' },
+          { id: 'script-only' as UploadMode, label: 'Script only', desc: 'SceneForge generates voice from your script', icon: '◎' },
           { id: 'script-and-voice' as UploadMode, label: 'Script + voiceover', desc: 'Use your own recorded voice', icon: '◉' },
         ].map((m) => (
           <button key={m.id} onClick={() => setMode(m.id)}
@@ -213,7 +213,7 @@ export default function UploadScript() {
 
           {voiceFile && (
             <div className="mt-3 bg-teal-500/8 border border-teal-500/20 rounded-lg p-3 text-[12px] text-teal-400/80">
-              Your voiceover will be used directly in the final video. AI will generate a matching visual for each scene based on your script timing.
+              Your voiceover will be used directly in the final video. SceneForge will generate a matching visual for each scene based on your script timing.
             </div>
           )}
         </Card>
@@ -236,7 +236,7 @@ export default function UploadScript() {
 
       {breaking && (
         <div className="mt-4">
-          <LoadingState label="AI is breaking your script into scenes…" progress={65} />
+          <LoadingState label="SceneForge is breaking your script into scenes…" progress={65} />
         </div>
       )}
 
@@ -248,7 +248,7 @@ export default function UploadScript() {
           <p>2. AI reads your script and splits it into {mode === 'script-and-voice' ? '6–12 timed scenes' : 'scenes with visual descriptions and keywords'}</p>
           {mode === 'script-and-voice'
             ? <p>3. Your uploaded voiceover is mapped to each scene by timing — no AI voice generation needed</p>
-            : <p>3. AI generates a voiceover for each scene using your selected voice from the next step</p>}
+            : <p>3. SceneForge generates a voiceover for each scene using your selected voice from the next step</p>}
           <p>4. You can edit every scene before rendering — text, duration, visuals, order</p>
         </div>
       </div>
