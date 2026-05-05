@@ -71,7 +71,7 @@ export default function Setup() {
     <div>
       <PageHeader
         title="New project"
-        subtitle="Configure your content — AI will generate everything from here"
+        subtitle="Configure your content — SceneForge will generate everything from here"
       />
 
       {/* Niche */}
@@ -138,7 +138,7 @@ export default function Setup() {
         )}
 
         <p className="text-[11px] text-white/30 mt-3">
-          Add up to 5 topics. AI will generate ideas around your hints. Leave blank for fully AI-generated ideas.
+          Add up to 5 topics. SceneForge will generate ideas around your hints. Leave blank for fully AI-generated ideas.
         </p>
       </Card>
 
