@@ -71,7 +71,7 @@ export default function Signup({ onSuccess, onLogin }: SignupProps) {
         <div style={{ marginTop: 40, display: 'flex', flexDirection: 'column', gap: 14 }}>
           {[
             'AI-generated scripts & scene breakdowns',
-            'Voice synthesis with Google TTS',
+            'Voice synthesis powered by multiple TTS engines',
             'Auto-matched Pexels stock footage',
             'Export to MP4, scene bundle, or CapCut',
           ].map((item) => (
