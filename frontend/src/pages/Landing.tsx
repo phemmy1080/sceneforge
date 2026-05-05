@@ -9,7 +9,7 @@ const FEATURES = [
   {
     icon: '◈',
     title: 'AI idea generation',
-    desc: 'Claude generates 6 viral content ideas from your niche and style in seconds.',
+    desc: 'SceneForge generates 6 viral content ideas from your niche and style in seconds.',
   },
   {
     icon: '◎',
@@ -24,7 +24,7 @@ const FEATURES = [
   {
     icon: '◉',
     title: 'Voice synthesis',
-    desc: 'ElevenLabs TTS with 6 voice options, speed control, and stability tuning.',
+    desc: 'Multi-engine text-to-speech support with diverse voice options, adjustable speed, and advanced voice tuning',
   },
   {
     icon: '◫',
@@ -40,7 +40,7 @@ const FEATURES = [
 
 const STEPS = [
   { num: '01', label: 'Pick niche & style' },
-  { num: '02', label: 'AI writes the script' },
+  { num: '02', label: 'SceneForge writes the script' },
   { num: '03', label: 'Edit scenes visually' },
   { num: '04', label: 'Render & export' },
 ]
@@ -125,7 +125,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
           margin: '0 auto 44px',
           lineHeight: 1.7,
         }}>
-          Pick your niche. AI writes the script, breaks it into scenes,
+          Pick your niche. SceneForge writes the script, breaks it into scenes,
           sources visuals, synthesises voice, and renders your video — all in one flow.
         </p>
 
@@ -139,7 +139,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
         </div>
 
         <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)', marginTop: 20 }}>
-          No credit card required · Free plan includes 3 videos/month
+          No credit card required · Free plan includes 3 videos/day
         </p>
       </section>
 
