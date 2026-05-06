@@ -3,11 +3,12 @@ from __future__ import annotations
 import asyncio
 import os
 import logging
+import time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import Response
+from fastapi.responses import Response, JSONResponse
 
 from app.config import get_settings
 
@@ -30,6 +31,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ── Health check cache (avoids Redis ping on every UptimeRobot call) ──────────
+_health_cache: dict = {"ts": 0.0, "status": "ok", "content": {}}
+_HEALTH_CACHE_TTL = 30  # seconds
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -40,11 +45,10 @@ async def lifespan(app: FastAPI):
     else:
         logger.error("No AI key found. Add GROQ_API_KEY to your environment.")
 
-    if not settings.elevenlabs_api_key:
-        logger.warning("ELEVENLABS_API_KEY not set — voice synthesis disabled")
+    if not getattr(settings, 'elevenlabs_api_key', None):
+        logger.warning("ELEVENLABS_API_KEY not set — ElevenLabs voices disabled")
 
-    # Pre-generate voice samples in background so first Preview click is instant
-    # Creates its own Redis connection directly (can't use Depends() outside a request)
+    # Warm voice sample cache in background — only runs once (flag stored in Redis)
     async def _warm_voices():
         redis = None
         try:
@@ -89,14 +93,13 @@ async def options_handler(path: str):
     return Response(status_code=200)
 
 
-# Rate limiting (optional — graceful if slowapi not installed)
+# Rate limiting
 try:
     from app.middleware.rate_limit import limiter, RATE_LIMITING_ENABLED
     app.state.limiter = limiter
     if RATE_LIMITING_ENABLED:
         from slowapi.errors import RateLimitExceeded
         from slowapi.middleware import SlowAPIMiddleware
-        from fastapi.responses import JSONResponse
 
         @app.exception_handler(RateLimitExceeded)
         async def rate_limit_handler(request, exc):
@@ -125,11 +128,21 @@ if os.path.exists(settings.renders_dir):
     app.mount("/renders", StaticFiles(directory=settings.renders_dir), name="renders")
 
 
+# ── Health check — cached 30s to avoid Redis ping on every monitor call ───────
 @app.get("/api/health")
 async def health_check():
-    import time
-    start = time.time()
-    status = {"status": "ok", "version": "1.0.0", "services": {}}
+    now = time.time()
+
+    # Serve cached response if fresh
+    if now - _health_cache["ts"] < _HEALTH_CACHE_TTL and _health_cache["content"]:
+        return JSONResponse(
+            status_code=200 if _health_cache["status"] == "ok" else 503,
+            content=_health_cache["content"]
+        )
+
+    # Fresh check
+    start = now
+    status: dict = {"status": "ok", "version": "1.0.0", "services": {}}
     try:
         import redis.asyncio as aioredis
         r = await aioredis.from_url(settings.redis_url, decode_responses=True)
@@ -139,8 +152,14 @@ async def health_check():
     except Exception as e:
         status["services"]["redis"] = f"error: {str(e)[:50]}"
         status["status"] = "degraded"
+
     status["response_ms"] = round((time.time() - start) * 1000)
-    from fastapi.responses import JSONResponse
+
+    # Cache the result
+    _health_cache["ts"]      = now
+    _health_cache["status"]  = status["status"]
+    _health_cache["content"] = status
+
     return JSONResponse(
         status_code=200 if status["status"] == "ok" else 503,
         content=status
