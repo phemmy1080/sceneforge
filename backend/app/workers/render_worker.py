@@ -20,7 +20,8 @@ from app.config import get_settings
 from app.models.schemas import RenderRequest
 from app.services.ffmpeg import render_full_pipeline
 from app.services.voice import synthesize_all_scenes, split_audio_by_scenes
-from app.services.visuals import fetch_visuals_for_scenes
+#from app.services.visuals import fetch_visuals_for_scenes
+from app.services.visuals import get_visual_for_scene
 from app.services.storage import upload_job_files, r2_enabled
 from app.services import auth as auth_service
 from app.services.capcut import build_capcut_draft, write_manifest
@@ -73,12 +74,29 @@ async def render_video(ctx, job_id: str, payload: dict):
             )
 
         # ── Stage 2: Fetch visuals ────────────────────────────────────────────
+       """ 
         await _set_progress(redis, job_id, "Fetching visuals...", 42)
         visual_files = await fetch_visuals_for_scenes(
             scenes=req.scenes,
             output_dir=str(output_dir),
             source=req.visual_source,
         )
+      """
+        await _set_progress(redis, job_id, "Fetching visuals...", 42)
+        visual_files = []
+        for i, scene in enumerate(req.scenes):
+        try:
+            visual = await get_visual_for_scene(
+            scene=scene,
+            output_dir=str(output_dir),
+            source=req.visual_source,
+            )
+            visual_files.append(visual)
+            pct = 42 + int((i / len(req.scenes)) * 12)
+            await _set_progress(redis, job_id, f"Visuals {i+1}/{len(req.scenes)}...", pct)
+        except Exception as e:
+        logger.error("Visual fetch failed for scene %s: %s", scene.id, e)
+        raise
 
         # ── Stage 3: FFmpeg render ────────────────────────────────────────────
         await _set_progress(redis, job_id, "Rendering video...", 55)
