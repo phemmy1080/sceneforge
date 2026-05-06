@@ -208,8 +208,21 @@ async def render_video(ctx, job_id: str, payload: dict):
         raise
 
 
+from arq.connections import RedisSettings
+from urllib.parse import urlparse as _urlparse
+
+def _make_redis_settings(url: str) -> RedisSettings:
+    p = _urlparse(url)
+    return RedisSettings(
+        host=p.hostname or "localhost",
+        port=p.port or 6379,
+        password=p.password or None,
+        database=int((p.path or "/0").lstrip("/") or 0),
+        ssl=p.scheme in ("rediss",),
+    )
+
 class WorkerSettings:
     functions      = [render_video]
-    redis_settings = aioredis.from_url(settings.redis_url)
+    redis_settings = _make_redis_settings(settings.redis_url)
     max_jobs       = 2
     job_timeout    = 600
