@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useAuthStore } from '../authStore'
+import { showError, showWarning } from '../hooks/useErrorToast'
 
 export const BASE = 'https://sceneforge-production-8d19.up.railway.app'
 
@@ -26,13 +27,44 @@ api.interceptors.request.use((config) => {
 })
 
 // Redirect on 401
+
+
 api.interceptors.response.use(
   (r) => r,
-  (err) => {
-    if (err.response?.status === 401) {
-      useAuthStore.getState().logout()
+  (error) => {
+    const status  = error?.response?.status
+    const detail  = error?.response?.data?.detail
+    const message = typeof detail === 'string' ? detail
+                  : detail?.message || error.message || 'Something went wrong'
+
+    // 429 Rate limit
+    if (status === 429) {
+      const msg = error.response.data?.message || 'Too many requests. Please slow down.'
+      document.dispatchEvent(new CustomEvent('api-rate-limited', { detail: msg }))
+      // Also show toast
+      showWarning('Rate limit reached', msg)
     }
-    return Promise.reject(err)
+
+    // 500 Server error — always show toast
+    else if (status >= 500) {
+      showError('Server error', 'Something went wrong on our end. Please try again.')
+    }
+
+    // 503 Service unavailable
+    else if (status === 503) {
+      showError('Service unavailable', 'SceneForge is temporarily unavailable. Try again shortly.')
+    }
+
+    // Network error (no response at all)
+    else if (!error.response) {
+      showError('Connection error', 'Check your internet connection and try again.')
+    }
+
+    // 401 — handled separately (logout), don't show toast
+    // 403 — handled in Login.tsx (redirect to verify screen), don't show generic toast
+    // 400/404 — handled inline in each page component, don't show generic toast
+
+    return Promise.reject(error)
   }
 )
 
