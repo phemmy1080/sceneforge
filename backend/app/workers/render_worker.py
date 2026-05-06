@@ -21,22 +21,6 @@ logger   = logging.getLogger(__name__)
 
 WORKER_BASE_URL = os.environ.get("WORKER_BASE_URL", "").rstrip("/")
 
-# Log R2 config on startup so we can see what the worker sees
-def _log_r2_status():
-    account = os.environ.get("R2_ACCOUNT_ID", "")
-    access  = os.environ.get("R2_ACCESS_KEY", "")
-    secret  = os.environ.get("R2_SECRET_KEY", "")
-    bucket  = os.environ.get("R2_BUCKET", "")
-    pub_url = os.environ.get("R2_PUBLIC_URL", "")
-    logger.info("R2 STATUS — account_id=%s access_key=%s secret_key=%s bucket=%s pub_url=%s",
-        account[:8] + "..." if account else "MISSING",
-        access[:8]  + "..." if access  else "MISSING",
-        secret[:8]  + "..." if secret  else "MISSING",
-        bucket      or "MISSING",
-        pub_url     or "MISSING",
-    )
-
-_log_r2_status()
 
 
 async def _set_progress(redis, job_id: str, stage: str, pct: int, extra: dict | None = None):
@@ -250,13 +234,16 @@ async def startup(ctx):
     bucket  = os.environ.get("R2_BUCKET", "")
     pub_url = os.environ.get("R2_PUBLIC_URL", "")
     # Use both print and logger to ensure visibility
+    # List ALL env vars to find any R2-related ones
+    all_r2 = {k: v[:8]+"..." for k, v in os.environ.items() if "R2" in k.upper()}
     msg = (
         f"=== WORKER STARTUP v2 ===\n"
-        f"R2_ACCOUNT_ID: {account[:8] + '...' if account else 'MISSING'}\n"
-        f"R2_ACCESS_KEY:  {access[:8]  + '...' if access  else 'MISSING'}\n"
-        f"R2_SECRET_KEY:  {secret[:8]  + '...' if secret  else 'MISSING'}\n"
-        f"R2_BUCKET:      {bucket or 'MISSING'}\n"
-        f"R2_PUBLIC_URL:  {pub_url or 'MISSING'}\n"
+        f"R2_ACCOUNT_ID: {account[:8] + '...' if account else '*** MISSING ***'}\n"
+        f"R2_ACCESS_KEY:  {access[:8]  + '...' if access  else '*** MISSING ***'}\n"
+        f"R2_SECRET_KEY:  {secret[:8]  + '...' if secret  else '*** MISSING ***'}\n"
+        f"R2_BUCKET:      {bucket or '*** MISSING ***'}\n"
+        f"R2_PUBLIC_URL:  {pub_url or '*** MISSING ***'}\n"
+        f"ALL R2 env vars found: {all_r2}\n"
         f"========================"
     )
     print(msg, flush=True)
