@@ -49,8 +49,11 @@ async def _set_progress(redis, job_id: str, stage: str, pct: int, extra: dict | 
 async def render_video(ctx, job_id: str, payload: dict):
     redis      = ctx["redis"]
     req        = RenderRequest(**payload)
-    user_id    = payload.get("user_id")
     output_dir = Path(settings.renders_dir) / job_id
+
+    # user_id and prev_job_id are stored in Redis by render.py (not in payload)
+    user_id    = await redis.get(f"job:{job_id}:user_id")
+    prev_job_stored = await redis.get(f"job:{job_id}:prev_job_id")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -154,7 +157,7 @@ async def render_video(ctx, job_id: str, payload: dict):
 
         # ── Stage 6: Token deduction ──────────────────────────────────────────
         tokens_remaining = 0
-        is_re_render     = bool(payload.get("prev_job_id"))
+        is_re_render     = bool(prev_job_stored or payload.get("prev_job_id"))
 
         if user_id and not is_re_render:
             try:
@@ -238,8 +241,29 @@ def _make_redis_settings(url: str) -> RedisSettings:
         ssl=p.scheme in ("rediss",),
     )
 
+async def startup(ctx):
+    """Called by ARQ when worker starts — perfect place for diagnostics."""
+    import os
+    account = os.environ.get("R2_ACCOUNT_ID", "")
+    access  = os.environ.get("R2_ACCESS_KEY", "")
+    secret  = os.environ.get("R2_SECRET_KEY", "")
+    bucket  = os.environ.get("R2_BUCKET", "")
+    pub_url = os.environ.get("R2_PUBLIC_URL", "")
+    logger.info(
+        "=== WORKER STARTUP === R2: account=%s access=%s secret=%s bucket=%s url=%s",
+        account[:8] + "..." if account else "MISSING",
+        access[:8]  + "..." if access  else "MISSING",
+        secret[:8]  + "..." if secret  else "MISSING",
+        bucket      or "MISSING",
+        pub_url     or "MISSING",
+    )
+    logger.info("=== WORKER STARTUP === redis_url=%s",
+        settings.redis_url[:30] + "..." if settings.redis_url else "MISSING")
+
+
 class WorkerSettings:
     functions      = [render_video]
+    on_startup     = startup
     redis_settings = _make_redis_settings(settings.redis_url)
     max_jobs       = 2
     job_timeout    = 600
