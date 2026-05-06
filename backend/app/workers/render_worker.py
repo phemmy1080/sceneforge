@@ -1,67 +1,59 @@
+"""
+backend/app/workers/render_worker.py
+Key changes vs previous version:
+- R2 upload after render completes
+- Render complete email notification
+- Better error handling and progress reporting
+"""
 from __future__ import annotations
 
-"""
-ARQ background worker.
-Run with:  python -m arq app.workers.render_worker.WorkerSettings
-"""
+import asyncio
 import json
-import os
 import logging
+import os
+import uuid
 from pathlib import Path
 
-import arq
-import arq.connections
 import redis.asyncio as aioredis
 
 from app.config import get_settings
 from app.models.schemas import RenderRequest
-from app.services.voice import synthesize_all_scenes, split_audio_by_scenes
-from app.services.visuals import get_visuals_for_all_scenes
 from app.services.ffmpeg import render_full_pipeline
-from app.services.storage import upload_to_s3
-from app.services.capcut import build_capcut_draft, write_manifest
+from app.services.voice import synthesize_all_scenes, split_audio_by_scenes
+from app.services.visuals import fetch_visuals_for_scenes
+from app.services.storage import upload_job_files, r2_enabled
 from app.services import auth as auth_service
+from app.services.capcut import build_capcut_draft, write_manifest
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
-
-async def _set_progress(redis, job_id: str, stage: str, pct: int):
-    await redis.set(
-        f"job:{job_id}:progress",
-        json.dumps({"stage": stage, "pct": pct, "status": "processing"}),
-        ex=3600,
-    )
+WORKER_BASE_URL = os.environ.get("WORKER_BASE_URL", "").rstrip("/")
 
 
-async def render_video(ctx: dict, job_id: str, request_data: dict):
-    redis: aioredis.Redis = ctx["redis"]
-    req = RenderRequest(**request_data)
+async def _set_progress(redis, job_id: str, stage: str, pct: int, extra: dict | None = None):
+    data = {"status": "processing", "stage": stage, "pct": pct, "job_id": job_id}
+    if extra:
+        data.update(extra)
+    await redis.set(f"job:{job_id}:progress", json.dumps(data), ex=3600)
 
+
+async def render_video(ctx, job_id: str, payload: dict):
+    redis = ctx["redis"]
+    req   = RenderRequest(**payload)
+
+    # Resolve user
+    user_id = payload.get("user_id")
     output_dir = Path(settings.renders_dir) / job_id
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Retrieve user_id stored by the API at queue time
-    # Decode from bytes — ARQ's redis ctx does not use decode_responses=True
-    _raw_user_id = await redis.get(f"job:{job_id}:user_id")
-    _raw_prev_job = await redis.get(f"job:{job_id}:prev_job_id")
-    user_id = _raw_user_id.decode() if isinstance(_raw_user_id, bytes) else _raw_user_id
-    prev_job_id = _raw_prev_job.decode() if isinstance(_raw_prev_job, bytes) else _raw_prev_job
-
-    # Is this a re-render of an already-charged job?
-    is_re_render = False
-    if user_id and prev_job_id:
-        is_re_render = bool(await redis.sismember(
-            f"user:{user_id}:charged_jobs", prev_job_id
-        ))
-
     try:
-        # ── Stage 1: Voice ────────────────────────────────────────────────
+        # ── Stage 1: Voice synthesis ──────────────────────────────────────────
         await _set_progress(redis, job_id, "Synthesising voice...", 5)
 
         async def voice_progress(done, total):
-            pct = 5 + int((done / total) * 30)
-            await _set_progress(redis, job_id, f"Voice: scene {done}/{total}", pct)
+            pct = 5 + int((done / total) * 35)
+            await _set_progress(redis, job_id, f"Voice {done}/{total}...", pct)
 
         if req.uploaded_voice_path:
             await _set_progress(redis, job_id, "Splitting uploaded voice...", 8)
@@ -76,28 +68,23 @@ async def render_video(ctx: dict, job_id: str, request_data: dict):
                 voice_name=req.voice_name,
                 output_dir=str(output_dir),
                 speed=req.voice_speed,
+                stability=req.voice_stability if hasattr(req, 'voice_stability') else 'medium',
                 on_progress=voice_progress,
             )
 
-        # ── Stage 2: Visuals ──────────────────────────────────────────────
-        await _set_progress(redis, job_id, "Fetching visuals...", 35)
-
-        async def visual_progress(done, total):
-            pct = 35 + int((done / total) * 20)
-            await _set_progress(redis, job_id, f"Visuals: scene {done}/{total}", pct)
-
-        visual_files = await get_visuals_for_all_scenes(
+        # ── Stage 2: Fetch visuals ────────────────────────────────────────────
+        await _set_progress(redis, job_id, "Fetching visuals...", 42)
+        visual_files = await fetch_visuals_for_scenes(
             scenes=req.scenes,
             output_dir=str(output_dir),
             source=req.visual_source,
-            on_progress=visual_progress,
         )
 
-        # ── Stage 3: FFmpeg ───────────────────────────────────────────────
-        await _set_progress(redis, job_id, "Rendering scenes...", 55)
+        # ── Stage 3: FFmpeg render ────────────────────────────────────────────
+        await _set_progress(redis, job_id, "Rendering video...", 55)
 
-        async def ffmpeg_progress(stage_msg, pct):
-            await _set_progress(redis, job_id, stage_msg, pct)
+        async def ffmpeg_progress(stage: str, pct: int):
+            await _set_progress(redis, job_id, stage, pct)
 
         result = await render_full_pipeline(
             scenes=req.scenes,
@@ -105,106 +92,133 @@ async def render_video(ctx: dict, job_id: str, request_data: dict):
             visual_files=visual_files,
             output_dir=str(output_dir),
             subtitle_style=req.subtitle_style,
+            music_path=req.music if req.music != "none" else None,
             on_progress=ffmpeg_progress,
             platform=req.platform,
         )
 
-        # ── Stage 4: Manifests ────────────────────────────────────────────
-        await _set_progress(redis, job_id, "Writing export files...", 92)
-
-        write_manifest(
-            scenes=req.scenes,
-            scene_files=result["scene_paths"],
-            final_path=result["final_path"],
-            project_title=req.project_title,
-            output_path=str(output_dir / "manifest.json"),
-        )
-
-        capcut_draft = build_capcut_draft(
-            scenes=req.scenes,
-            scene_files=result["scene_paths"],
-            project_title=req.project_title,
-        )
-        with open(output_dir / "draft_content.json", "w") as f:
-            json.dump(capcut_draft, f, indent=2)
-
-        # ── Stage 5: S3 (optional) ────────────────────────────────────────
-        video_url = None
-        if settings.s3_bucket:
-            await _set_progress(redis, job_id, "Uploading to storage...", 95)
-            video_url = await upload_to_s3(
-                result["final_path"],
-                f"renders/{job_id}/final_video.mp4",
+        # ── Stage 4: CapCut draft ─────────────────────────────────────────────
+        await _set_progress(redis, job_id, "Generating CapCut package...", 88)
+        try:
+            capcut_draft = build_capcut_draft(
+                scenes=req.scenes,
+                scene_paths=result["scene_paths"],
+                audio_files=audio_files,
             )
+            draft_path = str(output_dir / "draft_content.json")
+            with open(draft_path, "w") as f:
+                json.dump(capcut_draft, f, indent=2)
+            write_manifest(
+                job_id=job_id,
+                scenes=req.scenes,
+                scene_paths=result["scene_paths"],
+                final_path=result["final_path"],
+                output_dir=str(output_dir),
+            )
+        except Exception as e:
+            logger.warning("CapCut draft generation failed (non-fatal): %s", e)
 
-        # ── Stage 6: Deduct tokens + update scene stats ───────────────────
-        tokens_remaining = None
-        scene_count = len(req.scenes)
+        # ── Stage 5: Upload to R2 ─────────────────────────────────────────────
+        r2_urls: dict[str, str] = {}
+        video_url: str | None = None
+
+        if r2_enabled():
+            await _set_progress(redis, job_id, "Uploading to cloud storage...", 92)
+            try:
+                r2_urls = await upload_job_files(job_id, str(output_dir))
+                # Pick the final video URL
+                for name in ("final_video_music.mp4", "final_video.mp4"):
+                    if name in r2_urls:
+                        video_url = r2_urls[name]
+                        break
+                logger.info("R2 upload complete for job %s — video_url: %s", job_id, video_url)
+            except Exception as e:
+                logger.error("R2 upload failed for job %s: %s", job_id, e)
+                # Non-fatal — fall back to worker URL
+
+        # Fall back to worker URL if R2 not configured or failed
+        if not video_url:
+            video_url = f"{WORKER_BASE_URL}/renders/{job_id}/final_video.mp4"
+
+        # ── Stage 6: Token deduction ──────────────────────────────────────────
+        tokens_remaining = 0
+        is_re_render     = bool(payload.get("prev_job_id"))
+
         if user_id and not is_re_render:
             try:
-                # Create a fresh Redis connection with decode_responses=True for auth ops
-                import redis.asyncio as aioredis
-                auth_redis = await aioredis.from_url(
-                    settings.redis_url, decode_responses=True
-                )
-                updated_user = await auth_service.deduct_tokens(auth_redis, user_id, job_id)
-                tokens_remaining = updated_user.tokens_remaining
-                # Track scene count for analytics
-                await auth_service.update_scene_stats(auth_redis, user_id, scene_count)
-                await auth_redis.aclose()
-                logger.info(
-                    "Tokens deducted — user %s | job %s | remaining: %s",
-                    user_id, job_id, tokens_remaining,
-                )
+                raw_user = await redis.get(f"user:{user_id}")
+                if raw_user:
+                    user_data  = json.loads(raw_user)
+                    cost       = settings.cost_per_video if hasattr(settings, 'cost_per_video') else 100
+                    current    = user_data.get("tokens_remaining", 0)
+                    new_bal    = max(0, current - cost)
+                    user_data["tokens_remaining"] = new_bal
+                    user_data["videos_created"]   = user_data.get("videos_created", 0) + 1
+                    await redis.set(f"user:{user_id}", json.dumps(user_data))
+                    tokens_remaining = new_bal
+                    logger.info("Tokens deducted: user=%s cost=%d remaining=%d", user_id, cost, new_bal)
             except Exception as e:
-                # Don't fail the render just because token deduction failed
                 logger.error("Token deduction failed for user %s: %s", user_id, e)
         elif user_id and is_re_render:
-            import redis.asyncio as aioredis
-            auth_redis = await aioredis.from_url(
-                settings.redis_url, decode_responses=True
-            )
-            bal = await auth_service.get_token_balance(auth_redis, user_id)
-            tokens_remaining = bal["tokens_remaining"]
-            # Still track scene stats even for re-renders
-            await auth_service.update_scene_stats(auth_redis, user_id, scene_count)
-            await auth_redis.aclose()
-            tokens_remaining = bal["tokens_remaining"]
-            logger.info("Re-render — user %s | no tokens deducted", user_id)
+            try:
+                raw_user = await redis.get(f"user:{user_id}")
+                if raw_user:
+                    tokens_remaining = json.loads(raw_user).get("tokens_remaining", 0)
+            except Exception:
+                pass
 
-        # ── Done ──────────────────────────────────────────────────────────
+        # ── Stage 7: Render complete email ────────────────────────────────────
+        if user_id:
+            try:
+                raw_user = await redis.get(f"user:{user_id}")
+                if raw_user:
+                    user_data = json.loads(raw_user)
+                    from app.services.email import send_render_complete
+                    await send_render_complete(
+                        to_email=user_data.get("email", ""),
+                        full_name=user_data.get("full_name", "Creator"),
+                        project_title=getattr(req, 'project_title', None) or "Your video",
+                        scene_count=len(req.scenes),
+                        duration=int(sum(s.duration for s in req.scenes)),
+                        video_url=video_url,
+                        tokens_remaining=tokens_remaining,
+                    )
+                    logger.info("Render complete email sent → %s", user_data.get("email"))
+            except Exception as e:
+                logger.error("Render complete email failed: %s", e)
+
+        # ── Done ──────────────────────────────────────────────────────────────
         final_result = {
-            "status": "complete",
-            "stage": "Done",
-            "pct": 100,
-            "job_id": job_id,
-            "video_url": video_url or f"{os.environ.get('WORKER_BASE_URL', '')}/renders/{job_id}/final_video.mp4",
-            "scene_count": len(req.scenes),
-            "total_duration": sum(s.duration for s in req.scenes),
+            "status":          "complete",
+            "stage":           "Done",
+            "pct":             100,
+            "job_id":          job_id,
+            "video_url":       video_url,
+            "r2_urls":         r2_urls,
+            "scene_count":     len(req.scenes),
+            "total_duration":  sum(s.duration for s in req.scenes),
             "tokens_remaining": tokens_remaining,
-            "is_re_render": is_re_render,
+            "is_re_render":    is_re_render,
         }
-
-        await redis.set(
-            f"job:{job_id}:progress",
-            json.dumps(final_result),
-            ex=86400,
-        )
-
+        await redis.set(f"job:{job_id}:progress", json.dumps(final_result), ex=86400)  # 24h
+        logger.info("Render complete — job %s | video_url: %s", job_id, video_url)
         return final_result
 
-    except Exception as exc:
-        await redis.set(
-            f"job:{job_id}:progress",
-            json.dumps({"status": "failed", "stage": "Error", "pct": 0, "error": str(exc)}),
-            ex=3600,
-        )
+    except Exception as e:
+        logger.exception("Render failed — job %s: %s", job_id, e)
+        error_result = {
+            "status":   "failed",
+            "stage":    "Failed",
+            "pct":      0,
+            "job_id":   job_id,
+            "error":    str(e),
+        }
+        await redis.set(f"job:{job_id}:progress", json.dumps(error_result), ex=3600)
         raise
 
 
 class WorkerSettings:
-    functions = [render_video]
-    redis_settings = arq.connections.RedisSettings.from_dsn(settings.redis_url)
-    max_jobs = 2
-    job_timeout = 900
-    keep_result = 86400
+    functions  = [render_video]
+    redis_settings = aioredis.from_url(settings.redis_url)
+    max_jobs   = 2
+    job_timeout = 600  # 10 minutes max per render
