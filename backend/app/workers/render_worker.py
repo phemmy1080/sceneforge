@@ -242,23 +242,26 @@ def _make_redis_settings(url: str) -> RedisSettings:
     )
 
 async def startup(ctx):
-    """Called by ARQ when worker starts — perfect place for diagnostics."""
-    import os
+    """Called by ARQ when worker starts."""
+    import os, sys
     account = os.environ.get("R2_ACCOUNT_ID", "")
     access  = os.environ.get("R2_ACCESS_KEY", "")
     secret  = os.environ.get("R2_SECRET_KEY", "")
     bucket  = os.environ.get("R2_BUCKET", "")
     pub_url = os.environ.get("R2_PUBLIC_URL", "")
-    logger.info(
-        "=== WORKER STARTUP === R2: account=%s access=%s secret=%s bucket=%s url=%s",
-        account[:8] + "..." if account else "MISSING",
-        access[:8]  + "..." if access  else "MISSING",
-        secret[:8]  + "..." if secret  else "MISSING",
-        bucket      or "MISSING",
-        pub_url     or "MISSING",
+    # Use both print and logger to ensure visibility
+    msg = (
+        f"=== WORKER STARTUP v2 ===\n"
+        f"R2_ACCOUNT_ID: {account[:8] + '...' if account else 'MISSING'}\n"
+        f"R2_ACCESS_KEY:  {access[:8]  + '...' if access  else 'MISSING'}\n"
+        f"R2_SECRET_KEY:  {secret[:8]  + '...' if secret  else 'MISSING'}\n"
+        f"R2_BUCKET:      {bucket or 'MISSING'}\n"
+        f"R2_PUBLIC_URL:  {pub_url or 'MISSING'}\n"
+        f"========================"
     )
-    logger.info("=== WORKER STARTUP === redis_url=%s",
-        settings.redis_url[:30] + "..." if settings.redis_url else "MISSING")
+    print(msg, flush=True)
+    sys.stdout.flush()
+    logger.info(msg)
 
 
 class WorkerSettings:
