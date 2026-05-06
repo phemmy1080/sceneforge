@@ -24,8 +24,6 @@ aiofiles==24.1.0
 # Media
 ffmpeg-python==0.2.0
 
-# Storage
-boto3==1.35.0
 
 # Utils
 python-multipart==0.0.12
