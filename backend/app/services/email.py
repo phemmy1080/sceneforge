@@ -2,6 +2,11 @@ from __future__ import annotations
 
 import logging
 import os
+import smtplib
+import ssl
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
 import httpx
 
 from app.config import get_settings
@@ -9,24 +14,46 @@ from app.config import get_settings
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
-BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
+# Provider API keys (optional — falls back to SMTP if not set)
+BREVO_API_KEY  = os.environ.get("BREVO_API_KEY", "")
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+
+# Gmail SMTP (always available as final fallback)
+SMTP_HOST     = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT     = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER     = os.environ.get("SMTP_USER", "")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
 
 
 async def _send(to: str, subject: str, html: str, text: str) -> None:
-    from_email = settings.email_from or "hello.sceneforge@gmail.com"
-    from_name = settings.email_from_name or "SceneForge"
+    from_email = getattr(settings, "email_from", None) or SMTP_USER or "hello.sceneforge@gmail.com"
+    from_name  = getattr(settings, "email_from_name", None) or "SceneForge"
 
-    # Try Brevo first (supports Gmail sender, no domain needed)
+    # 1. Brevo (preferred — no domain verification needed)
     if BREVO_API_KEY:
-        await _send_brevo(to, subject, html, text, from_email, from_name)
-        return
+        try:
+            await _send_brevo(to, subject, html, text, from_email, from_name)
+            return
+        except Exception as e:
+            logger.error("Brevo failed, trying next provider: %s", e)
 
-    # Fallback to Resend (requires verified domain)
+    # 2. Resend
     if RESEND_API_KEY:
-        await _send_resend(to, subject, html, text, from_email, from_name)
-        return
+        try:
+            await _send_resend(to, subject, html, text, from_email, from_name)
+            return
+        except Exception as e:
+            logger.error("Resend failed, trying SMTP: %s", e)
 
+    # 3. Gmail SMTP (uses your SMTP_USER + SMTP_PASSWORD env vars)
+    if SMTP_USER and SMTP_PASSWORD:
+        try:
+            await _send_smtp(to, subject, html, text, from_email, from_name)
+            return
+        except Exception as e:
+            logger.error("SMTP failed: %s", e)
+
+    # All providers failed
     logger.warning("No email provider configured — email not sent to %s", to)
     _log_otp_fallback(to, subject)
 
@@ -39,24 +66,18 @@ async def _send_brevo(to, subject, html, text, from_email, from_name):
         "htmlContent": html,
         "textContent": text,
     }
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.post(
-                "https://api.brevo.com/v3/smtp/email",
-                headers={
-                    "api-key": BREVO_API_KEY,
-                    "Content-Type": "application/json",
-                },
-                json=payload,
-            )
-            if resp.status_code in (200, 201):
-                logger.info("Email sent via Brevo to %s: %s", to, subject)
-            else:
-                logger.error("Brevo API error %d: %s", resp.status_code, resp.text)
-                _log_otp_fallback(to, subject)
-    except Exception as e:
-        logger.error("Brevo send failed: %s", e)
-        _log_otp_fallback(to, subject)
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={"api-key": BREVO_API_KEY, "Content-Type": "application/json"},
+            json=payload,
+        )
+        if resp.status_code in (200, 201):
+            logger.info("Email sent via Brevo → %s: %s", to, subject)
+        else:
+            logger.error("Brevo error %d: %s", resp.status_code, resp.text)
+            _log_otp_fallback(to, subject)
+            raise Exception(f"Brevo HTTP {resp.status_code}")
 
 
 async def _send_resend(to, subject, html, text, from_email, from_name):
@@ -67,22 +88,44 @@ async def _send_resend(to, subject, html, text, from_email, from_name):
         "html": html,
         "text": text,
     }
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.post(
-                "https://api.resend.com/emails",
-                headers={"Authorization": f"Bearer {RESEND_API_KEY}",
-                         "Content-Type": "application/json"},
-                json=payload,
-            )
-            if resp.status_code in (200, 201):
-                logger.info("Email sent via Resend to %s: %s", to, subject)
-            else:
-                logger.error("Resend API error %d: %s", resp.status_code, resp.text)
-                _log_otp_fallback(to, subject)
-    except Exception as e:
-        logger.error("Resend send failed: %s", e)
-        _log_otp_fallback(to, subject)
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {RESEND_API_KEY}",
+                     "Content-Type": "application/json"},
+            json=payload,
+        )
+        if resp.status_code in (200, 201):
+            logger.info("Email sent via Resend → %s: %s", to, subject)
+        else:
+            logger.error("Resend error %d: %s", resp.status_code, resp.text)
+            _log_otp_fallback(to, subject)
+            raise Exception(f"Resend HTTP {resp.status_code}")
+
+
+async def _send_smtp(to, subject, html, text, from_email, from_name):
+    """Send via Gmail SMTP using SMTP_USER + SMTP_PASSWORD env vars."""
+    import asyncio
+
+    def _do_send():
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"]    = f"{from_name} <{from_email}>"
+        msg["To"]      = to
+        msg.attach(MIMEText(text, "plain"))
+        msg.attach(MIMEText(html,  "html"))
+
+        context = ssl.create_default_context()
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.ehlo()
+            server.starttls(context=context)
+            server.ehlo()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(from_email, to, msg.as_string())
+
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _do_send)
+    logger.info("Email sent via SMTP → %s: %s", to, subject)
 
 
 def _log_otp_fallback(to: str, subject: str) -> None:
@@ -93,6 +136,8 @@ def _log_otp_fallback(to: str, subject: str) -> None:
         logger.warning("EMAIL FAILED — OTP for %s is: %s", to, match.group(1))
         logger.warning("=" * 50)
 
+
+# ── Email templates ───────────────────────────────────────────────────────────
 
 async def send_verification_otp(to_email: str, full_name: str, otp: str) -> None:
     subject = f"Your SceneForge verification code: {otp}"
@@ -189,11 +234,6 @@ async def send_token_confirmation(
     await _send(to_email, subject, html, text)
 
 
-    """
-Add this function to backend/app/services/email.py
-(append to the bottom of the file)
-"""
-
 async def send_render_complete(
     to_email: str,
     full_name: str,
@@ -204,11 +244,8 @@ async def send_render_complete(
     tokens_remaining: int,
 ) -> None:
     """Send render complete notification email."""
-    from app.config import get_settings
-    app_url = get_settings().frontend_origin
-
+    app_url = settings.frontend_origin
     subject = f'🎬 Your video "{project_title}" is ready!'
-
     html = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#080810;font-family:Arial,sans-serif;color:#F0F0FF">
@@ -228,35 +265,32 @@ async def send_render_complete(
           <p style="margin:0 0 28px;font-size:13px;color:rgba(255,255,255,0.45)">
             Hi {full_name}, your video has finished rendering and is ready to download.
           </p>
-          <div style="display:flex;justify-content:center;gap:0;margin-bottom:28px">
-            <div style="background:rgba(45,212,191,0.08);border:1px solid rgba(45,212,191,0.2);
-              border-radius:12px;padding:16px 24px;display:inline-flex;gap:32px">
-              <div style="text-align:center">
+          <div style="background:rgba(45,212,191,0.08);border:1px solid rgba(45,212,191,0.2);
+            border-radius:12px;padding:16px 24px;display:inline-block;margin-bottom:28px">
+            <table cellpadding="0" cellspacing="0"><tr>
+              <td style="text-align:center;padding:0 16px">
                 <p style="margin:0;font-size:24px;font-weight:800;color:#fff">{scene_count}</p>
-                <p style="margin:4px 0 0;font-size:11px;color:rgba(255,255,255,0.4);
-                  text-transform:uppercase;letter-spacing:.08em">Scenes</p>
-              </div>
-              <div style="width:1px;background:rgba(255,255,255,0.08)"></div>
-              <div style="text-align:center">
+                <p style="margin:4px 0 0;font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.08em">Scenes</p>
+              </td>
+              <td style="width:1px;background:rgba(255,255,255,0.08)"></td>
+              <td style="text-align:center;padding:0 16px">
                 <p style="margin:0;font-size:24px;font-weight:800;color:#fff">{duration}s</p>
-                <p style="margin:4px 0 0;font-size:11px;color:rgba(255,255,255,0.4);
-                  text-transform:uppercase;letter-spacing:.08em">Duration</p>
-              </div>
-              <div style="width:1px;background:rgba(255,255,255,0.08)"></div>
-              <div style="text-align:center">
+                <p style="margin:4px 0 0;font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.08em">Duration</p>
+              </td>
+              <td style="width:1px;background:rgba(255,255,255,0.08)"></td>
+              <td style="text-align:center;padding:0 16px">
                 <p style="margin:0;font-size:24px;font-weight:800;color:#2DD4BF">{tokens_remaining:,}</p>
-                <p style="margin:4px 0 0;font-size:11px;color:rgba(255,255,255,0.4);
-                  text-transform:uppercase;letter-spacing:.08em">Tokens left</p>
-              </div>
-            </div>
-          </div>
+                <p style="margin:4px 0 0;font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.08em">Tokens left</p>
+              </td>
+            </tr></table>
+          </div><br>
           <a href="{app_url}" style="display:inline-block;background:#7C5CFF;color:#fff;
             text-decoration:none;padding:14px 36px;border-radius:10px;
             font-size:14px;font-weight:700;margin-bottom:16px">
             Download your video →
           </a>
-          <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.25)">
-            Open SceneForge → go to Export step to download your video, scenes, or CapCut package.
+          <p style="margin:8px 0 0;font-size:12px;color:rgba(255,255,255,0.25)">
+            Open SceneForge → Export step to download your video, scenes, or CapCut package.
           </p>
         </td></tr>
         <tr><td style="padding:16px 40px;border-top:1px solid rgba(255,255,255,0.06);text-align:center">
@@ -266,7 +300,6 @@ async def send_render_complete(
     </td></tr>
   </table>
 </body></html>"""
-
     text = (
         f"Hi {full_name},\n\n"
         f'Your video "{project_title}" is ready!\n\n'
