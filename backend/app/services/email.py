@@ -187,3 +187,91 @@ async def send_token_confirmation(
 </body></html>"""
     text = f"Hi {full_name},\n\n+{tokens_added:,} tokens added. Balance: {tokens_total:,}.\nPlan: {plan_label} · {currency} {amount:,}\nTX: {transaction_id}\n\n— SceneForge"
     await _send(to_email, subject, html, text)
+
+
+    """
+Add this function to backend/app/services/email.py
+(append to the bottom of the file)
+"""
+
+async def send_render_complete(
+    to_email: str,
+    full_name: str,
+    project_title: str,
+    scene_count: int,
+    duration: int,
+    video_url: str,
+    tokens_remaining: int,
+) -> None:
+    """Send render complete notification email."""
+    from app.config import get_settings
+    app_url = get_settings().frontend_origin
+
+    subject = f'🎬 Your video "{project_title}" is ready!'
+
+    html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#080810;font-family:Arial,sans-serif;color:#F0F0FF">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#080810;padding:40px 0">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0"
+        style="background:#111118;border-radius:16px;border:1px solid rgba(255,255,255,0.08);overflow:hidden">
+        <tr><td style="background:linear-gradient(135deg,#1a0d33,#0a1a2e);padding:28px 40px;text-align:center">
+          <h1 style="margin:0;font-size:24px;font-weight:800;color:#fff">
+            Scene<span style="color:#A78BFA">Forge</span>
+          </h1>
+          <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.45)">Your video is ready</p>
+        </td></tr>
+        <tr><td style="padding:36px 40px;text-align:center">
+          <div style="font-size:48px;margin-bottom:16px">🎬</div>
+          <h2 style="margin:0 0 8px;font-size:20px;font-weight:800;color:#fff">{project_title}</h2>
+          <p style="margin:0 0 28px;font-size:13px;color:rgba(255,255,255,0.45)">
+            Hi {full_name}, your video has finished rendering and is ready to download.
+          </p>
+          <div style="display:flex;justify-content:center;gap:0;margin-bottom:28px">
+            <div style="background:rgba(45,212,191,0.08);border:1px solid rgba(45,212,191,0.2);
+              border-radius:12px;padding:16px 24px;display:inline-flex;gap:32px">
+              <div style="text-align:center">
+                <p style="margin:0;font-size:24px;font-weight:800;color:#fff">{scene_count}</p>
+                <p style="margin:4px 0 0;font-size:11px;color:rgba(255,255,255,0.4);
+                  text-transform:uppercase;letter-spacing:.08em">Scenes</p>
+              </div>
+              <div style="width:1px;background:rgba(255,255,255,0.08)"></div>
+              <div style="text-align:center">
+                <p style="margin:0;font-size:24px;font-weight:800;color:#fff">{duration}s</p>
+                <p style="margin:4px 0 0;font-size:11px;color:rgba(255,255,255,0.4);
+                  text-transform:uppercase;letter-spacing:.08em">Duration</p>
+              </div>
+              <div style="width:1px;background:rgba(255,255,255,0.08)"></div>
+              <div style="text-align:center">
+                <p style="margin:0;font-size:24px;font-weight:800;color:#2DD4BF">{tokens_remaining:,}</p>
+                <p style="margin:4px 0 0;font-size:11px;color:rgba(255,255,255,0.4);
+                  text-transform:uppercase;letter-spacing:.08em">Tokens left</p>
+              </div>
+            </div>
+          </div>
+          <a href="{app_url}" style="display:inline-block;background:#7C5CFF;color:#fff;
+            text-decoration:none;padding:14px 36px;border-radius:10px;
+            font-size:14px;font-weight:700;margin-bottom:16px">
+            Download your video →
+          </a>
+          <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.25)">
+            Open SceneForge → go to Export step to download your video, scenes, or CapCut package.
+          </p>
+        </td></tr>
+        <tr><td style="padding:16px 40px;border-top:1px solid rgba(255,255,255,0.06);text-align:center">
+          <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.2)">SceneForge · AI Video Studio</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+
+    text = (
+        f"Hi {full_name},\n\n"
+        f'Your video "{project_title}" is ready!\n\n'
+        f"{scene_count} scenes · {duration}s · {tokens_remaining:,} tokens remaining\n\n"
+        f"Open SceneForge to download: {app_url}\n\n"
+        f"— SceneForge"
+    )
+    await _send(to_email, subject, html, text)
