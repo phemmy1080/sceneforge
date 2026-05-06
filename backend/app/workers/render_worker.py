@@ -107,11 +107,11 @@ async def render_video(ctx, job_id: str, payload: dict):
             with open(draft_path, "w") as f:
                 json.dump(capcut_draft, f, indent=2)
             write_manifest(
-                job_id=job_id,
                 scenes=req.scenes,
-                scene_paths=result["scene_paths"],
+                scene_files=result["scene_paths"],
                 final_path=result["final_path"],
-                output_dir=str(output_dir),
+                project_title=getattr(req, "project_title", None) or "SceneForge Export",
+                output_path=str(output_dir / "manifest.json"),
             )
         except Exception as e:
             logger.warning("CapCut draft generation failed (non-fatal): %s", e)
