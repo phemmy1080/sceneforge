@@ -100,8 +100,8 @@ async def render_video(ctx, job_id: str, payload: dict):
         try:
             capcut_draft = build_capcut_draft(
                 scenes=req.scenes,
-                scene_paths=result["scene_paths"],
-                audio_files=audio_files,
+                scene_files=result["scene_paths"],
+                project_title=getattr(req, "project_title", None) or "SceneForge Export",
             )
             draft_path = str(output_dir / "draft_content.json")
             with open(draft_path, "w") as f:
