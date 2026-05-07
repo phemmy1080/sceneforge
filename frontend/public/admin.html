@@ -338,7 +338,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 ══════════════════════════════════════════════════ -->
 <div id="login-screen">
   <nav class="login-nav">
-    <a href="http://localhost:5173" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none;color:var(--text3);font-size:12px;transition:color var(--transition)" onmouseover="this.style.color='var(--text2)'" onmouseout="this.style.color='var(--text3)'">
+    <a href="https://sceneforge.com" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none;color:var(--text3);font-size:12px;transition:color var(--transition)" onmouseover="this.style.color='var(--text2)'" onmouseout="this.style.color='var(--text3)'">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10 3L5 8l5 5"/></svg>Back to app
     </a>
     <div class="logo-text">Scene<em>Forge</em></div>
@@ -831,10 +831,10 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 
 <script>
-var API='http://127.0.0.1:8000/api/admin';
+var API='https://sceneforge-production-8d19.up.railway.app/api/admin';
 var USER_CACHE={};
-var AAPI='http://127.0.0.1:8000/api/admin-auth';
-var NAPI='http://127.0.0.1:8000/api/niches';
+var AAPI='https://sceneforge-production-8d19.up.railway.app/api/admin-auth';
+var NAPI='https://sceneforge-production-8d19.up.railway.app/api/niches';
 var KEY='',ROLE='',ALL_USERS=[],MODAL_USER=null,revChart=null;
 
 function apiFetch(path,opts){
