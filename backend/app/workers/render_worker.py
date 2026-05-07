@@ -36,9 +36,10 @@ async def render_video(ctx, job_id: str, payload: dict):
     output_dir = Path(settings.renders_dir) / job_id
 
     # user_id and prev_job_id are stored in Redis by render.py (not in payload)
-    user_id    = await redis.get(f"job:{job_id}:user_id")
+    user_id         = await redis.get(f"job:{job_id}:user_id")
     prev_job_stored = await redis.get(f"job:{job_id}:prev_job_id")
     output_dir.mkdir(parents=True, exist_ok=True)
+    logger.info("Job %s — user_id=%s prev_job=%s", job_id, user_id, prev_job_stored)
 
     try:
         # ── Stage 1: Voice synthesis ──────────────────────────────────────────
@@ -143,9 +144,11 @@ async def render_video(ctx, job_id: str, payload: dict):
         tokens_remaining = 0
         is_re_render     = bool(prev_job_stored or payload.get("prev_job_id"))
 
+        logger.info("Token deduction check — user_id=%s is_re_render=%s", user_id, is_re_render)
         if user_id and not is_re_render:
             try:
                 raw_user = await redis.get(f"user:{user_id}")
+                logger.info("Raw user data found: %s", bool(raw_user))
                 if raw_user:
                     user_data = json.loads(raw_user)
                     cost      = getattr(settings, "cost_per_video", 100)
