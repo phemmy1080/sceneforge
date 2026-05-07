@@ -17,61 +17,66 @@ from app.models.schemas import (
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
-_client: Optional[AsyncOpenAI] = None
+# ── Cached clients ────────────────────────────────────────────────────────────
+_groq_client:   Optional[AsyncOpenAI] = None
+_openai_client: Optional[AsyncOpenAI] = None
+
+PREMIUM_PLANS = {"pro", "studio"}
 
 
-def get_client() -> AsyncOpenAI:
-    global _client
-    if _client is not None:
-        return _client
-
-    if settings.groq_api_key:
-        _client = AsyncOpenAI(
+def _get_groq_client() -> AsyncOpenAI:
+    global _groq_client
+    if _groq_client is None:
+        if not settings.groq_api_key:
+            raise ValueError("GROQ_API_KEY not set")
+        _groq_client = AsyncOpenAI(
             api_key=settings.groq_api_key,
             base_url="https://api.groq.com/openai/v1",
         )
-        logger.info("Using Groq — model: %s", settings.groq_model)
+        logger.info("Groq client initialised — model: %s", settings.groq_model)
+    return _groq_client
 
-    elif settings.gemini_api_key:
-        # Gemini via OpenAI-compatible endpoint
-        _client = AsyncOpenAI(
-            api_key=settings.gemini_api_key,
-            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-        )
-        logger.info("Using Gemini — model: %s", settings.gemini_model)
 
-    elif settings.grok_api_key:
-        _client = AsyncOpenAI(
-            api_key=settings.grok_api_key,
-            base_url="https://api.x.ai/v1",
-        )
-        logger.info("Using Grok (xAI) — model: %s", settings.grok_model)
+def _get_openai_client() -> AsyncOpenAI:
+    global _openai_client
+    if _openai_client is None:
+        import os
+        openai_key = os.environ.get("OPENAI_API_KEY", "")
+        if not openai_key:
+            raise ValueError("OPENAI_API_KEY not set")
+        _openai_client = AsyncOpenAI(api_key=openai_key)
+        logger.info("OpenAI client initialised — model: gpt-4o")
+    return _openai_client
 
-    elif settings.anthropic_api_key:
-        _client = AsyncOpenAI(
-            api_key=settings.anthropic_api_key,
-            base_url="https://api.anthropic.com/v1",
-        )
-        logger.info("Using Anthropic compat — model: %s", settings.claude_model)
 
-    else:
-        raise ValueError(
-            "No AI API key found. Set GROQ_API_KEY in your .env file. "
-            "Get a free key at https://console.groq.com"
-        )
+def _client_and_model(plan: str = "free") -> tuple[AsyncOpenAI, str]:
+    """Return (client, model) based on user plan."""
+    import os
+    openai_key = os.environ.get("OPENAI_API_KEY", "")
+    if plan.lower() in PREMIUM_PLANS and openai_key:
+        logger.info("Using OpenAI (gpt-4o) for plan=%s", plan)
+        return _get_openai_client(), "gpt-4o"
+    logger.info("Using Groq (%s) for plan=%s", settings.groq_model, plan)
+    return _get_groq_client(), settings.groq_model
 
-    return _client
 
+def get_provider_info(plan: str = "free") -> dict:
+    """Return provider info — used by generate.py for logging."""
+    import os
+    if plan.lower() in PREMIUM_PLANS and os.environ.get("OPENAI_API_KEY"):
+        return {"provider": "openai", "model": "gpt-4o"}
+    return {"provider": "groq", "model": settings.groq_model}
+
+
+# ── Kept for backwards compatibility (used by existing code that calls get_client()) ──
+def get_client() -> AsyncOpenAI:
+    return _get_groq_client()
 
 def _model() -> str:
-    if settings.groq_api_key:
-        return settings.groq_model
-    if settings.gemini_api_key:
-        return settings.gemini_model
-    if settings.grok_api_key:
-        return settings.grok_model
-    return settings.claude_model
+    return settings.groq_model
 
+
+# ── JSON cleaning ─────────────────────────────────────────────────────────────
 
 def _clean_json(raw: str) -> str:
     raw = re.sub(r"```(?:json)?", "", raw).strip()
@@ -84,10 +89,11 @@ def _clean_json(raw: str) -> str:
     return raw
 
 
-async def generate_ideas(req: GenerateIdeasRequest) -> list[IdeaItem]:
-    client = get_client()
+# ── Public API ────────────────────────────────────────────────────────────────
 
-    # Build hints section from user-supplied topic tags
+async def generate_ideas(req: GenerateIdeasRequest, plan: str = "free") -> list[IdeaItem]:
+    client, model = _client_and_model(plan)
+
     hints_section = ""
     if req.idea_tags:
         hints_section = f"""
@@ -112,12 +118,12 @@ Return ONLY a valid JSON array of 6 objects — no explanation, no markdown:
 - angle: unique approach or angle (max 60 chars)"""
 
     response = await client.chat.completions.create(
-        model=_model(),
+        model=model,
         max_tokens=1024,
         temperature=0.8,
         messages=[
             {"role": "system", "content": "You are a viral content strategist. Return only valid JSON arrays, no markdown, no explanation."},
-            {"role": "user", "content": prompt},
+            {"role": "user",   "content": prompt},
         ],
     )
 
@@ -133,9 +139,9 @@ Return ONLY a valid JSON array of 6 objects — no explanation, no markdown:
     return [IdeaItem(**item) for item in data]
 
 
-async def generate_script(req: GenerateScriptRequest) -> str:
-    client = get_client()
-    is_long = "YouTube" in req.platform and "Shorts" not in req.platform
+async def generate_script(req: GenerateScriptRequest, plan: str = "free") -> str:
+    client, model = _client_and_model(plan)
+    is_long  = "YouTube" in req.platform and "Shorts" not in req.platform
     duration = "3-5 minutes (450-700 words)" if is_long else "45-60 seconds (120-160 words)"
 
     prompt = f"""Write a complete {req.style} video script for {req.platform}.
@@ -152,21 +158,22 @@ Add visual cues like [SHOW: chart] or [CUT TO: talking head].
 Short punchy sentences for voiceover. No markdown."""
 
     response = await client.chat.completions.create(
-        model=_model(),
+        model=model,
         max_tokens=2048,
         temperature=0.7,
         messages=[
             {"role": "system", "content": "You are an expert short-form video scriptwriter."},
-            {"role": "user", "content": prompt},
+            {"role": "user",   "content": prompt},
         ],
     )
-
     return response.choices[0].message.content or ""
 
 
-async def stream_script(req: GenerateScriptRequest) -> AsyncGenerator[str, None]:
-    client = get_client()
-    is_long = "YouTube" in req.platform and "Shorts" not in req.platform
+async def stream_script(
+    req: GenerateScriptRequest, plan: str = "free"
+) -> AsyncGenerator[str, None]:
+    client, model = _client_and_model(plan)
+    is_long  = "YouTube" in req.platform and "Shorts" not in req.platform
     duration = "3-5 minutes" if is_long else "45-60 seconds"
 
     prompt = f"""Write a complete {req.style} video script.
@@ -177,13 +184,13 @@ Use [HOOK] [INTRO] [MAIN] [CTA] section labels.
 Add [SHOW: ...] visual cues. Short punchy sentences."""
 
     stream = await client.chat.completions.create(
-        model=_model(),
+        model=model,
         max_tokens=2048,
         temperature=0.7,
         stream=True,
         messages=[
             {"role": "system", "content": "You are an expert short-form video scriptwriter."},
-            {"role": "user", "content": prompt},
+            {"role": "user",   "content": prompt},
         ],
     )
 
@@ -193,8 +200,8 @@ Add [SHOW: ...] visual cues. Short punchy sentences."""
             yield delta
 
 
-async def generate_scenes(req: GenerateScenesRequest) -> list[Scene]:
-    client = get_client()
+async def generate_scenes(req: GenerateScenesRequest, plan: str = "free") -> list[Scene]:
+    client, model = _client_and_model(plan)
 
     prompt = f"""You are a professional video editor. Break this script into scenes.
 
@@ -229,12 +236,12 @@ Rules:
 - Each scene text = one complete thought or paragraph from the script"""
 
     response = await client.chat.completions.create(
-        model=_model(),
+        model=model,
         max_tokens=8192,
         temperature=0.1,
         messages=[
             {"role": "system", "content": "You are a video production assistant. Return only valid JSON arrays, no markdown."},
-            {"role": "user", "content": prompt},
+            {"role": "user",   "content": prompt},
         ],
     )
 
@@ -251,8 +258,9 @@ Rules:
     for item in data:
         t = str(item.get('type', 'main')).lower().strip()
         if t not in valid_types:
-            if t.startswith('ct'): item['type'] = 'cta'
+            if t.startswith('ct'):   item['type'] = 'cta'
             elif t.startswith('ho'): item['type'] = 'hook'
             elif t.startswith('in'): item['type'] = 'intro'
-            else: item['type'] = 'main'
+            else:                    item['type'] = 'main'
+
     return [Scene(**item) for item in data]
