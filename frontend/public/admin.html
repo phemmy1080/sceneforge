@@ -1119,12 +1119,13 @@ async function loadRevenue(){
     }catch(e){rate=CACHED_RATE||1600;}
     var totalUsd=(total/rate);
     var avgNgn=txCount>0?Math.round(total/txCount):0;
-    document.getElementById('rev-ngn').textContent='₦'+fmt(Math.round(total));
-    document.getElementById('rev-usd').textContent='$'+totalUsd.toFixed(2);
-    document.getElementById('rev-usd-sub').textContent='≈ $'+totalUsd.toFixed(2)+' USD';
-    document.getElementById('rev-rate-sub').textContent='Rate: ₦'+Math.round(rate)+'/$1';
-    document.getElementById('rev-count').textContent=fmt(txCount);
-    document.getElementById('rev-avg').textContent='₦'+fmt(avgNgn);
+    function _set(id,val){var el=document.getElementById(id);if(el)el.textContent=val;}
+    _set('rev-ngn','₦'+fmt(Math.round(total)));
+    _set('rev-usd','$'+totalUsd.toFixed(2));
+    _set('rev-usd-sub','≈ $'+totalUsd.toFixed(2)+' USD');
+    _set('rev-rate-sub','Rate: ₦'+Math.round(rate)+'/$1');
+    _set('rev-count',fmt(txCount));
+    _set('rev-avg','₦'+fmt(avgNgn));
     REV_CHART_DATA=chart; REV_TOTAL=total; REV_TX=txCount; REV_RATE=rate;
     var ctx=document.getElementById('revenue-chart').getContext('2d');
     if(revChart)revChart.destroy();
