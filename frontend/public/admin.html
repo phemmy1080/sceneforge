@@ -603,20 +603,49 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 
     <!-- BROADCAST -->
     <div class="pg" id="pg-broadcast">
-      <div class="ph"><div class="ph-title">Email broadcast</div><div class="ph-sub">Send a message to all active users</div></div>
+      <div class="ph"><div class="ph-title">Email broadcast</div><div class="ph-sub">Send targeted emails — all users, by plan, or a single user</div></div>
       <div id="alert-broadcast" class="alert"></div>
       <div class="two-col">
         <div class="card">
           <div class="card-hdr"><span class="card-title">Compose message</span></div>
           <div style="padding:20px">
-            <div class="field"><label>Subject</label><input type="text" id="bc-subject" placeholder="e.g. New features just dropped!"></div>
-            <div class="field"><label>Message body</label><textarea id="bc-message" rows="7" placeholder="Write your message here..."></textarea></div>
-            <button class="btn btn-gold" style="width:100%;justify-content:center" onclick="doBroadcast()">Send to all users</button>
-            <p style="font-size:11px;color:var(--text3);text-align:center;margin-top:10px">Only sent to non-suspended accounts</p>
+            <div class="field">
+              <label>Send to</label>
+              <div style="display:flex;gap:8px">
+                <button id="bt-all" class="btn btn-teal btn-sm" onclick="setBcTarget('all')" style="flex:1">&#127760; All users</button>
+                <button id="bt-plan" class="btn btn-ghost btn-sm" onclick="setBcTarget('plan')" style="flex:1">&#128203; By plan</button>
+                <button id="bt-user" class="btn btn-ghost btn-sm" onclick="setBcTarget('user')" style="flex:1">&#128100; One user</button>
+              </div>
+            </div>
+            <div id="bc-plan-row" class="field" style="display:none">
+              <label>Plan</label>
+              <select id="bc-plan" style="width:100%;background:var(--ink3);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-size:13px;padding:10px 13px;outline:none">
+                <option value="free">Free</option>
+                <option value="starter">Starter</option>
+                <option value="pro">Pro</option>
+                <option value="studio">Studio</option>
+              </select>
+            </div>
+            <div id="bc-user-row" class="field" style="display:none">
+              <label>User ID</label>
+              <input type="text" id="bc-user-id" placeholder="e6e31718-4b58-446f-8a05-b11ef670afae">
+              <div style="font-size:11px;color:var(--text3);margin-top:4px">Find IDs in Users tab &middot; copy from Manage modal</div>
+            </div>
+            <div class="field"><label>Subject &mdash; use {{name}} to personalise</label><input type="text" id="bc-subject" placeholder="e.g. New feature just dropped!"></div>
+            <div class="field"><label>Message &mdash; use {{name}} or {{email}}</label><textarea id="bc-message" rows="7" placeholder="Hi {{name}},&#10;&#10;We just shipped something big...&#10;&#10;&mdash; SceneForge Team"></textarea></div>
+            <div id="bc-preview-wrap" style="display:none;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px;margin-bottom:12px;font-size:13px;color:rgba(255,255,255,0.7);line-height:1.7">
+              <div style="font-size:10px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em">Preview ({{name}} = "Creator")</div>
+              <div id="bc-preview-body" style="white-space:pre-wrap"></div>
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:12px">
+              <button class="btn btn-ghost btn-sm" onclick="toggleBcPreview()" style="flex:1">Preview message</button>
+            </div>
+            <button class="btn btn-gold" style="width:100%;justify-content:center" onclick="doBroadcast()">Send broadcast &rarr;</button>
+            <p style="font-size:11px;color:var(--text3);text-align:center;margin-top:10px">Suspended accounts are always skipped</p>
           </div>
         </div>
         <div class="card">
-          <div class="card-hdr"><span class="card-title">Sent broadcasts</span></div>
+          <div class="card-hdr"><span class="card-title">Sent broadcasts</span><button class="btn btn-ghost btn-sm" onclick="loadBroadcasts()">Refresh</button></div>
           <div id="broadcast-history"><div class="loading"></div></div>
         </div>
       </div>
@@ -802,11 +831,10 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 
 <script>
-var API='https://sceneforge-production-8d19.up.railway.app/api/admin';
-  //https://sceneforge-production-8d19.up.railway.app
+var API='http://127.0.0.1:8000/api/admin';
 var USER_CACHE={};
-var AAPI='https://sceneforge-production-8d19.up.railway.app/api/admin-auth';
-var NAPI='https://sceneforge-production-8d19.up.railway.app/api/niches';
+var AAPI='http://127.0.0.1:8000/api/admin-auth';
+var NAPI='http://127.0.0.1:8000/api/niches';
 var KEY='',ROLE='',ALL_USERS=[],MODAL_USER=null,revChart=null;
 
 function apiFetch(path,opts){
@@ -985,16 +1013,63 @@ async function doTopUp(){
 }
 function setTopup(n){document.getElementById('topup-amount').value=n;}
 
+var BC_TARGET='all';
+function setBcTarget(t){
+  BC_TARGET=t;
+  ['all','plan','user'].forEach(function(x){
+    var btn=document.getElementById('bt-'+x);
+    if(btn)btn.className='btn btn-sm '+(x===t?'btn-teal':'btn-ghost');
+  });
+  document.getElementById('bc-plan-row').style.display=t==='plan'?'block':'none';
+  document.getElementById('bc-user-row').style.display=t==='user'?'block':'none';
+}
+function toggleBcPreview(){
+  var w=document.getElementById('bc-preview-wrap'),msg=document.getElementById('bc-message').value;
+  if(w.style.display==='none'){
+    w.style.display='block';
+    document.getElementById('bc-preview-body').textContent=msg.replace(/{{name}}/g,'Creator').replace(/{{email}}/g,'creator@example.com');
+  }else{w.style.display='none';}
+}
 async function doBroadcast(){
-  var subj=document.getElementById('bc-subject').value.trim(),msg=document.getElementById('bc-message').value.trim();
+  var subj=document.getElementById('bc-subject').value.trim();
+  var msg=document.getElementById('bc-message').value.trim();
+  var plan=document.getElementById('bc-plan')&&document.getElementById('bc-plan').value;
+  var userId=document.getElementById('bc-user-id')&&document.getElementById('bc-user-id').value.trim();
   if(!subj||!msg){showAlert('broadcast','Fill subject and message','error');return;}
-  if(!confirm('Send "'+subj+'" to all users?'))return;
-  try{var r=await apiFetch('/broadcast',{method:'POST',body:JSON.stringify({subject:subj,message:msg})});showAlert('broadcast','Sent to '+r.sent+' users','success');document.getElementById('bc-subject').value='';document.getElementById('bc-message').value='';loadBroadcasts();}
-  catch(e){showAlert('broadcast',e.detail||'Failed','error');}
+  if(BC_TARGET==='plan'&&!plan){showAlert('broadcast','Select a plan','error');return;}
+  if(BC_TARGET==='user'&&!userId){showAlert('broadcast','Enter a user ID','error');return;}
+  var label=BC_TARGET==='all'?'ALL users':BC_TARGET==='plan'?'all '+plan.toUpperCase()+' plan users':'user '+userId.slice(0,8)+'...';
+  if(!confirm('Send "'+subj+'" to '+label+'?\n\nThis cannot be undone.'))return;
+  try{
+    var body={subject:subj,message:msg,target:BC_TARGET};
+    if(BC_TARGET==='plan')body.plan=plan;
+    if(BC_TARGET==='user')body.user_id=userId;
+    var r=await apiFetch('/broadcast',{method:'POST',body:JSON.stringify(body)});
+    showAlert('broadcast','Sent '+r.sent+' | Failed '+r.failed+' | Skipped '+r.skipped+' (of '+r.total+' matched)','success');
+    document.getElementById('bc-subject').value='';
+    document.getElementById('bc-message').value='';
+    document.getElementById('bc-preview-wrap').style.display='none';
+    loadBroadcasts();
+  }catch(e){showAlert('broadcast',e.detail||'Broadcast failed','error');}
 }
 async function loadBroadcasts(){
-  try{var d=await apiFetch('/broadcasts');var list=d.broadcasts||[];document.getElementById('broadcast-history').innerHTML=list.length?list.map(function(b){return '<div class="bc-item"><div class="bc-subj">'+b.subject+'</div><div class="bc-meta">'+b.recipients+' recipients &middot; '+ago(b.ts)+'</div></div>';}).join(''):'<div class="loading">No broadcasts yet</div>';}
-  catch(e){document.getElementById('broadcast-history').innerHTML='<div class="loading">Failed</div>';}
+  try{
+    var d=await apiFetch('/broadcasts'),list=d.broadcasts||[];
+    var targetLabel=function(b){
+      if(b.target==='plan')return'Plan: '+b.plan;
+      if(b.target==='user')return'User: '+(b.user_id||'').slice(0,8)+'...';
+      return'All users';
+    };
+    document.getElementById('broadcast-history').innerHTML=list.length
+      ?list.map(function(b){
+        return'<div class="bc-item"><div class="bc-subj">'+b.subject+'</div>'
+          +'<div class="bc-meta">'+targetLabel(b)
+          +' &middot; <span style="color:var(--teal)">'+b.sent+' sent</span>'
+          +(b.failed>0?' &middot; <span style="color:var(--rose)">'+b.failed+' failed</span>':'')
+          +' &middot; '+ago(b.ts)+'</div></div>';
+      }).join('')
+      :'<div class="loading">No broadcasts yet</div>';
+  }catch(e){document.getElementById('broadcast-history').innerHTML='<div class="loading">Failed</div>';}
 }
 
 async function loadRevenue(){
