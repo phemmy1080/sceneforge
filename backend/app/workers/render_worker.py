@@ -187,6 +187,8 @@ async def render_video(ctx, job_id: str, payload: dict):
                 if raw_user:
                     user_data = json.loads(raw_user)
                     from app.services.email import send_render_complete
+                    # Get project_id from payload for deep link
+                    project_id = payload.get("project_id") or payload.get("project_title", "")
                     await send_render_complete(
                         to_email=user_data.get("email", ""),
                         full_name=user_data.get("full_name", "Creator"),
@@ -195,6 +197,7 @@ async def render_video(ctx, job_id: str, payload: dict):
                         duration=int(sum(s.duration for s in req.scenes)),
                         video_url=video_url,
                         tokens_remaining=tokens_remaining,
+                        job_id=job_id,
                     )
                     logger.info("Render complete email sent → %s", user_data.get("email"))
             except Exception as e:
