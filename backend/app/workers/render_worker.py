@@ -151,16 +151,24 @@ async def render_video(ctx, job_id: str, payload: dict):
                 logger.info("Raw user data found: %s", bool(raw_user))
                 if raw_user:
                     user_data = json.loads(raw_user)
-                    cost      = getattr(settings, "cost_per_video", 100)
-                    new_bal   = max(0, user_data.get("tokens_remaining", 0) - cost)
+                    current   = user_data.get("tokens_remaining", 0)
+                    cost      = 100  # hardcoded — avoids settings attribute issues
+                    new_bal   = max(0, current - cost)
                     user_data["tokens_remaining"] = new_bal
                     user_data["videos_created"]   = user_data.get("videos_created", 0) + 1
-                    await redis.set(f"user:{user_id}", json.dumps(user_data))
+                    result = await redis.set(f"user:{user_id}", json.dumps(user_data))
                     tokens_remaining = new_bal
-                    logger.info("Tokens deducted — user=%s cost=%d remaining=%d",
-                                user_id, cost, new_bal)
+                    logger.info("Tokens deducted ✓ — user=%s %d→%d (result=%s)",
+                                user_id, current, new_bal, result)
+                else:
+                    logger.warning("No user data in Redis for user_id=%s key=user:%s",
+                                   user_id, user_id)
             except Exception as e:
-                logger.error("Token deduction failed for user %s: %s", user_id, e)
+                logger.error("Token deduction FAILED for user %s: %s", user_id, e, exc_info=True)
+        elif not user_id:
+            logger.warning("Cannot deduct tokens — user_id is None/empty")
+        elif is_re_render:
+            logger.info("Re-render — tokens not deducted")
         elif user_id and is_re_render:
             try:
                 raw_user = await redis.get(f"user:{user_id}")
@@ -230,28 +238,14 @@ def _make_redis_settings(url: str) -> RedisSettings:
 
 async def startup(ctx):
     """Called by ARQ when worker starts."""
-    import os, sys
-    account = os.environ.get("R2_ACCOUNT_ID", "")
-    access  = os.environ.get("R2_ACCESS_KEY", "")
-    secret  = os.environ.get("R2_SECRET_KEY", "")
-    bucket  = os.environ.get("R2_BUCKET", "")
-    pub_url = os.environ.get("R2_PUBLIC_URL", "")
-    # Use both print and logger to ensure visibility
-    # List ALL env vars to find any R2-related ones
-    all_r2 = {k: v[:8]+"..." for k, v in os.environ.items() if "R2" in k.upper()}
-    msg = (
-        f"=== WORKER STARTUP v2 ===\n"
-        f"R2_ACCOUNT_ID: {account[:8] + '...' if account else '*** MISSING ***'}\n"
-        f"R2_ACCESS_KEY:  {access[:8]  + '...' if access  else '*** MISSING ***'}\n"
-        f"R2_SECRET_KEY:  {secret[:8]  + '...' if secret  else '*** MISSING ***'}\n"
-        f"R2_BUCKET:      {bucket or '*** MISSING ***'}\n"
-        f"R2_PUBLIC_URL:  {pub_url or '*** MISSING ***'}\n"
-        f"ALL R2 env vars found: {all_r2}\n"
-        f"========================"
-    )
-    print(msg, flush=True)
-    sys.stdout.flush()
-    logger.info(msg)
+    from app.services.storage import r2_enabled
+    enabled = r2_enabled()
+    logger.info("Worker started — R2 enabled: %s", enabled)
+    if not enabled:
+        import os
+        missing = [k for k in ["R2_ACCOUNT_ID","R2_ACCESS_KEY","R2_SECRET_KEY","R2_BUCKET"]
+                   if not os.environ.get(k)]
+        logger.warning("R2 disabled — missing: %s", missing)
 
 
 class WorkerSettings:
