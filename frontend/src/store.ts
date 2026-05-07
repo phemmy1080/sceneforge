@@ -167,10 +167,40 @@ export const useStore = create<AppState>()(
               folders: newFolders,
               folderOpen: { ...s.folderOpen, [folder]: true },
               activeProjectId: id,
+              // Reset config for new project
+              config: { ...DEFAULT_CONFIG, niche, style, platform },
+              // Clear all workflow state from previous project
+              ideas: [],
+              selectedIdea: null,
+              script: '',
+              wordCount: 0,
+              estimatedDuration: 0,
+              scenes: [],
+              activeSceneIndex: 0,
+              jobId: null,
+              videoUrl: null,
+              renderProgress: 0,
+              renderStage: '',
+              renderStatus: 'idle',
+              uploadedVoicePath: null,
+              voiceConfig: DEFAULT_VOICE,
+          }
+          })
+
+          /*
+          set((s) => {
+            const newFolders = { ...s.folders }
+            if (!newFolders[folder]) newFolders[folder] = []
+            newFolders[folder] = [id, ...newFolders[folder]]
+            return {
+              projects: [proj, ...s.projects],
+              folders: newFolders,
+              folderOpen: { ...s.folderOpen, [folder]: true },
+              activeProjectId: id,
               config: { ...s.config, niche, style, platform },
             }
           })
-
+*/
           // Create on backend immediately
           projectsApi.create({ id, name, niche, style, platform, folder })
             .then(() => {
