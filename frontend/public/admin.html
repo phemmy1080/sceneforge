@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root {
   --ink: #0a0a0f;
@@ -519,7 +521,17 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 
     <!-- ANALYTICS -->
     <div class="pg" id="pg-analytics">
-      <div class="ph"><div class="ph-title">Analytics</div><div class="ph-sub">Content trends and platform usage</div></div>
+      <div class="ph">
+        <div class="ph-top">
+          <div><div class="ph-title">Analytics</div><div class="ph-sub">Content trends and platform usage</div></div>
+          <div class="ph-actions">
+            <button class="btn btn-ghost btn-sm" onclick="exportAnalyticsExcel()">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 2h7l3 3v9H3z"/><path d="M10 2v4h4"/><path d="M5 9l2 2 4-4"/></svg>
+              Export Excel
+            </button>
+          </div>
+        </div>
+      </div>
       <div class="two-col" style="margin-bottom:18px">
         <div class="card">
           <div class="card-hdr"><span class="card-title">Top niches</span></div>
@@ -656,13 +668,20 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <div class="ph">
         <div class="ph-top">
           <div><div class="ph-title">Revenue</div><div class="ph-sub">NGN earned over the last 30 days</div></div>
-          <button class="btn btn-ghost btn-sm" onclick="loadRevenue()">Refresh</button>
+          <div class="ph-actions">
+            <button class="btn btn-ghost btn-sm" onclick="exportRevenueExcel()">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 2h7l3 3v9H3z"/><path d="M10 2v4h4"/><path d="M5 9l2 2 4-4"/></svg>
+              Export Excel
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="loadRevenue()">Refresh</button>
+          </div>
         </div>
       </div>
-      <div class="stat-row" style="grid-template-columns:repeat(3,1fr)" id="rev-stats">
-        <div class="stat gold"><div class="stat-label">Total revenue</div><div class="stat-val">—</div></div>
-        <div class="stat teal"><div class="stat-label">Transactions</div><div class="stat-val">—</div></div>
-        <div class="stat violet"><div class="stat-label">Avg transaction</div><div class="stat-val">—</div></div>
+      <div class="stat-row" style="grid-template-columns:repeat(4,1fr)" id="rev-stats">
+        <div class="stat gold"><div class="stat-label">Total revenue (NGN)</div><div class="stat-val" id="rev-ngn">—</div></div>
+        <div class="stat teal"><div class="stat-label">Total revenue (USD)</div><div class="stat-val" id="rev-usd">—</div><div class="stat-meta" id="rev-rate"></div></div>
+        <div class="stat rose"><div class="stat-label">Transactions</div><div class="stat-val" id="rev-count">—</div></div>
+        <div class="stat violet"><div class="stat-label">Avg transaction</div><div class="stat-val" id="rev-avg">—</div></div>
       </div>
       <div class="card">
         <div class="card-hdr"><span class="card-title">Daily revenue (NGN)</span></div>
@@ -672,7 +691,18 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 
     <!-- TRANSACTIONS -->
     <div class="pg" id="pg-tx">
-      <div class="ph"><div class="ph-title">Transactions</div><div class="ph-sub">All completed Flutterwave payments</div></div>
+      <div class="ph">
+        <div class="ph-top">
+          <div><div class="ph-title">Transactions</div><div class="ph-sub">All completed Flutterwave payments</div></div>
+          <div class="ph-actions">
+            <button class="btn btn-ghost btn-sm" onclick="exportTxExcel()">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 2h7l3 3v9H3z"/><path d="M10 2v4h4"/><path d="M5 9l2 2 4-4"/></svg>
+              Export Excel
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="loadTx()">Refresh</button>
+          </div>
+        </div>
+      </div>
       <div class="card">
         <table><thead><tr>
           <th style="width:26%">Transaction ID</th><th style="width:16%">Plan</th>
@@ -836,6 +866,8 @@ var USER_CACHE={};
 var AAPI='https://sceneforge-production-8d19.up.railway.app/api/admin-auth';
 var NAPI='https://sceneforge-production-8d19.up.railway.app/api/niches';
 var KEY='',ROLE='',ALL_USERS=[],MODAL_USER=null,revChart=null;
+var CACHED_RATE=0,REV_CHART_DATA=[],REV_TOTAL=0,REV_TX=0,REV_RATE=1600;
+var TX_DATA=[],ANA_DATA={};
 
 function apiFetch(path,opts){
   opts=opts||{};
@@ -940,7 +972,7 @@ async function loadDash(){
 
 async function loadAnalytics(){
   try{
-    var s=await apiFetch('/stats');
+    var s=await apiFetch('/stats');ANA_DATA=s;
     document.getElementById('m-avg').textContent=s.avg_scenes_per_video||0;
     document.getElementById('m-scenes').textContent=fmt(s.total_scenes_generated||0);
     document.getElementById('m-videos').textContent=fmt(s.total_videos_created||0);
@@ -1075,8 +1107,25 @@ async function loadBroadcasts(){
 async function loadRevenue(){
   try{
     var d=await apiFetch('/revenue/chart'),chart=d.chart||[],total=d.total_revenue||0,txCount=d.total_transactions||0;
-    var cards=document.getElementById('rev-stats').querySelectorAll('.stat-val');
-    cards[0].textContent='N'+fmt(total);cards[1].textContent=fmt(txCount);cards[2].textContent='N'+fmt(txCount>0?Math.round(total/txCount):0);
+    // Fetch live exchange rate
+    var rate=CACHED_RATE||1600;
+    try{
+      if(!CACHED_RATE){
+        var er=await fetch('https://open.er-api.com/v6/latest/USD');
+        var erd=await er.json();
+        rate=erd.rates&&erd.rates.NGN?erd.rates.NGN:1600;
+        CACHED_RATE=rate;
+      }
+    }catch(e){rate=CACHED_RATE||1600;}
+    var totalUsd=(total/rate);
+    var avgNgn=txCount>0?Math.round(total/txCount):0;
+    document.getElementById('rev-ngn').textContent='₦'+fmt(Math.round(total));
+    document.getElementById('rev-usd').textContent='$'+totalUsd.toFixed(2);
+    document.getElementById('rev-usd-sub').textContent='≈ $'+totalUsd.toFixed(2)+' USD';
+    document.getElementById('rev-rate-sub').textContent='Rate: ₦'+Math.round(rate)+'/$1';
+    document.getElementById('rev-count').textContent=fmt(txCount);
+    document.getElementById('rev-avg').textContent='₦'+fmt(avgNgn);
+    REV_CHART_DATA=chart; REV_TOTAL=total; REV_TX=txCount; REV_RATE=rate;
     var ctx=document.getElementById('revenue-chart').getContext('2d');
     if(revChart)revChart.destroy();
     revChart=new Chart(ctx,{type:'bar',data:{labels:chart.map(function(c){return c.date.slice(5);}),datasets:[{data:chart.map(function(c){return c.amount;}),backgroundColor:'rgba(201,168,76,0.25)',borderColor:'rgba(201,168,76,0.7)',borderWidth:1,borderRadius:4,hoverBackgroundColor:'rgba(201,168,76,0.4)'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'rgba(240,240,248,0.35)',font:{size:10,family:'DM Mono'}}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'rgba(240,240,248,0.35)',font:{size:10,family:'DM Mono'}},beginAtZero:true}}}});
@@ -1084,7 +1133,7 @@ async function loadRevenue(){
 }
 
 async function loadTx(){
-  try{var d=await apiFetch('/transactions'),txns=d.transactions||[];document.getElementById('tx-tbody').innerHTML=txns.length?txns.map(function(t){return '<tr><td style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--text3)">'+(t.transaction_id||'—')+'</td><td>'+(t.plan?'<span class="tag tag-green">'+t.plan+'</span>':'—')+'</td><td style="font-family:\'DM Mono\',monospace;color:var(--teal)">'+(t.amount?'N'+fmt(t.amount):'—')+'</td><td style="font-family:\'DM Mono\',monospace">'+(t.tokens?fmt(t.tokens):'—')+'</td><td style="color:var(--text3)">'+(t.email||'—')+'</td><td style="color:var(--text3)">'+ago(t.ts)+'</td></tr>';}).join(''):'<tr><td colspan="6" class="loading">No transactions yet</td></tr>';}
+  try{var d=await apiFetch('/transactions'),txns=d.transactions||[];TX_DATA=txns;document.getElementById('tx-tbody').innerHTML=txns.length?txns.map(function(t){return '<tr><td style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--text3)">'+(t.transaction_id||'—')+'</td><td>'+(t.plan?'<span class="tag tag-green">'+t.plan+'</span>':'—')+'</td><td style="font-family:\'DM Mono\',monospace;color:var(--teal)">'+(t.amount?'N'+fmt(t.amount):'—')+'</td><td style="font-family:\'DM Mono\',monospace">'+(t.tokens?fmt(t.tokens):'—')+'</td><td style="color:var(--text3)">'+(t.email||'—')+'</td><td style="color:var(--text3)">'+ago(t.ts)+'</td></tr>';}).join(''):'<tr><td colspan="6" class="loading">No transactions yet</td></tr>';}
   catch(e){document.getElementById('tx-tbody').innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--rose);padding:20px">Failed to load</td></tr>';}
 }
 
@@ -1176,6 +1225,134 @@ function updateStrength(v){
   var s=0;if(v.length>=8)s++;if(/[A-Z]/.test(v))s++;if(/[0-9]/.test(v))s++;if(/[^A-Za-z0-9]/.test(v))s++;
   var bg=['','#f87171','#f59e0b','#2dd4bf','#4ade80'][s],lbs=['','Weak','Fair','Good','Strong'][s];
   bar.style.width=(s*25)+'%';bar.style.background=bg;lbl.textContent=lbs;lbl.style.color=bg;
+}
+
+// ── Excel export helpers ──────────────────────────────────────────────────────
+async function _xlsxDownload(wb, filename){
+  var buf=await wb.xlsx.writeBuffer();
+  var blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.download=filename;a.click();
+  URL.revokeObjectURL(url);
+}
+
+function _xlsxHeader(ws, cols){
+  var row=ws.addRow(cols.map(function(c){return c.header;}));
+  row.eachCell(function(cell){
+    cell.font={bold:true,color:{argb:'FFFFFFFF'},size:11};
+    cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF111118'}};
+    cell.border={bottom:{style:'thin',color:{argb:'FF444455'}}};
+    cell.alignment={vertical:'middle'};
+  });
+  cols.forEach(function(c,i){ws.getColumn(i+1).width=c.width||16;});
+}
+
+async function exportRevenueExcel(){
+  if(!REV_CHART_DATA.length){await loadRevenue();}
+  var wb=new ExcelJS.Workbook();
+  wb.creator='SceneForge Admin';wb.created=new Date();
+
+  // Sheet 1 — Daily revenue
+  var ws1=wb.addWorksheet('Daily Revenue');
+  _xlsxHeader(ws1,[
+    {header:'Date',width:14},{header:'Revenue (NGN)',width:18},
+    {header:'Revenue (USD)',width:18}
+  ]);
+  var rate=REV_RATE||1600;
+  REV_CHART_DATA.forEach(function(r){
+    ws1.addRow([r.date, r.amount, parseFloat((r.amount/rate).toFixed(2))]);
+  });
+  // Totals row
+  var tot=ws1.addRow(['TOTAL', REV_TOTAL, parseFloat((REV_TOTAL/rate).toFixed(2))]);
+  tot.eachCell(function(c){c.font={bold:true};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1A1A24'}};});
+
+  // Sheet 2 — Summary
+  var ws2=wb.addWorksheet('Summary');
+  _xlsxHeader(ws2,[{header:'Metric',width:28},{header:'Value',width:20}]);
+  var today=new Date().toISOString().slice(0,10);
+  [
+    ['Report date', today],
+    ['Total revenue (NGN)', '₦'+fmt(Math.round(REV_TOTAL))],
+    ['Total revenue (USD)', '$'+(REV_TOTAL/rate).toFixed(2)],
+    ['Total transactions', REV_TX],
+    ['Avg per transaction (NGN)', REV_TX>0?'₦'+fmt(Math.round(REV_TOTAL/REV_TX)):'—'],
+    ['Exchange rate used', '₦'+Math.round(rate)+'/$1'],
+  ].forEach(function(r){ws2.addRow(r);});
+
+  await _xlsxDownload(wb,'sceneforge_revenue_'+today+'.xlsx');
+}
+
+async function exportTxExcel(){
+  if(!TX_DATA.length){await loadTx();await new Promise(function(r){setTimeout(r,500);});}
+  var wb=new ExcelJS.Workbook();
+  wb.creator='SceneForge Admin';wb.created=new Date();
+  var ws=wb.addWorksheet('Transactions');
+  _xlsxHeader(ws,[
+    {header:'Transaction ID',width:32},{header:'Plan',width:12},
+    {header:'Amount (NGN)',width:16},{header:'Amount (USD)',width:16},
+    {header:'Tokens',width:12},{header:'User email',width:28},
+    {header:'User ID',width:36},{header:'Date',width:20}
+  ]);
+  var rate=CACHED_RATE||1600;
+  TX_DATA.forEach(function(t){
+    ws.addRow([
+      t.transaction_id||'',
+      t.plan||'',
+      t.amount||0,
+      parseFloat(((t.amount||0)/rate).toFixed(2)),
+      t.tokens||0,
+      t.email||'',
+      t.user_id||'',
+      t.ts?new Date(t.ts).toLocaleString():'',
+    ]);
+  });
+  // Summary row
+  var totalNgn=TX_DATA.reduce(function(s,t){return s+(t.amount||0);},0);
+  var sumRow=ws.addRow(['TOTAL','',totalNgn,parseFloat((totalNgn/rate).toFixed(2)),
+    TX_DATA.reduce(function(s,t){return s+(t.tokens||0);},0),'','','']);
+  sumRow.eachCell(function(c){c.font={bold:true};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1A1A24'}};});
+
+  var today=new Date().toISOString().slice(0,10);
+  await _xlsxDownload(wb,'sceneforge_transactions_'+today+'.xlsx');
+}
+
+async function exportAnalyticsExcel(){
+  if(!ANA_DATA.total_users){await loadAnalytics();await new Promise(function(r){setTimeout(r,500);});}
+  var wb=new ExcelJS.Workbook();
+  wb.creator='SceneForge Admin';wb.created=new Date();
+  var today=new Date().toISOString().slice(0,10);
+
+  // Sheet 1 — Platform summary
+  var ws1=wb.addWorksheet('Platform Summary');
+  _xlsxHeader(ws1,[{header:'Metric',width:30},{header:'Value',width:20}]);
+  [
+    ['Report date', today],
+    ['Total users', ANA_DATA.total_users||0],
+    ['Total videos created', ANA_DATA.total_videos_created||0],
+    ['Total scenes generated', ANA_DATA.total_scenes_generated||0],
+    ['Avg scenes per video', ANA_DATA.avg_scenes_per_video||0],
+    ['Total transactions', ANA_DATA.total_transactions||0],
+    ['Tokens in circulation', ANA_DATA.total_tokens_in_circulation||0],
+  ].forEach(function(r){ws1.addRow(r);});
+
+  // Sheet 2 — Users by plan
+  var ws2=wb.addWorksheet('Users by Plan');
+  _xlsxHeader(ws2,[{header:'Plan',width:16},{header:'Users',width:12},{header:'% of total',width:14}]);
+  var plans=ANA_DATA.users_by_plan||{};
+  var totalUsers=ANA_DATA.total_users||1;
+  Object.entries(plans).forEach(function(e){
+    ws2.addRow([e[0], e[1], parseFloat((e[1]/totalUsers*100).toFixed(1))+'%']);
+  });
+
+  // Sheet 3 — Top niches
+  var ws3=wb.addWorksheet('Top Niches');
+  _xlsxHeader(ws3,[{header:'Niche',width:24},{header:'Videos',width:14}]);
+  var niches=ANA_DATA.top_niches||{};
+  Object.entries(niches).sort(function(a,b){return b[1]-a[1];}).forEach(function(e){
+    ws3.addRow([e[0], e[1]]);
+  });
+
+  await _xlsxDownload(wb,'sceneforge_analytics_'+today+'.xlsx');
 }
 </script>
 </body>
