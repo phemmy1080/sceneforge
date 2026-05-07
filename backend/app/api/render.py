@@ -139,6 +139,10 @@ async def start_render(
     if niche:
         await redis.set(f"job:{job_id}:niche", niche, ex=86400)
 
+    project_id = getattr(req, "project_id", None) or ""
+    if project_id:
+        await redis.set(f"job:{job_id}:project_id", project_id, ex=86400)
+   
     pool = await arq.create_pool(
         arq.connections.RedisSettings.from_dsn(settings.redis_url)
     )
