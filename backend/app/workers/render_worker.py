@@ -36,8 +36,11 @@ async def render_video(ctx, job_id: str, payload: dict):
     output_dir = Path(settings.renders_dir) / job_id
 
     # user_id and prev_job_id are stored in Redis by render.py (not in payload)
-    user_id         = await redis.get(f"job:{job_id}:user_id")
-    prev_job_stored = await redis.get(f"job:{job_id}:prev_job_id")
+    _uid            = await redis.get(f"job:{job_id}:user_id")
+    _prev           = await redis.get(f"job:{job_id}:prev_job_id")
+    # decode bytes → str if Redis returns bytes instead of str
+    user_id         = _uid.decode()  if isinstance(_uid,  bytes) else _uid
+    prev_job_stored = _prev.decode() if isinstance(_prev, bytes) else _prev
     output_dir.mkdir(parents=True, exist_ok=True)
     logger.info("Job %s — user_id=%s prev_job=%s", job_id, user_id, prev_job_stored)
 
