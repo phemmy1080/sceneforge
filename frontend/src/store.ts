@@ -357,6 +357,7 @@ export const useStore = create<AppState>()(
             project_title: selectedIdea?.title ?? activeProject?.name ?? 'Untitled',
             platform: config.platform,
             uploaded_voice_path: uploadedVoicePath ?? null,
+            project_id: activeProjectId ?? undefined,
           }
         },
 
