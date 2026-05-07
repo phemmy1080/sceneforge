@@ -234,6 +234,10 @@ async def send_token_confirmation(
     await _send(to_email, subject, html, text)
 
 
+"""
+Replace send_render_complete in backend/app/services/email.py
+"""
+
 async def send_render_complete(
     to_email: str,
     full_name: str,
@@ -242,10 +246,22 @@ async def send_render_complete(
     duration: int,
     video_url: str,
     tokens_remaining: int,
+    job_id: str = "",
+    project_id: str = "",
 ) -> None:
-    """Send render complete notification email."""
-    app_url = settings.frontend_origin
-    subject = f'🎬 Your video "{project_title}" is ready!'
+    """Send render complete notification with direct download + deep link."""
+    from app.config import get_settings
+    app_url = get_settings().frontend_origin
+
+    # Direct R2 download URL (works without login if R2 is public)
+    direct_download = video_url  # R2 public URL — no auth needed
+
+    # Deep link → opens app → auto-navigates to export step for this project
+    # App reads ?job_id= and ?project_id= from URL on load
+    deep_link = f"{app_url}?job_id={job_id}&project_id={project_id}&step=export"
+
+    subject = f'🎬 Your video "{project_title}" is ready to download!'
+
     html = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#080810;font-family:Arial,sans-serif;color:#F0F0FF">
@@ -253,46 +269,76 @@ async def send_render_complete(
     <tr><td align="center">
       <table width="520" cellpadding="0" cellspacing="0"
         style="background:#111118;border-radius:16px;border:1px solid rgba(255,255,255,0.08);overflow:hidden">
+
+        <!-- Header -->
         <tr><td style="background:linear-gradient(135deg,#1a0d33,#0a1a2e);padding:28px 40px;text-align:center">
           <h1 style="margin:0;font-size:24px;font-weight:800;color:#fff">
             Scene<span style="color:#A78BFA">Forge</span>
           </h1>
           <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.45)">Your video is ready</p>
         </td></tr>
+
+        <!-- Body -->
         <tr><td style="padding:36px 40px;text-align:center">
           <div style="font-size:48px;margin-bottom:16px">🎬</div>
           <h2 style="margin:0 0 8px;font-size:20px;font-weight:800;color:#fff">{project_title}</h2>
           <p style="margin:0 0 28px;font-size:13px;color:rgba(255,255,255,0.45)">
-            Hi {full_name}, your video has finished rendering and is ready to download.
+            Hi {full_name}, your video has finished rendering!
           </p>
+
+          <!-- Stats -->
           <div style="background:rgba(45,212,191,0.08);border:1px solid rgba(45,212,191,0.2);
-            border-radius:12px;padding:16px 24px;display:inline-block;margin-bottom:28px">
-            <table cellpadding="0" cellspacing="0"><tr>
-              <td style="text-align:center;padding:0 16px">
-                <p style="margin:0;font-size:24px;font-weight:800;color:#fff">{scene_count}</p>
-                <p style="margin:4px 0 0;font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.08em">Scenes</p>
+            border-radius:12px;padding:16px;margin-bottom:28px;display:inline-block;width:100%;box-sizing:border-box">
+            <table width="100%" cellpadding="0" cellspacing="0"><tr>
+              <td style="text-align:center;padding:0 8px">
+                <p style="margin:0;font-size:22px;font-weight:800;color:#fff">{scene_count}</p>
+                <p style="margin:3px 0 0;font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.08em">Scenes</p>
               </td>
               <td style="width:1px;background:rgba(255,255,255,0.08)"></td>
-              <td style="text-align:center;padding:0 16px">
-                <p style="margin:0;font-size:24px;font-weight:800;color:#fff">{duration}s</p>
-                <p style="margin:4px 0 0;font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.08em">Duration</p>
+              <td style="text-align:center;padding:0 8px">
+                <p style="margin:0;font-size:22px;font-weight:800;color:#fff">{duration}s</p>
+                <p style="margin:3px 0 0;font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.08em">Duration</p>
               </td>
               <td style="width:1px;background:rgba(255,255,255,0.08)"></td>
-              <td style="text-align:center;padding:0 16px">
-                <p style="margin:0;font-size:24px;font-weight:800;color:#2DD4BF">{tokens_remaining:,}</p>
-                <p style="margin:4px 0 0;font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.08em">Tokens left</p>
+              <td style="text-align:center;padding:0 8px">
+                <p style="margin:0;font-size:22px;font-weight:800;color:#2DD4BF">{tokens_remaining:,}</p>
+                <p style="margin:3px 0 0;font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.08em">Tokens left</p>
               </td>
             </tr></table>
-          </div><br>
-          <a href="{app_url}" style="display:inline-block;background:#7C5CFF;color:#fff;
-            text-decoration:none;padding:14px 36px;border-radius:10px;
-            font-size:14px;font-weight:700;margin-bottom:16px">
-            Download your video →
-          </a>
-          <p style="margin:8px 0 0;font-size:12px;color:rgba(255,255,255,0.25)">
-            Open SceneForge → Export step to download your video, scenes, or CapCut package.
+          </div>
+
+          <!-- Primary CTA — direct download -->
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px">
+            <tr><td align="center">
+              <a href="{direct_download}"
+                style="display:inline-block;background:#7C5CFF;color:#fff;
+                text-decoration:none;padding:14px 40px;border-radius:10px;
+                font-size:15px;font-weight:700;">
+                ⬇ Download video now
+              </a>
+            </td></tr>
+          </table>
+          <p style="margin:0 0 20px;font-size:11px;color:rgba(255,255,255,0.25)">
+            Direct download — no login required
+          </p>
+
+          <!-- Secondary CTA — deep link to export -->
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr><td align="center">
+              <a href="{deep_link}"
+                style="display:inline-block;background:transparent;color:#A78BFA;
+                text-decoration:none;padding:11px 32px;border-radius:10px;
+                font-size:13px;font-weight:600;border:1px solid rgba(167,139,250,0.3);">
+                Open in SceneForge → Export page
+              </a>
+            </td></tr>
+          </table>
+          <p style="margin:8px 0 0;font-size:11px;color:rgba(255,255,255,0.2)">
+            Download scenes, CapCut package, or voiceover separately
           </p>
         </td></tr>
+
+        <!-- Footer -->
         <tr><td style="padding:16px 40px;border-top:1px solid rgba(255,255,255,0.06);text-align:center">
           <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.2)">SceneForge · AI Video Studio</p>
         </td></tr>
@@ -300,11 +346,13 @@ async def send_render_complete(
     </td></tr>
   </table>
 </body></html>"""
+
     text = (
         f"Hi {full_name},\n\n"
         f'Your video "{project_title}" is ready!\n\n'
         f"{scene_count} scenes · {duration}s · {tokens_remaining:,} tokens remaining\n\n"
-        f"Open SceneForge to download: {app_url}\n\n"
+        f"⬇ Direct download (no login): {direct_download}\n\n"
+        f"Open export page: {deep_link}\n\n"
         f"— SceneForge"
     )
     await _send(to_email, subject, html, text)
