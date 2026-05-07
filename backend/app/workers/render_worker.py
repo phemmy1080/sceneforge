@@ -103,6 +103,48 @@ async def render_video(ctx, job_id: str, payload: dict):
             platform=req.platform,
         )
 
+        # ── Stage 3b: Watermark (free plan only) ────────────────────────────────
+        await _set_progress(redis, job_id, "Finalising video...", 85)
+        try:
+            # Check user plan — watermark free users only
+            user_plan = "free"
+            if user_id:
+                raw_user = await redis.get(f"user:{user_id}")
+                if raw_user:
+                    user_plan = json.loads(raw_user).get("plan", "free")
+
+            if user_plan == "free":
+                final_path = result.get("final_path") or result.get("output_path", "")
+                if final_path and os.path.exists(final_path):
+                    watermarked = final_path.replace(".mp4", "_wm.mp4")
+                    wm_cmd = [
+                        "ffmpeg", "-y", "-i", final_path,
+                        "-vf",
+                        "drawtext=text='Made with SceneForge':"
+                        "fontcolor=white@0.45:"
+                        "fontsize=22:"
+                        "x=w-tw-18:"
+                        "y=h-th-18:"
+                        "shadowcolor=black@0.6:"
+                        "shadowx=2:shadowy=2",
+                        "-c:a", "copy",
+                        "-preset", "fast",
+                        watermarked,
+                    ]
+                    import subprocess
+                    wm_result = subprocess.run(
+                        wm_cmd, capture_output=True, timeout=120
+                    )
+                    if wm_result.returncode == 0 and os.path.exists(watermarked):
+                        # Replace final video with watermarked version
+                        os.replace(watermarked, final_path)
+                        logger.info("Watermark applied — job %s (plan=%s)", job_id, user_plan)
+                    else:
+                        logger.warning("Watermark failed (non-fatal): %s",
+                                       wm_result.stderr.decode()[:200])
+        except Exception as e:
+            logger.warning("Watermark step failed (non-fatal): %s", e)
+
         # ── Stage 4: CapCut draft ─────────────────────────────────────────────
         await _set_progress(redis, job_id, "Generating CapCut package...", 88)
         try:
@@ -147,38 +189,23 @@ async def render_video(ctx, job_id: str, payload: dict):
         tokens_remaining = 0
         is_re_render     = bool(prev_job_stored or payload.get("prev_job_id"))
 
-        logger.info("Token deduction check — user_id=%s is_re_render=%s", user_id, is_re_render)
-        if user_id and not is_re_render:
+        if user_id:
             try:
-                raw_user = await redis.get(f"user:{user_id}")
-                logger.info("Raw user data found: %s", bool(raw_user))
-                if raw_user:
-                    user_data = json.loads(raw_user)
-                    current   = user_data.get("tokens_remaining", 0)
-                    cost      = 100  # hardcoded — avoids settings attribute issues
-                    new_bal   = max(0, current - cost)
-                    user_data["tokens_remaining"] = new_bal
-                    user_data["videos_created"]   = user_data.get("videos_created", 0) + 1
-                    result = await redis.set(f"user:{user_id}", json.dumps(user_data))
-                    tokens_remaining = new_bal
-                    logger.info("Tokens deducted ✓ — user=%s %d→%d (result=%s)",
-                                user_id, current, new_bal, result)
+                from app.services.auth import deduct_tokens, get_token_balance
+                if not is_re_render:
+                    user_out = await deduct_tokens(redis, user_id, job_id)
+                    tokens_remaining = user_out.tokens_remaining
+                    logger.info("Tokens deducted ✓ — user=%s remaining=%d",
+                                user_id, tokens_remaining)
                 else:
-                    logger.warning("No user data in Redis for user_id=%s key=user:%s",
-                                   user_id, user_id)
+                    bal = await get_token_balance(redis, user_id)
+                    tokens_remaining = bal["tokens_remaining"]
+                    logger.info("Re-render — tokens not deducted, remaining=%d",
+                                tokens_remaining)
             except Exception as e:
-                logger.error("Token deduction FAILED for user %s: %s", user_id, e, exc_info=True)
-        elif not user_id:
-            logger.warning("Cannot deduct tokens — user_id is None/empty")
-        elif is_re_render:
-            logger.info("Re-render — tokens not deducted")
-        elif user_id and is_re_render:
-            try:
-                raw_user = await redis.get(f"user:{user_id}")
-                if raw_user:
-                    tokens_remaining = json.loads(raw_user).get("tokens_remaining", 0)
-            except Exception:
-                pass
+                logger.error("Token deduction failed for user %s: %s", user_id, e, exc_info=True)
+        else:
+            logger.warning("No user_id — tokens not deducted for job %s", job_id)
 
         # ── Stage 7: Render complete email ────────────────────────────────────
         if user_id:
