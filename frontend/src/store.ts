@@ -23,7 +23,9 @@ export interface Project {
   platform: string; folder: string; status: 'draft' | 'active' | 'exported'
   sceneCount: number; duration: number; createdAt: string
   step: AppStep; voice?: string
-  synced?: boolean  // true once saved to backend
+  synced?: boolean
+  job_id?: string     // restored from backend after render
+  video_url?: string  // restored from backend after render
 }
 
 // ─── Debounce helper ──────────────────────────────────────────────────────────
@@ -37,21 +39,12 @@ function debounce(key: string, fn: () => void, ms = 2000) {
 async function saveProjectToBackend(project: Project, extra?: Record<string, any>) {
   try {
     await projectsApi.update(project.id, {
-      name: project.name,
-      niche: project.niche,
-      style: project.style,
-      platform: project.platform,
-      folder: project.folder,
-      status: project.status,
-      step: project.step as string,
-      scene_count: project.sceneCount,
-      duration: project.duration,
-      ...extra,
+      name: project.name, niche: project.niche, style: project.style,
+      platform: project.platform, folder: project.folder, status: project.status,
+      step: project.step as string, scene_count: project.sceneCount,
+      duration: project.duration, ...extra,
     })
-  } catch {
-    // Silent fail — local state is always the source of truth for UX
-    // Backend sync failures don't interrupt the user
-  }
+  } catch { /* silent */ }
 }
 
 interface AppState {
@@ -76,7 +69,6 @@ interface AppState {
   renderStage: string
   renderStatus: 'idle' | 'queued' | 'processing' | 'complete' | 'failed'
   videoUrl: string | null
-  // Backend sync state
   backendSynced: boolean
 
   setStep: (step: AppStep) => void
@@ -103,20 +95,27 @@ interface AppState {
   setRenderProgress: (progress: number, stage: string, status: AppState['renderStatus']) => void
   setVideoUrl: (url: string) => void
   getRenderRequest: () => RenderRequest
-  // Backend sync actions
   loadProjectsFromBackend: () => Promise<void>
   syncLocalProjectsToBackend: () => Promise<void>
 }
 
 const DEFAULT_CONFIG: ProjectConfig = {
-  niche: '', style: 'Educational',
-  platform: 'TikTok (9:16, 60s)', tone: 'Energetic & punchy',
-  audience: '', context: '', ideaHints: '', ideaTags: [],
+  niche: '', style: 'Educational', platform: 'TikTok (9:16, 60s)',
+  tone: 'Energetic & punchy', audience: '', context: '', ideaHints: '', ideaTags: [],
 }
 
 const DEFAULT_VOICE: VoiceConfig = {
   voice_name: 'Marcus', voice_speed: 1.0, voice_stability: 'medium',
   visual_source: 'mixed', subtitle_style: 'viral', music: 'none',
+}
+
+// Shared workflow reset — used by addProject and openProject
+const CLEAR_WORKFLOW = {
+  ideas: [] as IdeaItem[], selectedIdea: null, script: '', wordCount: 0,
+  estimatedDuration: 0, scenes: [] as Scene[], activeSceneIndex: 0,
+  jobId: null, videoUrl: null, renderProgress: 0, renderStage: '',
+  renderStatus: 'idle' as const, uploadedVoicePath: null,
+  voiceConfig: DEFAULT_VOICE, completedSteps: new Set<AppStep>(),
 }
 
 export const useStore = create<AppState>()(
@@ -130,24 +129,13 @@ export const useStore = create<AppState>()(
         folderOpen: {},
         activeProjectId: null,
         config: DEFAULT_CONFIG,
-        ideas: [],
-        selectedIdea: null,
-        script: '',
-        wordCount: 0,
-        estimatedDuration: 0,
-        scenes: [],
-        activeSceneIndex: 0,
-        voiceConfig: DEFAULT_VOICE,
-        uploadedVoicePath: null,
-        jobId: null,
-        renderProgress: 0,
-        renderStage: '',
-        renderStatus: 'idle',
-        videoUrl: null,
+        ...CLEAR_WORKFLOW,
         backendSynced: false,
 
         setStep: (step) => set({ currentStep: step }),
-        markStepComplete: (step) => set((s) => ({ completedSteps: new Set([...s.completedSteps, step]) })),
+        markStepComplete: (step) => set((s) => ({
+          completedSteps: new Set([...s.completedSteps, step])
+        })),
 
         addProject: ({ name, niche, style, platform, folder: folderArg }) => {
           const folder = folderArg || niche || 'General'
@@ -157,7 +145,6 @@ export const useStore = create<AppState>()(
             status: 'draft', sceneCount: 0, duration: 0,
             createdAt: 'Just now', step: 'setup', synced: false,
           }
-
           set((s) => {
             const newFolders = { ...s.folders }
             if (!newFolders[folder]) newFolders[folder] = []
@@ -167,71 +154,54 @@ export const useStore = create<AppState>()(
               folders: newFolders,
               folderOpen: { ...s.folderOpen, [folder]: true },
               activeProjectId: id,
-              // Reset config for new project
+              currentStep: 'setup',
               config: { ...DEFAULT_CONFIG, niche, style, platform },
-              // Clear all workflow state from previous project
-              ideas: [],
-              selectedIdea: null,
-              script: '',
-              wordCount: 0,
-              estimatedDuration: 0,
-              scenes: [],
-              activeSceneIndex: 0,
-              jobId: null,
-              videoUrl: null,
-              renderProgress: 0,
-              renderStage: '',
-              renderStatus: 'idle',
-              uploadedVoicePath: null,
-              voiceConfig: DEFAULT_VOICE,
-          }
-          })
-
-          /*
-          set((s) => {
-            const newFolders = { ...s.folders }
-            if (!newFolders[folder]) newFolders[folder] = []
-            newFolders[folder] = [id, ...newFolders[folder]]
-            return {
-              projects: [proj, ...s.projects],
-              folders: newFolders,
-              folderOpen: { ...s.folderOpen, [folder]: true },
-              activeProjectId: id,
-              config: { ...s.config, niche, style, platform },
+              ...CLEAR_WORKFLOW,
             }
           })
-*/
-          // Create on backend immediately
           projectsApi.create({ id, name, niche, style, platform, folder })
-            .then(() => {
-              set((s) => ({
-                projects: s.projects.map((p) =>
-                  p.id === id ? { ...p, synced: true } : p
-                ),
-              }))
-            })
-            .catch(() => {/* silent — local state intact */})
+            .then(() => set((s) => ({
+              projects: s.projects.map((p) => p.id === id ? { ...p, synced: true } : p)
+            })))
+            .catch(() => {})
         },
 
-        openProject: (id) => set((s) => {
-          const proj = s.projects.find((p) => p.id === id)
-          if (!proj) return s
-          return {
-            activeProjectId: id,
-            config: { ...s.config, niche: proj.niche, style: proj.style, platform: proj.platform },
+        openProject: (id) => {
+          const proj = get().projects.find((p) => p.id === id)
+          if (!proj) return
+
+          // If exported and has job_id — go straight to export with video ready
+          if (proj.status === 'exported' && proj.job_id) {
+            set({
+              activeProjectId: id,
+              currentStep: 'export',
+              config: { ...DEFAULT_CONFIG, niche: proj.niche, style: proj.style, platform: proj.platform },
+              ...CLEAR_WORKFLOW,
+              jobId: proj.job_id,
+              videoUrl: proj.video_url || null,
+              renderStatus: 'complete',
+              renderProgress: 100,
+              renderStage: 'Done',
+            })
+            return
           }
-        }),
+
+          // Otherwise go to the step the project was last on
+          set({
+            activeProjectId: id,
+            currentStep: (proj.step as AppStep) || 'setup',
+            config: { ...DEFAULT_CONFIG, niche: proj.niche, style: proj.style, platform: proj.platform },
+            ...CLEAR_WORKFLOW,
+          })
+        },
 
         updateProject: (id, patch) => {
           set((s) => ({
             projects: s.projects.map((p) => p.id === id ? { ...p, ...patch } : p),
           }))
-          // Debounced auto-save to backend
           const project = get().projects.find((p) => p.id === id)
           if (project) {
-            debounce(`project-${id}`, () => {
-              saveProjectToBackend({ ...project, ...patch })
-            }, 2000)
+            debounce(`project-${id}`, () => saveProjectToBackend({ ...project, ...patch }), 2000)
           }
         },
 
@@ -255,11 +225,9 @@ export const useStore = create<AppState>()(
           if (!proj) return
           const newId = 'proj_' + Date.now()
           const copy: Project = {
-            ...proj, id: newId,
-            name: proj.name + ' (copy)',
-            createdAt: 'Just now',
-            status: 'draft',
-            synced: false,
+            ...proj, id: newId, name: proj.name + ' (copy)',
+            createdAt: 'Just now', status: 'draft', synced: false,
+            job_id: undefined, video_url: undefined,
           }
           set((s) => {
             const newFolders = { ...s.folders }
@@ -282,25 +250,21 @@ export const useStore = create<AppState>()(
 
         setSelectedIdea: (idea) => {
           set({ selectedIdea: idea })
-          // Save idea selection to backend
           const { activeProjectId } = get()
           if (activeProjectId) {
             debounce(`idea-${activeProjectId}`, () => {
-              projectsApi.update(activeProjectId, { selected_idea: idea as any })
-                .catch(() => {})
+              projectsApi.update(activeProjectId, { selected_idea: idea as any }).catch(() => {})
             }, 1000)
           }
         },
 
         setScript: (script, wordCount, estimatedDuration) => {
           set({ script, wordCount, estimatedDuration })
-          // Save script to backend
           const { activeProjectId } = get()
           if (activeProjectId) {
             debounce(`script-${activeProjectId}`, () => {
-              projectsApi.update(activeProjectId, { script } as any)
-                .catch(() => {})
-            }, 3000) // longer debounce for script — it changes rapidly while typing
+              projectsApi.update(activeProjectId, { script } as any).catch(() => {})
+            }, 3000)
           }
         },
 
@@ -359,16 +323,26 @@ export const useStore = create<AppState>()(
         setVoiceConfig: (cfg) => set((s) => ({ voiceConfig: { ...s.voiceConfig, ...cfg } })),
         setUploadedVoicePath: (path) => set({ uploadedVoicePath: path }),
         setJobId: (id) => set({ jobId: id }),
-        setRenderProgress: (progress, stage, status) => set({ renderProgress: progress, renderStage: stage, renderStatus: status }),
+        setRenderProgress: (progress, stage, status) => set({
+          renderProgress: progress, renderStage: stage, renderStatus: status
+        }),
 
         setVideoUrl: (url) => {
+          const { activeProjectId, jobId } = get()
           set({ videoUrl: url })
-          // Mark project as exported on backend
-          const { activeProjectId } = get()
           if (activeProjectId) {
+            // Save job_id + video_url on the project so openProject can restore it
+            set((s) => ({
+              projects: s.projects.map((p) =>
+                p.id === activeProjectId
+                  ? { ...p, status: 'exported', job_id: jobId || p.job_id, video_url: url, step: 'export' }
+                  : p
+              )
+            }))
             projectsApi.update(activeProjectId, {
               status: 'exported' as any,
               video_url: url,
+              job_id: jobId || undefined,
               step: 'export',
             }).catch(() => {})
           }
@@ -391,44 +365,28 @@ export const useStore = create<AppState>()(
           }
         },
 
-        // ─── Backend sync ───────────────────────────────────────────────────
-
         loadProjectsFromBackend: async () => {
           try {
             const serverProjects = await projectsApi.list()
             if (serverProjects.length === 0) return
-
-            // Convert server project shape to local Project shape
             const converted: Project[] = serverProjects.map((sp) => ({
-              id: sp.id,
-              name: sp.name,
-              niche: sp.niche,
-              style: sp.style,
-              platform: sp.platform,
-              folder: sp.folder,
+              id: sp.id, name: sp.name, niche: sp.niche, style: sp.style,
+              platform: sp.platform, folder: sp.folder,
               status: (sp.status as any) || 'draft',
-              sceneCount: sp.scene_count || 0,
-              duration: sp.duration || 0,
+              sceneCount: sp.scene_count || 0, duration: sp.duration || 0,
               createdAt: sp.created_at ? new Date(sp.created_at).toLocaleDateString() : 'Unknown',
               step: (sp.step as AppStep) || 'setup',
               synced: true,
+              job_id:    (sp as any).job_id    || undefined,
+              video_url: (sp as any).video_url || undefined,
             }))
-
-            // Rebuild folders from projects
             const folders: Record<string, string[]> = {}
             converted.forEach((p) => {
               if (!folders[p.folder]) folders[p.folder] = []
               folders[p.folder].push(p.id)
             })
-
-            set({
-              projects: converted,
-              folders,
-              backendSynced: true,
-            })
-          } catch {
-            // Fail silently — local cache remains
-          }
+            set({ projects: converted, folders, backendSynced: true })
+          } catch { /* silent */ }
         },
 
         syncLocalProjectsToBackend: async () => {
@@ -437,17 +395,12 @@ export const useStore = create<AppState>()(
           if (unsynced.length === 0) return
           try {
             await projectsApi.sync(unsynced.map((p) => ({
-              id: p.id, name: p.name, niche: p.niche,
-              style: p.style, platform: p.platform, folder: p.folder,
-              status: p.status, step: p.step,
-              scene_count: p.sceneCount, duration: p.duration,
+              id: p.id, name: p.name, niche: p.niche, style: p.style,
+              platform: p.platform, folder: p.folder, status: p.status,
+              step: p.step, scene_count: p.sceneCount, duration: p.duration,
             })))
-            set((s) => ({
-              projects: s.projects.map((p) => ({ ...p, synced: true })),
-            }))
-          } catch {
-            // Silent fail
-          }
+            set((s) => ({ projects: s.projects.map((p) => ({ ...p, synced: true })) }))
+          } catch { /* silent */ }
         },
       }),
       {
