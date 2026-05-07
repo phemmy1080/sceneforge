@@ -115,7 +115,7 @@ const CLEAR_WORKFLOW = {
   estimatedDuration: 0, scenes: [] as Scene[], activeSceneIndex: 0,
   jobId: null, videoUrl: null, renderProgress: 0, renderStage: '',
   renderStatus: 'idle' as const, uploadedVoicePath: null,
-  voiceConfig: DEFAULT_VOICE, completedSteps: new Set<AppStep>(),
+  voiceConfig: DEFAULT_VOICE,
 }
 
 export const useStore = create<AppState>()(
