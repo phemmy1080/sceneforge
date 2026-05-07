@@ -2,8 +2,13 @@ import { useState, useEffect } from 'react'
 import { useStore } from '../store'
 import { getNiches, type Niche } from '../lib/api'
 
-// Niches loaded from API
-const PLATFORMS = ['TikTok (9:16, 60s)', 'YouTube Shorts (9:16, 60s)', 'Instagram Reels (9:16, 30s)', 'YouTube (16:9, 3–10 min)', 'LinkedIn (1:1, 60s)']
+const PLATFORMS = [
+  'TikTok (9:16, 60s)',
+  'YouTube Shorts (9:16, 60s)',
+  'Instagram Reels (9:16, 30s)',
+  'YouTube (16:9, 3–10 min)',
+  'LinkedIn (1:1, 60s)',
+]
 
 interface Props {
   open: boolean
@@ -12,28 +17,46 @@ interface Props {
 
 export default function NewProjectModal({ open, onClose }: Props) {
   const addProject = useStore((s) => s.addProject)
-  const folders = useStore((s) => s.folders)
-  const config = useStore((s) => s.config)
-  const [niches, setNiches] = useState<Niche[]>([])
-  useEffect(() => { getNiches().then(setNiches).catch(()=>{}) }, [])
+  const setStep    = useStore((s) => s.setStep)
+  const folders    = useStore((s) => s.folders)
+  const config     = useStore((s) => s.config)
 
-
-  const [name, setName] = useState('')
-  const [niche, setNiche] = useState(config.niche || '')
-  const [folder, setFolder] = useState(config.niche || '')
+  const [niches, setNiches]           = useState<Niche[]>([])
+  const [name, setName]               = useState('')
+  const [niche, setNiche]             = useState(config.niche || '')
+  const [folder, setFolder]           = useState(config.niche || '')
   const [newFolderName, setNewFolderName] = useState('')
-  const [platform, setPlatform] = useState('TikTok (9:16, 60s)')
-  const [error, setError] = useState('')
+  const [platform, setPlatform]       = useState('TikTok (9:16, 60s)')
+  const [error, setError]             = useState('')
+
+  useEffect(() => { getNiches().then(setNiches).catch(() => {}) }, [])
+  useEffect(() => { setFolder(niche) }, [niche])
+
+  // Reset form when modal opens
+  useEffect(() => {
+    if (open) {
+      setName('')
+      setError('')
+      setNiche(config.niche || '')
+      setFolder(config.niche || '')
+      setPlatform('TikTok (9:16, 60s)')
+      setNewFolderName('')
+    }
+  }, [open])
 
   const existingFolders = Object.keys(folders).filter((f) => f !== '__all')
 
-  useEffect(() => { setFolder(niche) }, [niche])
-
   function handleCreate() {
     if (!name.trim()) { setError('Please enter a project name.'); return }
-    const resolvedFolder = folder === '__new' ? (newFolderName.trim() || 'New folder') : folder
+    const resolvedFolder = folder === '__new'
+      ? (newFolderName.trim() || 'New folder')
+      : (folder || niche || 'General')
+
     addProject({ name: name.trim(), niche, style: 'Educational', platform, folder: resolvedFolder })
-    setName(''); setError(''); onClose()
+
+    // Navigate to setup immediately — don't wait for backend
+    onClose()
+    setStep('setup')
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -55,12 +78,17 @@ export default function NewProjectModal({ open, onClose }: Props) {
         onKeyDown={handleKeyDown}
       >
         <h2 className="font-display font-bold text-[18px] tracking-tight mb-1">New project</h2>
-        <p className="text-[12.5px] text-white/40 mb-5">Name your project and pick a niche — SceneForge auto-saves as you work.</p>
+        <p className="text-[12.5px] text-white/40 mb-5">
+          Name your project and pick a niche — SceneForge auto-saves as you work.
+        </p>
 
         {error && (
-          <div className="bg-red-500/10 border border-red-500/25 rounded-lg p-3 text-[12.5px] text-red-300 mb-4">{error}</div>
+          <div className="bg-red-500/10 border border-red-500/25 rounded-lg p-3 text-[12.5px] text-red-300 mb-4">
+            {error}
+          </div>
         )}
 
+        {/* Project name */}
         <div className="mb-4">
           <label className="block text-[11px] font-medium text-white/45 mb-1.5">Project name</label>
           <input
@@ -73,6 +101,7 @@ export default function NewProjectModal({ open, onClose }: Props) {
           />
         </div>
 
+        {/* Niche */}
         <div className="mb-4">
           <label className="block text-[11px] font-medium text-white/45 mb-1.5">Niche</label>
           <div className="flex flex-wrap gap-2">
@@ -92,6 +121,7 @@ export default function NewProjectModal({ open, onClose }: Props) {
           </div>
         </div>
 
+        {/* Folder + Platform */}
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div>
             <label className="block text-[11px] font-medium text-white/45 mb-1.5">Save to folder</label>
@@ -119,6 +149,7 @@ export default function NewProjectModal({ open, onClose }: Props) {
           </div>
         </div>
 
+        {/* New folder name */}
         {folder === '__new' && (
           <div className="mb-4">
             <label className="block text-[11px] font-medium text-white/45 mb-1.5">New folder name</label>
@@ -136,10 +167,11 @@ export default function NewProjectModal({ open, onClose }: Props) {
         <div className="bg-white/[0.03] border border-white/[0.07] rounded-lg px-3.5 py-2.5 mb-5">
           <p className="text-[9.5px] text-white/30 uppercase tracking-widest font-semibold mb-1">Preview</p>
           <p className="text-[12.5px] text-white/55">
-            {niche} project · {platform.split(' ')[0]} · saved to /{previewFolder}
+            {niche || 'General'} project · {platform.split(' ')[0]} · saved to /{previewFolder || 'General'}
           </p>
         </div>
 
+        {/* Actions */}
         <div className="flex gap-2">
           <button
             onClick={onClose}
