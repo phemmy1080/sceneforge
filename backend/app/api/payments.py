@@ -16,6 +16,7 @@ from app.dependencies import get_redis
 from app.services import auth as auth_service
 from app.services.email import send_token_confirmation
 from app.services import pricing as pricing_service
+from app.services.geo import detect_currency, build_plans_response_async, get_country_from_ip
 
 settings = get_settings()
 router = APIRouter()
@@ -38,6 +39,13 @@ class InitiatePaymentResponse(BaseModel):
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
+def _get_client_ip(request: Request) -> str:
+    return (
+        request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or request.headers.get("x-real-ip", "")
+        or (request.client.host if request.client else "")
+    )
+
 def _get_user_id(authorization: Optional[str]) -> Optional[str]:
     token = (authorization or "").removeprefix("Bearer ").strip()
     if not token:
@@ -46,7 +54,6 @@ def _get_user_id(authorization: Optional[str]) -> Optional[str]:
 
 
 async def _verify_flw_transaction(tx_id: str) -> dict:
-    """Verify a transaction with Flutterwave API."""
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             f"{FLW_BASE}/transactions/{tx_id}/verify",
@@ -60,40 +67,36 @@ async def _verify_flw_transaction(tx_id: str) -> dict:
 # ─── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.get("/plans")
-async def get_plans(redis=Depends(get_redis)):
-    """Return available token plans from Redis (live-updatable)."""
-    plans = await pricing_service.get_plans(redis)
-    return {
-        "plans": [
-            {
-                "key": key,
-                "label": plan["label"],
-                "amount": plan["amount"],
-                "currency": plan["currency"],
-                "tokens": plan["tokens"],
-                "videos": plan.get("videos", plan["tokens"] // 100),
-                "per_token_rate": round(plan["amount"] / plan["tokens"], 2),
-            }
-            for key, plan in plans.items()
-        ]
-    }
+async def get_plans(
+    request: Request,
+    redis=Depends(get_redis),
+):
+    """Return plans with live geo-aware pricing — NGN for Nigeria, USD for everyone else."""
+    client_ip  = _get_client_ip(request)
+    country    = await get_country_from_ip(client_ip, redis)
+    currency   = "NGN" if country == "NG" else "USD"
+    plans_raw  = await pricing_service.get_plans(redis)
+    plans_list = await build_plans_response_async(plans_raw, currency, redis)
+    return {"plans": plans_list, "currency": currency, "country": country}
 
 
 @router.post("/initiate", response_model=InitiatePaymentResponse)
 async def initiate_payment(
     req: InitiatePaymentRequest,
+    request: Request,
     authorization: Optional[str] = Header(None),
     redis=Depends(get_redis),
 ):
-    """
-    Create a Flutterwave payment link and return it to the frontend.
-    The frontend redirects the user to this URL.
-    """
     user_id = _get_user_id(authorization)
     if not user_id:
         raise HTTPException(status_code=401, detail="Login required to make a payment")
 
-    plan = await pricing_service.get_plan(redis, req.plan_key)
+    client_ip  = _get_client_ip(request)
+    country    = await get_country_from_ip(client_ip, redis)
+    currency   = "NGN" if country == "NG" else "USD"
+    raw_plans  = await pricing_service.get_plans(redis)
+    plans_list = await build_plans_response_async(raw_plans, currency, redis)
+    plan = next((p for p in plans_list if p["key"] == req.plan_key), None)
     if not plan:
         raise HTTPException(status_code=400, detail=f"Unknown plan: {req.plan_key}")
 
@@ -107,44 +110,44 @@ async def initiate_payment(
             detail="Payment not configured. Add FLUTTERWAVE_SECRET_KEY to .env"
         )
 
-    # Unique transaction reference — stored in Redis so webhook can match it
     tx_ref = f"sf_{user_id[:8]}_{uuid.uuid4().hex[:8]}"
 
-    # Store pending transaction metadata (24h TTL)
+    # Use display amount for USD (float), full amount for NGN (int)
+    payment_amount = plan.get("amount_display", plan["amount"]) if currency == "USD" else plan["amount"]
+
     await redis.set(
         f"payment:pending:{tx_ref}",
         json.dumps({
-            "user_id": user_id,
-            "plan_key": req.plan_key,
-            "tokens": plan["tokens"],
-            "amount": plan["amount"],
-            "currency": plan["currency"],
+            "user_id":    user_id,
+            "plan_key":   req.plan_key,
+            "tokens":     plan["tokens"],
+            "amount":     payment_amount,
+            "currency":   currency,
             "plan_label": plan["label"],
-            "email": user.email,
-            "full_name": user.full_name,
+            "email":      user.email,
+            "full_name":  user.full_name,
         }),
         ex=86400,
     )
 
-    # Create Flutterwave payment link
     payload = {
-        "tx_ref": tx_ref,
-        "amount": str(plan["amount"]),
-        "currency": plan["currency"],
+        "tx_ref":       tx_ref,
+        "amount":       str(payment_amount),
+        "currency":     currency,
         "redirect_url": f"{settings.frontend_origin}/payment/callback",
         "meta": {
-            "user_id": user_id,
+            "user_id":  user_id,
             "plan_key": req.plan_key,
-            "tokens": plan["tokens"],
+            "tokens":   plan["tokens"],
         },
         "customer": {
             "email": user.email,
-            "name": user.full_name,
+            "name":  user.full_name,
         },
         "customizations": {
-            "title": "SceneForge",
+            "title":       "SceneForge",
             "description": f"{plan['label']} — {plan['tokens']:,} tokens",
-            "logo": f"{settings.frontend_origin}/logo.png",
+            "logo":        f"{settings.frontend_origin}/logo.png",
         },
         "payment_options": "card,banktransfer,ussd",
     }
@@ -165,22 +168,13 @@ async def initiate_payment(
     if not payment_url:
         raise HTTPException(status_code=502, detail="No payment URL returned")
 
-    logger.info("Payment initiated | user=%s | plan=%s | tx_ref=%s", user_id, req.plan_key, tx_ref)
-    return InitiatePaymentResponse(
-        payment_url=payment_url,
-        tx_ref=tx_ref,
-        plan=plan,
-    )
+    logger.info("Payment initiated | user=%s | plan=%s | currency=%s | amount=%s | tx_ref=%s",
+                user_id, req.plan_key, currency, payment_amount, tx_ref)
+    return InitiatePaymentResponse(payment_url=payment_url, tx_ref=tx_ref, plan=plan)
 
 
 @router.post("/webhook")
 async def flutterwave_webhook(request: Request, redis=Depends(get_redis)):
-    """
-    Flutterwave webhook — called by Flutterwave when payment completes.
-    Verifies signature, tops up tokens, sends confirmation email.
-    Set this URL in your Flutterwave dashboard webhook settings.
-    """
-    # Verify webhook signature
     verif_hash = request.headers.get("verif-hash", "")
     if settings.flutterwave_secret_hash and verif_hash != settings.flutterwave_secret_hash:
         logger.warning("Webhook signature mismatch — rejected")
@@ -202,60 +196,48 @@ async def flutterwave_webhook(request: Request, redis=Depends(get_redis)):
     currency  = data.get("currency", "")
 
     if tx_status != "successful":
-        logger.info("Webhook: tx %s not successful (%s)", tx_ref, tx_status)
         return {"status": "skipped", "reason": tx_status}
 
-    # Idempotency — don't process the same transaction twice
     already = await redis.get(f"payment:processed:{tx_id}")
     if already:
-        logger.info("Webhook: tx %s already processed", tx_id)
         return {"status": "duplicate"}
 
-    # Look up pending transaction
     raw = await redis.get(f"payment:pending:{tx_ref}")
     if not raw:
-        # Try to recover from Flutterwave metadata
-        meta = data.get("meta", {})
+        meta      = data.get("meta", {})
         user_id   = meta.get("user_id")
         plan_key  = meta.get("plan_key")
         tokens    = int(meta.get("tokens", 0))
         plan_info = settings.token_plans.get(plan_key or "", {})
         plan_label = plan_info.get("label", plan_key or "Unknown")
+        pending   = {}
     else:
-        pending   = json.loads(raw if isinstance(raw, str) else raw.decode())
-        user_id   = pending["user_id"]
-        tokens    = pending["tokens"]
+        pending    = json.loads(raw if isinstance(raw, str) else raw.decode())
+        user_id    = pending["user_id"]
+        tokens     = pending["tokens"]
         plan_label = pending["plan_label"]
 
     if not user_id or not tokens:
         logger.error("Webhook: cannot find user or tokens for tx_ref=%s", tx_ref)
         return {"status": "error", "reason": "missing metadata"}
 
-    # Verify with Flutterwave API (double-check the payment)
     try:
         verified = await _verify_flw_transaction(tx_id)
         if verified.get("data", {}).get("status") != "successful":
-            logger.warning("Webhook: verification failed for tx %s", tx_id)
             return {"status": "verification_failed"}
     except Exception as e:
         logger.error("Webhook: FLW verification error: %s", e)
-        # Don't block — proceed if webhook data itself is valid
 
-    # Top up tokens
     import redis.asyncio as aioredis
     auth_redis = await aioredis.from_url(settings.redis_url, decode_responses=True)
     try:
-        updated_user = await auth_service.add_tokens(auth_redis, user_id, tokens, plan=pending.get("plan_key",""))
-        logger.info(
-            "Tokens topped up | user=%s | +%d tokens | balance=%d",
-            user_id, tokens, updated_user.tokens_remaining,
+        updated_user = await auth_service.add_tokens(
+            auth_redis, user_id, tokens, plan=pending.get("plan_key", "")
         )
-
-        # Mark transaction as processed (idempotency key, 90 days)
+        logger.info("Tokens topped up | user=%s | +%d | balance=%d",
+                    user_id, tokens, updated_user.tokens_remaining)
         await redis.set(f"payment:processed:{tx_id}", "1", ex=60 * 60 * 24 * 90)
         await redis.delete(f"payment:pending:{tx_ref}")
-
-        # Send confirmation email
         await send_token_confirmation(
             to_email=updated_user.email,
             full_name=updated_user.full_name,
@@ -279,23 +261,16 @@ async def payment_callback(
     transaction_id: str = "",
     redis=Depends(get_redis),
 ):
-    """
-    Flutterwave redirects here after payment.
-    Does the FULL token top-up here so it works even without a webhook
-    (needed for local development where Flutterwave can't reach localhost).
-    """
     if status != "successful" or not transaction_id:
         return {"status": "cancelled", "message": "Payment was cancelled or failed"}
 
-    # Already processed (webhook may have fired first)
     already = await redis.get(f"payment:processed:{transaction_id}")
     if already:
         return {"status": "success", "message": "Payment confirmed — tokens already credited"}
 
-    # Verify with Flutterwave API
     try:
         verified = await _verify_flw_transaction(transaction_id)
-        tx_data = verified.get("data", {})
+        tx_data  = verified.get("data", {})
     except Exception as e:
         logger.error("Callback: FLW verification error: %s", e)
         return {"status": "error", "message": "Could not verify payment with Flutterwave"}
@@ -303,47 +278,47 @@ async def payment_callback(
     if tx_data.get("status") != "successful":
         return {"status": "failed", "message": "Payment not confirmed by Flutterwave"}
 
-    # Get pending transaction metadata
     raw = await redis.get(f"payment:pending:{tx_ref}")
     if not raw:
         logger.error("Callback: no pending record for tx_ref=%s", tx_ref)
         return {"status": "error", "message": "Transaction record not found — contact support"}
 
-    pending = json.loads(raw if isinstance(raw, str) else raw.decode())
+    pending    = json.loads(raw if isinstance(raw, str) else raw.decode())
     user_id    = pending["user_id"]
     tokens     = pending["tokens"]
     plan_label = pending["plan_label"]
     amount     = int(tx_data.get("amount", pending["amount"]))
     currency   = tx_data.get("currency", pending["currency"])
 
-    # Credit tokens
     import redis.asyncio as aioredis
     auth_redis = await aioredis.from_url(settings.redis_url, decode_responses=True)
     try:
-        updated_user = await auth_service.add_tokens(auth_redis, user_id, tokens, plan=pending.get("plan_key",""))
-        logger.info(
-            "Callback: tokens credited | user=%s | +%d | balance=%d",
-            user_id, tokens, updated_user.tokens_remaining,
+        updated_user = await auth_service.add_tokens(
+            auth_redis, user_id, tokens, plan=pending.get("plan_key", "")
         )
+        logger.info("Callback: tokens credited | user=%s | +%d | balance=%d",
+                    user_id, tokens, updated_user.tokens_remaining)
 
-        # Mark as processed so webhook doesn't double-credit
         await redis.set(f"payment:processed:{transaction_id}", "1", ex=60 * 60 * 24 * 90)
         await redis.delete(f"payment:pending:{tx_ref}")
-        # Store rich payment record for revenue chart (90 day TTL)
-        await redis.set(f"payment:record:{transaction_id}", json.dumps({
-            "transaction_id": transaction_id,
-            "tx_ref": tx_ref,
-            "user_id": user_id,
-            "email": updated_user.email,
-            "plan": plan_label,
-            "tokens": tokens,
-            "amount": amount,
-            "currency": currency,
-            "status": "completed",
-            "ts": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
-        }), ex=60 * 60 * 24 * 90)
-
-        # Send confirmation email
+        await redis.set(
+            f"payment:record:{transaction_id}",
+            json.dumps({
+                "transaction_id": transaction_id,
+                "tx_ref":   tx_ref,
+                "user_id":  user_id,
+                "email":    updated_user.email,
+                "plan":     plan_label,
+                "tokens":   tokens,
+                "amount":   amount,
+                "currency": currency,
+                "status":   "completed",
+                "ts": __import__("datetime").datetime.now(
+                    __import__("datetime").timezone.utc
+                ).isoformat(),
+            }),
+            ex=60 * 60 * 24 * 90,
+        )
         try:
             await send_token_confirmation(
                 to_email=updated_user.email,
@@ -356,15 +331,14 @@ async def payment_callback(
                 transaction_id=transaction_id,
             )
         except Exception as email_err:
-            logger.error("Callback: email failed (non-blocking): %s", email_err)
-
+            logger.error("Callback: email failed: %s", email_err)
     finally:
         await auth_redis.aclose()
 
     return {
-        "status": "success",
-        "message": f"{tokens:,} tokens added to your account!",
+        "status":       "success",
+        "message":      f"{tokens:,} tokens added to your account!",
         "tokens_added": tokens,
         "tokens_total": updated_user.tokens_remaining,
-        "tx_ref": tx_ref,
+        "tx_ref":       tx_ref,
     }
