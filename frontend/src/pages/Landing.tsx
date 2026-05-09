@@ -317,9 +317,9 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
             <p style={sectionEyebrow}>Get started today</p>
             <h2 id="cta-heading" style={{
               fontFamily: "'Syne', system-ui, sans-serif",
-              fontSize: 'clamp(32px, 5vw, 54px)',
-              fontWeight: 800, letterSpacing: '-1.5px',
-              margin: '0 auto 16px', maxWidth: 640, color: '#FFFFFF', lineHeight: 1.1,
+              fontSize: 'clamp(28px, 2.8vw, 42px)',
+              fontWeight: 800, letterSpacing: '-1px',
+              margin: '0 auto 16px', maxWidth: 560, color: '#FFFFFF', lineHeight: 1.1,
             }}>
               Your next viral video is one click away
             </h2>
@@ -381,7 +381,7 @@ const sectionEyebrow: React.CSSProperties = {
 
 const sectionTitle: React.CSSProperties = {
   fontFamily: "'Syne', system-ui, sans-serif",
-  fontSize: 'clamp(26px, 3vw, 34px)',
+  fontSize: 'clamp(22px, 2vw, 30px)',
   fontWeight: 800, letterSpacing: '-0.5px',
   color: '#FFFFFF', margin: '0 auto', lineHeight: 1.15,
 }
