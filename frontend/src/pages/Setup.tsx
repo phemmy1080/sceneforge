@@ -2,17 +2,15 @@ import { useState, useEffect } from 'react'
 import { useStore } from '../store'
 import { getNiches, type Niche } from '../lib/api'
 import { Button, Card, CardTitle, Chip, Select, TextInput, PageHeader } from '../components/ui'
+import FeedbackModal from '../components/FeedbackModal'
+import { useFeedback } from '../hooks/useFeedback'
 
-// Niches loaded from API — see useEffect below
 const STYLES = ['Educational', 'Viral / Hook-first', 'Storytelling', 'Listicle', 'Documentary', 'Tutorial', 'Opinion / Hot take']
 const PLATFORMS = ['TikTok (9:16, 60s)', 'YouTube Shorts (9:16, 60s)', 'Instagram Reels (9:16, 30s)', 'YouTube (16:9, 3–10 min)', 'LinkedIn (1:1, 60s)']
 const TONES = ['Energetic & punchy', 'Calm & informative', 'Conversational', 'Professional', 'Humorous', 'Inspirational']
 
-// Suggested idea prompts per niche — shown as quick-add chips
-// Suggestions loaded from API
-
 export default function Setup() {
-  const [niches, setNiches] = useState<Niche[]>([])
+  const [niches, setNiches]   = useState<Niche[]>([])
   const [nicheMap, setNicheMap] = useState<Record<string, string[]>>({})
 
   useEffect(() => {
@@ -24,15 +22,21 @@ export default function Setup() {
     }).catch(() => {})
   }, [])
 
-  const config = useStore((s) => s.config)
-  const setConfig = useStore((s) => s.setConfig)
-  const setStep = useStore((s) => s.setStep)
+  const config          = useStore((s) => s.config)
+  const setConfig       = useStore((s) => s.setConfig)
+  const setStep         = useStore((s) => s.setStep)
   const markStepComplete = useStore((s) => s.markStepComplete)
+  const renderStatus    = useStore((s) => s.renderStatus)
 
   const [ideaInput, setIdeaInput] = useState(config.ideaHints || '')
-  const [ideaTags, setIdeaTags] = useState<string[]>(config.ideaTags || [])
+  const [ideaTags, setIdeaTags]   = useState<string[]>(config.ideaTags || [])
 
   const suggestions = nicheMap[config.niche] || []
+
+  // Feedback — fires after video complete OR 3 min on screen
+  const renderComplete = renderStatus === 'complete'
+  const { show: showFeedback, trigger: feedbackTrigger, closeFeedback } =
+    useFeedback(true, renderComplete)
 
   function addTag(tag: string) {
     const trimmed = tag.trim()
@@ -90,11 +94,9 @@ export default function Setup() {
         </div>
       </Card>
 
-      {/* Idea hints — NEW FEATURE */}
+      {/* Idea hints */}
       <Card className="mb-4">
         <CardTitle>Topic ideas & hints <span className="text-violet-400 normal-case font-normal">(optional — guides AI generation)</span></CardTitle>
-
-        {/* Tag input */}
         <div className="flex flex-wrap gap-2 min-h-[40px] bg-[#1A1A24] border border-white/12 rounded-lg px-3 py-2 mb-3 cursor-text"
           onClick={() => document.getElementById('idea-input')?.focus()}
         >
@@ -116,8 +118,6 @@ export default function Setup() {
             className="flex-1 min-w-[180px] bg-transparent outline-none text-[13px] text-white/80 placeholder-white/25"
           />
         </div>
-
-        {/* Suggestions for the selected niche */}
         {suggestions.length > 0 && (
           <div>
             <p className="text-[11px] text-white/35 mb-2">Quick add for {config.niche}:</p>
@@ -136,7 +136,6 @@ export default function Setup() {
             </div>
           </div>
         )}
-
         <p className="text-[11px] text-white/30 mt-3">
           Add up to 5 topics. SceneForge will generate ideas around your hints. Leave blank for fully AI-generated ideas.
         </p>
@@ -172,6 +171,14 @@ export default function Setup() {
           Upload my own script & voice
         </Button>
       </div>
+
+      {/* Feedback modal */}
+      {showFeedback && (
+        <FeedbackModal
+          trigger={feedbackTrigger}
+          onClose={closeFeedback}
+        />
+      )}
     </div>
   )
 }
