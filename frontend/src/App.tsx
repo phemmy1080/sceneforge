@@ -74,10 +74,16 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
     return () => document.removeEventListener('open-new-project-modal', handler)
   }, [])
 
+  useEffect(() => {
+    const handler = () => openFeedback()
+    document.addEventListener('open-feedback-modal', handler)
+    return () => document.removeEventListener('open-feedback-modal', handler)
+  }, [openFeedback])
+
   return (
     <>
       <NewProjectModal open={modalOpen} onClose={() => setModalOpen(false)} />
-      <Layout onLogout={onLogout} onNewProject={() => setModalOpen(true)} onFeedback={openFeedback}>
+      <Layout onLogout={onLogout} onNewProject={() => setModalOpen(true)}>
         {currentStep === 'projects' && <Projects />}
         {currentStep === 'setup'    && <Setup />}
         {currentStep === 'ideas'    && <Ideas />}
