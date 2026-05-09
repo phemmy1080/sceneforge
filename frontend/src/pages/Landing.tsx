@@ -139,9 +139,9 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
             </div>
             <h1 id="hero-heading" style={{
               fontFamily: 'var(--font-display)',
-              fontSize: 'clamp(40px, 7.5vw, 84px)',
-              fontWeight: 800, lineHeight: 1.0, letterSpacing: '-3px',
-              margin: '0 auto 28px', maxWidth: 920,
+              fontSize: 'clamp(40px, 6vw, 72px)',
+              fontWeight: 800, lineHeight: 1.05, letterSpacing: '-1.5px',
+              margin: '0 auto 28px', maxWidth: 800,
             }}>
               Go from idea to{' '}
               <span style={{ background: 'linear-gradient(135deg, #A78BFA 0%, #2DD4BF 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
@@ -381,8 +381,8 @@ const sectionEyebrow: React.CSSProperties = {
 
 const sectionTitle: React.CSSProperties = {
   fontFamily: 'var(--font-display)',
-  fontSize: 'clamp(26px, 4vw, 36px)',
-  fontWeight: 800, letterSpacing: '-1px',
+  fontSize: 'clamp(26px, 3vw, 34px)',
+  fontWeight: 800, letterSpacing: '-0.5px',
   color: '#FFFFFF', margin: '0 auto', lineHeight: 1.15,
 }
 
