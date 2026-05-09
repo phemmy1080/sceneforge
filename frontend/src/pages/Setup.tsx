@@ -166,9 +166,6 @@ export default function Setup() {
         </Button>
       </div>
 
-      {/* Feedback modal */}
-        />
-      )}
     </div>
   )
 }
