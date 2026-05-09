@@ -87,12 +87,13 @@ class SuspendUserRequest(BaseModel):
     reason: str = ""
 
 class BroadcastRequest(BaseModel):
-    target:  str = "all"           # "all" | "plan" | "user"
-    plan:    Optional[str] = None  # required if target=plan
-    user_id: Optional[str] = None  # required if target=user
-    subject: str
-    message: str
-    html:    Optional[str] = None  # optional custom HTML body
+    target:      str = "all"           # "all" | "plan" | "user" | "upload"
+    plan:        Optional[str] = None  # required if target=plan
+    user_id:     Optional[str] = None  # required if target=user
+    email_list:  Optional[list] = None # required if target=upload
+    subject:     str
+    message:     str
+    html:        Optional[str] = None  # rich HTML body from editor
 
 class CouponRequest(BaseModel):
     code: str
@@ -406,13 +407,38 @@ async def broadcast_email(
     if req.target == "user":
         if not req.user_id:
             raise HTTPException(status_code=400, detail="user_id required for target=user")
-        raw = await redis.get(f"user:{req.user_id}")
+        # Support email lookup as well as UUID
+        if "@" in req.user_id:
+            idx_raw = await redis.get(f"email_index:{req.user_id.lower()}")
+            uid = idx_raw.decode() if isinstance(idx_raw, bytes) else (idx_raw or "")
+        else:
+            uid = req.user_id
+        raw = await redis.get(f"user:{uid}")
         if not raw:
             raise HTTPException(status_code=404, detail="User not found")
         user = json.loads(raw)
         user.pop("password_hash", None)
         if user.get("email"):
             recipients.append(user)
+    elif req.target == "upload":
+        if not req.email_list:
+            raise HTTPException(status_code=400, detail="email_list required for target=upload")
+        for email_addr in req.email_list:
+            email_addr = email_addr.strip().lower()
+            if not email_addr:
+                continue
+            # Try to find user record for personalisation
+            idx_raw = await redis.get(f"email_index:{email_addr}")
+            uid = idx_raw.decode() if isinstance(idx_raw, bytes) else (idx_raw or "")
+            if uid:
+                raw = await redis.get(f"user:{uid}")
+                if raw:
+                    user = json.loads(raw)
+                    user.pop("password_hash", None)
+                    recipients.append(user)
+                    continue
+            # Not a registered user — send with email only
+            recipients.append({"email": email_addr, "full_name": "Creator"})
     else:
         all_users = await _all_users(redis)
         for user in all_users:
@@ -487,6 +513,8 @@ async def broadcast_email(
         "plan":       req.plan or "",
         "user_id":    req.user_id or "",
         "subject":    req.subject,
+        "message":    req.message[:500] if req.message else "",
+        "html":       req.html[:5000] if req.html else "",
         "recipients": len(recipients),
         "sent":       sent,
         "failed":     failed,
@@ -609,15 +637,7 @@ async def get_admin_logs(redis=Depends(get_redis), _=Depends(_require_admin)):
             break
     logs.sort(key=lambda l: l.get("ts", ""), reverse=True)
     return {"logs": logs[:50]}
-    
-# ─── Get Users Feedback ───────────────────────────────────────────────────────
 
-@router.get("/feedback")
-async def list_feedback(redis=Depends(get_redis), _=Depends(_require_admin)):
-    raw  = await redis.lrange("sceneforge:feedback", 0, 99)
-    items = [json.loads(r) for r in raw]
-    avg  = sum(i["rating"] for i in items) / len(items) if items else 0
-    return {"feedback": items, "total": len(items), "avg_rating": round(avg, 2)}
 
 # ─── Backfill utilities ───────────────────────────────────────────────────────
 
