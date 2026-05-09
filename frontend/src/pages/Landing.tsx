@@ -139,9 +139,9 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
             </div>
             <h1 id="hero-heading" style={{
               fontFamily: "'Syne', system-ui, sans-serif",
-              fontSize: 'clamp(40px, 6vw, 72px)',
-              fontWeight: 800, lineHeight: 1.05, letterSpacing: '-1.5px',
-              margin: '0 auto 28px', maxWidth: 800,
+              fontSize: 'clamp(32px, 3.5vw, 52px)',
+              fontWeight: 800, lineHeight: 1.1, letterSpacing: '-1px',
+              margin: '0 auto 28px', maxWidth: 700,
             }}>
               Go from idea to{' '}
               <span style={{ background: 'linear-gradient(135deg, #A78BFA 0%, #2DD4BF 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
