@@ -609,7 +609,15 @@ async def get_admin_logs(redis=Depends(get_redis), _=Depends(_require_admin)):
             break
     logs.sort(key=lambda l: l.get("ts", ""), reverse=True)
     return {"logs": logs[:50]}
+    
+# ─── Get Users Feedback ───────────────────────────────────────────────────────
 
+@router.get("/feedback")
+async def list_feedback(redis=Depends(get_redis), _=Depends(_require_admin)):
+    raw  = await redis.lrange("sceneforge:feedback", 0, 99)
+    items = [json.loads(r) for r in raw]
+    avg  = sum(i["rating"] for i in items) / len(items) if items else 0
+    return {"feedback": items, "total": len(items), "avg_rating": round(avg, 2)}
 
 # ─── Backfill utilities ───────────────────────────────────────────────────────
 
