@@ -65,7 +65,7 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
   // Feedback fires when render completes OR after 3 min on a workflow step
   const isWorkflowStep = ['setup','ideas','script','scenes','voice','export'].includes(currentStep)
   const renderComplete = renderStatus === 'complete'
-  const { show: showFeedback, trigger: feedbackTrigger, closeFeedback } =
+  const { show: showFeedback, trigger: feedbackTrigger, closeFeedback, openManual: openFeedback } =
     useFeedback(isWorkflowStep, renderComplete)
 
   useEffect(() => {
@@ -77,7 +77,7 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
   return (
     <>
       <NewProjectModal open={modalOpen} onClose={() => setModalOpen(false)} />
-      <Layout onLogout={onLogout} onNewProject={() => setModalOpen(true)}>
+      <Layout onLogout={onLogout} onNewProject={() => setModalOpen(true)} onFeedback={openFeedback}>
         {currentStep === 'projects' && <Projects />}
         {currentStep === 'setup'    && <Setup />}
         {currentStep === 'ideas'    && <Ideas />}
