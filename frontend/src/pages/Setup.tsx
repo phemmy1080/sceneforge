@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react'
 import { useStore } from '../store'
 import { getNiches, type Niche } from '../lib/api'
 import { Button, Card, CardTitle, Chip, Select, TextInput, PageHeader } from '../components/ui'
-import FeedbackModal from '../components/FeedbackModal'
-import { useFeedback } from '../hooks/useFeedback'
 
 const STYLES = ['Educational', 'Viral / Hook-first', 'Storytelling', 'Listicle', 'Documentary', 'Tutorial', 'Opinion / Hot take']
 const PLATFORMS = ['TikTok (9:16, 60s)', 'YouTube Shorts (9:16, 60s)', 'Instagram Reels (9:16, 30s)', 'YouTube (16:9, 3–10 min)', 'LinkedIn (1:1, 60s)']
@@ -26,7 +24,6 @@ export default function Setup() {
   const setConfig       = useStore((s) => s.setConfig)
   const setStep         = useStore((s) => s.setStep)
   const markStepComplete = useStore((s) => s.markStepComplete)
-  const renderStatus    = useStore((s) => s.renderStatus)
 
   const [ideaInput, setIdeaInput] = useState(config.ideaHints || '')
   const [ideaTags, setIdeaTags]   = useState<string[]>(config.ideaTags || [])
@@ -34,9 +31,6 @@ export default function Setup() {
   const suggestions = nicheMap[config.niche] || []
 
   // Feedback — fires after video complete OR 3 min on screen
-  const renderComplete = renderStatus === 'complete'
-  const { show: showFeedback, trigger: feedbackTrigger, closeFeedback } =
-    useFeedback(true, renderComplete)
 
   function addTag(tag: string) {
     const trimmed = tag.trim()
@@ -173,10 +167,6 @@ export default function Setup() {
       </div>
 
       {/* Feedback modal */}
-      {showFeedback && (
-        <FeedbackModal
-          trigger={feedbackTrigger}
-          onClose={closeFeedback}
         />
       )}
     </div>
