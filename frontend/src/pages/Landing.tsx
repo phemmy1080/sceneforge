@@ -102,7 +102,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
         position: 'sticky', top: 0, zIndex: 100,
         background: 'rgba(7,7,14,0.92)', backdropFilter: 'blur(16px)',
       }}>
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 800, letterSpacing: '-0.5px' }}>
+        <div style={{ fontFamily: "'Syne', system-ui, sans-serif", fontSize: 20, fontWeight: 800, letterSpacing: '-0.5px' }}>
           Scene<span style={{ color: '#A78BFA' }}>Forge</span>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -138,7 +138,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
               </span>
             </div>
             <h1 id="hero-heading" style={{
-              fontFamily: 'var(--font-display)',
+              fontFamily: "'Syne', system-ui, sans-serif",
               fontSize: 'clamp(40px, 6vw, 72px)',
               fontWeight: 800, lineHeight: 1.05, letterSpacing: '-1.5px',
               margin: '0 auto 28px', maxWidth: 800,
@@ -174,7 +174,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
           <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 clamp(20px, 4vw, 48px)', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)' }}>
             {STATS.map((s, i) => (
               <div key={i} style={{ textAlign: 'center', padding: '28px 16px', borderRight: i < 3 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 800, color: '#A78BFA', letterSpacing: '-1px', marginBottom: 4 }}>{s.value}</div>
+                <div style={{ fontFamily: "'Syne', system-ui, sans-serif", fontSize: 30, fontWeight: 800, color: '#A78BFA', letterSpacing: '-1px', marginBottom: 4 }}>{s.value}</div>
                 <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.60)' }}>{s.label}</div>
               </div>
             ))}
@@ -230,7 +230,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
                   width: 36, height: 36, borderRadius: 10,
                   background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.2)', marginBottom: 16,
                 }}>
-                  <span style={{ fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 800, color: '#A78BFA' }}>{step.num}</span>
+                  <span style={{ fontFamily: "'Syne', system-ui, sans-serif", fontSize: 12, fontWeight: 800, color: '#A78BFA' }}>{step.num}</span>
                 </div>
                 <p style={{ fontSize: 14, fontWeight: 700, color: '#FFFFFF', marginBottom: 6, lineHeight: 1.3 }}>{step.label}</p>
                 <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.60)', lineHeight: 1.5, margin: 0 }}>{step.sub}</p>
@@ -316,7 +316,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
           <div style={{ position: 'relative', zIndex: 1 }}>
             <p style={sectionEyebrow}>Get started today</p>
             <h2 id="cta-heading" style={{
-              fontFamily: 'var(--font-display)',
+              fontFamily: "'Syne', system-ui, sans-serif",
               fontSize: 'clamp(32px, 5vw, 54px)',
               fontWeight: 800, letterSpacing: '-1.5px',
               margin: '0 auto 16px', maxWidth: 640, color: '#FFFFFF', lineHeight: 1.1,
@@ -345,7 +345,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
         padding: 'clamp(20px, 3vw, 28px) clamp(20px, 4vw, 64px)',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12,
       }}>
-        <span aria-label="SceneForge" style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 800, color: 'rgba(255,255,255,0.80)' }}>
+        <span aria-label="SceneForge" style={{ fontFamily: "'Syne', system-ui, sans-serif", fontSize: 15, fontWeight: 800, color: 'rgba(255,255,255,0.80)' }}>
           Scene<span style={{ color: '#A78BFA' }}>Forge</span>
         </span>
         <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
@@ -380,7 +380,7 @@ const sectionEyebrow: React.CSSProperties = {
 }
 
 const sectionTitle: React.CSSProperties = {
-  fontFamily: 'var(--font-display)',
+  fontFamily: "'Syne', system-ui, sans-serif",
   fontSize: 'clamp(26px, 3vw, 34px)',
   fontWeight: 800, letterSpacing: '-0.5px',
   color: '#FFFFFF', margin: '0 auto', lineHeight: 1.15,
