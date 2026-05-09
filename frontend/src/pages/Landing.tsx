@@ -141,7 +141,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
               fontFamily: "'Syne', system-ui, sans-serif",
               fontSize: 'clamp(32px, 3.5vw, 52px)',
               fontWeight: 800, lineHeight: 1.1, letterSpacing: '-1px',
-              margin: '0 auto 28px', maxWidth: 700,
+              margin: '0 auto 28px', maxWidth: 920,
             }}>
               Go from idea to{' '}
               <span style={{ background: 'linear-gradient(135deg, #A78BFA 0%, #2DD4BF 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
