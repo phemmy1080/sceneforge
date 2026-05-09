@@ -63,7 +63,7 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
 
   // Feedback modal state
   const [showFeedback, setShowFeedback]     = useState(false)
-  const [feedbackTrigger, setFeedbackTrigger] = useState<'video_complete'|'time_on_screen'|'manual'>('manual')
+  const [feedbackTrigger, setFeedbackTrigger] = useState<'video_complete'|'time_on_screen'|'manual'>('video_complete')
   const feedbackShownRef = useRef(false)
 
   function closeFeedback() { setShowFeedback(false) }
