@@ -962,12 +962,12 @@ document.getElementById('admin-email').addEventListener('keydown',function(e){if
 document.getElementById('admin-pass').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
 
 function applyRoleRestrictions(){
-  var access={analytics:['nb-dashboard','nb-analytics','nb-revenue','nb-tx'],support:['nb-dashboard','nb-users','nb-topup','nb-queue','nb-logs']};
+  var access={analytics:['nb-dashboard','nb-analytics','nb-revenue','nb-tx','nb-feedback'],support:['nb-dashboard','nb-users','nb-topup','nb-queue','nb-logs','nb-feedback']};
   var allowed=access[ROLE];
   if(!allowed)return;
-  var all=['nb-dashboard','nb-analytics','nb-users','nb-topup','nb-broadcast','nb-revenue','nb-tx','nb-pricing','nb-niches','nb-coupons','nb-queue','nb-logs'];
+  var all=['nb-dashboard','nb-analytics','nb-users','nb-topup','nb-broadcast','nb-revenue','nb-tx','nb-pricing','nb-niches','nb-coupons','nb-queue','nb-logs','nb-feedback'];
   all.forEach(function(id){var el=document.getElementById(id);if(el)el.style.display=allowed.indexOf(id)>=0?'flex':'none';});
-  var secs={'sec-users':['nb-users','nb-topup','nb-broadcast'],'sec-revenue':['nb-revenue','nb-tx','nb-pricing','nb-niches','nb-coupons'],'sec-system':['nb-queue','nb-logs']};
+  var secs={'sec-users':['nb-users','nb-topup','nb-broadcast'],'sec-revenue':['nb-revenue','nb-tx','nb-pricing','nb-niches','nb-coupons'],'sec-system':['nb-queue','nb-logs','nb-feedback']};
   Object.keys(secs).forEach(function(s){var el=document.getElementById(s);if(el)el.style.display=secs[s].some(function(id){return allowed.indexOf(id)>=0;})?'block':'none';});
 }
 
