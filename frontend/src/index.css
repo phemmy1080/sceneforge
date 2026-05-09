@@ -7,18 +7,26 @@
 @layer base {
   :root {
     --font-display: 'Syne', system-ui, sans-serif;
-    --font-body: 'DM Sans', system-ui, sans-serif;
+    --font-body:    'DM Sans', system-ui, sans-serif;
   }
-  * { box-sizing: border-box; }
+
+  /* Override Tailwind Preflight font reset */
+  html {
+    font-family: 'DM Sans', system-ui, sans-serif !important;
+  }
+
   body {
+    font-family: 'DM Sans', system-ui, sans-serif !important;
     background: #0A0A0F;
     color: #F0F0FF;
-    font-family: var(--font-body);
     -webkit-font-smoothing: antialiased;
   }
+
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-display);
+    font-family: 'Syne', system-ui, sans-serif !important;
   }
+
+  * { box-sizing: border-box; }
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
@@ -26,8 +34,8 @@
 }
 
 @layer utilities {
-  .font-display { font-family: var(--font-display); }
-  .font-body { font-family: var(--font-body); }
+  .font-display { font-family: 'Syne', system-ui, sans-serif !important; }
+  .font-body    { font-family: 'DM Sans', system-ui, sans-serif !important; }
   .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -50,7 +58,7 @@ textarea::placeholder {
   color: rgba(255,255,255,0.50) !important;
 }
 
-/* ── Accessibility: Touch target minimum 44×44px ─────────────────────────── */
+/* ── Accessibility: Touch targets ────────────────────────────────────────── */
 button,
 [role="button"],
 select,
@@ -63,19 +71,10 @@ textarea {
   min-height: 44px;
 }
 
-button.w-6,
-button.w-7,
-button.w-8 {
-  position: relative;
+button.w-6, button.w-7, button.w-8 { position: relative; }
+button.w-6::after, button.w-7::after, button.w-8::after {
+  content: ''; position: absolute; inset: -10px;
 }
-button.w-6::after,
-button.w-7::after,
-button.w-8::after {
-  content: '';
-  position: absolute;
-  inset: -10px;
-}
-
 button.rounded-full {
   min-height: 36px;
   padding-left: 14px;
