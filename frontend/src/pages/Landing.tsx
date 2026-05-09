@@ -319,7 +319,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
               fontFamily: "'Syne', system-ui, sans-serif",
               fontSize: 'clamp(28px, 2.8vw, 42px)',
               fontWeight: 800, letterSpacing: '-1px',
-              margin: '0 auto 16px', maxWidth: 560, color: '#FFFFFF', lineHeight: 1.1,
+              margin: '0 auto 16px', maxWidth: 920, color: '#FFFFFF', lineHeight: 1.1,
             }}>
               Your next viral video is one click away
             </h2>
