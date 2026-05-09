@@ -25,7 +25,6 @@ interface LayoutProps {
   children: React.ReactNode
   onLogout: () => void
   onNewProject: () => void
-  onFeedback?: () => void
 }
 
 function TokenGateBar({ onUpgrade }: { onUpgrade: () => void }) {
@@ -71,7 +70,7 @@ function TokenGateBar({ onUpgrade }: { onUpgrade: () => void }) {
   )
 }
 
-function SidebarContent({ onLogout, onNewProject, onClose, onFeedback }: { onLogout: () => void; onNewProject: () => void; onClose?: () => void; onFeedback?: () => void }) {
+function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => void; onNewProject: () => void; onClose?: () => void }) {
   const currentStep    = useStore((s) => s.currentStep)
   const completedSteps = useStore((s) => s.completedSteps)
   const setStep        = useStore((s) => s.setStep)
@@ -228,25 +227,23 @@ function SidebarContent({ onLogout, onNewProject, onClose, onFeedback }: { onLog
         </div>
       )}
 
-      {onFeedback && (
-        <button
-          onClick={onFeedback}
-          className="mx-2 mb-1.5 flex items-center gap-2 px-3 py-2.5 rounded-xl text-white/40 hover:text-violet-400 hover:bg-violet-500/10 border border-transparent hover:border-violet-500/20 transition-all text-[12px] font-medium flex-shrink-0"
-        >
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M14 2H2a1 1 0 00-1 1v8a1 1 0 001 1h3l3 3 3-3h3a1 1 0 001-1V3a1 1 0 00-1-1z"/>
-            <path d="M5 7h6M5 5h4"/>
-          </svg>
-          Share feedback
-        </button>
-      )}
+      <button
+        onClick={() => document.dispatchEvent(new CustomEvent('open-feedback-modal'))}
+        className="mx-2 mb-1.5 flex items-center gap-2 px-3 py-2.5 rounded-xl text-white/40 hover:text-violet-400 hover:bg-violet-500/10 border border-transparent hover:border-violet-500/20 transition-all text-[12px] font-medium flex-shrink-0"
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M14 2H2a1 1 0 00-1 1v8a1 1 0 001 1h3l3 3 3-3h3a1 1 0 001-1V3a1 1 0 00-1-1z"/>
+          <path d="M5 7h6M5 5h4"/>
+        </svg>
+        Share feedback
+      </button>
       <TokenGateBar onUpgrade={() => useStore.getState().setStep('upgrade')} />
       <UserMenu onLogout={onLogout} />
     </>
   )
 }
 
-export default function Layout({ children, onLogout, onNewProject, onFeedback }: LayoutProps) {
+export default function Layout({ children, onLogout, onNewProject }: LayoutProps) {
   const setStep = useStore((s) => s.setStep)
   const currentStep = useStore((s) => s.currentStep)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -278,7 +275,7 @@ export default function Layout({ children, onLogout, onNewProject, onFeedback }:
 
         {/* ── Desktop Sidebar ── */}
         <aside className="hidden md:flex w-56 shrink-0 bg-[#111118] border-r border-white/[0.07] flex-col sticky top-0 h-screen overflow-hidden">
-          <SidebarContent onLogout={onLogout} onNewProject={onNewProject} onFeedback={onFeedback} />
+          <SidebarContent onLogout={onLogout} onNewProject={onNewProject} />
         </aside>
 
         {/* ── Mobile: overlay + drawer ── */}
@@ -292,7 +289,7 @@ export default function Layout({ children, onLogout, onNewProject, onFeedback }:
         <aside className={`fixed top-0 left-0 h-full w-72 max-w-[85vw] bg-[#111118] border-r border-white/[0.07] flex flex-col z-50 md:hidden transition-transform duration-300 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}>
-          <SidebarContent onLogout={onLogout} onNewProject={onNewProject} onClose={() => setSidebarOpen(false)} onFeedback={onFeedback} />
+          <SidebarContent onLogout={onLogout} onNewProject={onNewProject} onClose={() => setSidebarOpen(false)} />
         </aside>
 
         {/* ── Main content ── */}
@@ -316,19 +313,17 @@ export default function Layout({ children, onLogout, onNewProject, onFeedback }:
               <span className="text-[12px] font-medium text-white/40">{STEP_LABELS[currentStep] || ''}</span>
             </div>
             {/* Feedback button */}
-            {onFeedback && (
-              <button
-                onClick={onFeedback}
-                className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-lg hover:bg-white/8 text-white/40 hover:text-violet-400 transition-colors"
-                aria-label="Give feedback"
-                title="Give feedback"
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M14 2H2a1 1 0 00-1 1v8a1 1 0 001 1h3l3 3 3-3h3a1 1 0 001-1V3a1 1 0 00-1-1z"/>
-                  <path d="M5 7h6M5 5h4"/>
-                </svg>
-              </button>
-            )}
+            <button
+              onClick={() => document.dispatchEvent(new CustomEvent('open-feedback-modal'))}
+              className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-lg hover:bg-white/8 text-white/40 hover:text-violet-400 transition-colors"
+              aria-label="Give feedback"
+              title="Give feedback"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M14 2H2a1 1 0 00-1 1v8a1 1 0 001 1h3l3 3 3-3h3a1 1 0 001-1V3a1 1 0 00-1-1z"/>
+                <path d="M5 7h6M5 5h4"/>
+              </svg>
+            </button>
           </header>
 
           {/* Page content */}
