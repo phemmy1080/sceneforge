@@ -1,18 +1,23 @@
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --font-display: 'Syne', sans-serif;
+    --font-display: 'Syne', system-ui, sans-serif;
+    --font-body: 'DM Sans', system-ui, sans-serif;
   }
   * { box-sizing: border-box; }
   body {
     background: #0A0A0F;
     color: #F0F0FF;
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-body);
     -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
   }
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -22,6 +27,7 @@
 
 @layer utilities {
   .font-display { font-family: var(--font-display); }
+  .font-body { font-family: var(--font-body); }
   .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -30,10 +36,7 @@
   }
 }
 
-/* ── Accessibility: WCAG AA contrast fixes ───────────────────────────────────
-   Boosts low-opacity text from failing (<3:1) to passing (4.5:1+) ratio
-   on the #0A0A0F dark background.
-────────────────────────────────────────────────────────────────────────── */
+/* ── Accessibility: WCAG AA contrast fixes ───────────────────────────────── */
 @layer utilities {
   .text-white\/20 { color: rgba(255,255,255,0.55) !important; }
   .text-white\/25 { color: rgba(255,255,255,0.55) !important; }
@@ -47,9 +50,7 @@ textarea::placeholder {
   color: rgba(255,255,255,0.50) !important;
 }
 
-/* ── Accessibility: Touch target minimum 44×44px ─────────────────────────────
-   WCAG 2.5.5 — interactive elements must be at least 44px in each dimension
-────────────────────────────────────────────────────────────────────────── */
+/* ── Accessibility: Touch target minimum 44×44px ─────────────────────────── */
 button,
 [role="button"],
 select,
@@ -62,7 +63,6 @@ textarea {
   min-height: 44px;
 }
 
-/* Small icon buttons — expand invisible tap area without changing visual size */
 button.w-6,
 button.w-7,
 button.w-8 {
@@ -76,7 +76,6 @@ button.w-8::after {
   inset: -10px;
 }
 
-/* Filter chips / pill buttons keep visual size but get enough padding */
 button.rounded-full {
   min-height: 36px;
   padding-left: 14px;
