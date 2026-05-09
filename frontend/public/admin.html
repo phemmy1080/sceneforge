@@ -325,6 +325,16 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .bar-fill{height:100%;border-radius:3px;transition:width .6s cubic-bezier(0.4,0,0.2,1)}
 .bar-count{font-family:DM Mono,monospace;font-size:11px;color:var(--text3);min-width:22px;text-align:right}
 
+/* ── EDITOR TOOLBAR ──────────────────────────── */
+.bc-tb-btn{
+  background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);
+  border-radius:5px;color:var(--text2);font-size:12px;padding:3px 8px;
+  cursor:pointer;transition:all var(--transition);min-width:28px;
+  font-family:'Instrument Sans',sans-serif;
+}
+.bc-tb-btn:hover{background:rgba(255,255,255,0.1);color:var(--text);border-color:rgba(255,255,255,0.18)}
+#bc-editor:empty:before{content:attr(data-placeholder);color:var(--text3);pointer-events:none;white-space:pre-wrap}
+
 /* ── BROADCAST HISTORY ────────────────────── */
 .bc-item{padding:14px 20px;border-bottom:1px solid var(--border)}
 .bc-item:last-child{border-bottom:none}
@@ -619,50 +629,163 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 
     <!-- BROADCAST -->
     <div class="pg" id="pg-broadcast">
-      <div class="ph"><div class="ph-title">Email broadcast</div><div class="ph-sub">Send targeted emails — all users, by plan, or a single user</div></div>
+      <div class="ph"><div class="ph-title">Email broadcast</div><div class="ph-sub">Compose and send targeted emails to your users</div></div>
       <div id="alert-broadcast" class="alert"></div>
       <div class="two-col">
+
+        <!-- LEFT: Compose -->
         <div class="card">
-          <div class="card-hdr"><span class="card-title">Compose message</span></div>
+          <div class="card-hdr">
+            <span class="card-title">Compose</span>
+            <div class="card-actions">
+              <button class="btn btn-ghost btn-xs" onclick="bcLoadTemplate()" title="Load from history">&#128196; Template</button>
+            </div>
+          </div>
           <div style="padding:20px">
+
+            <!-- Target selector -->
             <div class="field">
               <label>Send to</label>
-              <div style="display:flex;gap:8px">
-                <button id="bt-all" class="btn btn-teal btn-sm" onclick="setBcTarget('all')" style="flex:1">&#127760; All users</button>
-                <button id="bt-plan" class="btn btn-ghost btn-sm" onclick="setBcTarget('plan')" style="flex:1">&#128203; By plan</button>
-                <button id="bt-user" class="btn btn-ghost btn-sm" onclick="setBcTarget('user')" style="flex:1">&#128100; One user</button>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <button id="bt-all"    class="btn btn-teal btn-sm"  onclick="setBcTarget('all')"    style="flex:1;min-width:80px">&#127760; All</button>
+                <button id="bt-plan"   class="btn btn-ghost btn-sm" onclick="setBcTarget('plan')"   style="flex:1;min-width:80px">&#128203; By plan</button>
+                <button id="bt-user"   class="btn btn-ghost btn-sm" onclick="setBcTarget('user')"   style="flex:1;min-width:80px">&#128100; One user</button>
+                <button id="bt-upload" class="btn btn-ghost btn-sm" onclick="setBcTarget('upload')" style="flex:1;min-width:80px">&#128229; Upload CSV</button>
               </div>
             </div>
+
             <div id="bc-plan-row" class="field" style="display:none">
               <label>Plan</label>
               <select id="bc-plan" style="width:100%;background:var(--ink3);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-size:13px;padding:10px 13px;outline:none">
-                <option value="free">Free</option>
-                <option value="starter">Starter</option>
-                <option value="pro">Pro</option>
-                <option value="studio">Studio</option>
+                <option value="free">Free</option><option value="starter">Starter</option>
+                <option value="pro">Pro</option><option value="studio">Studio</option>
               </select>
             </div>
+
             <div id="bc-user-row" class="field" style="display:none">
-              <label>User ID</label>
-              <input type="text" id="bc-user-id" placeholder="e6e31718-4b58-446f-8a05-b11ef670afae">
-              <div style="font-size:11px;color:var(--text3);margin-top:4px">Find IDs in Users tab &middot; copy from Manage modal</div>
+              <label>User ID or email</label>
+              <input type="text" id="bc-user-id" placeholder="UUID or user@email.com">
             </div>
-            <div class="field"><label>Subject &mdash; use {{name}} to personalise</label><input type="text" id="bc-subject" placeholder="e.g. New feature just dropped!"></div>
-            <div class="field"><label>Message &mdash; use {{name}} or {{email}}</label><textarea id="bc-message" rows="7" placeholder="Hi {{name}},&#10;&#10;We just shipped something big...&#10;&#10;&mdash; SceneForge Team"></textarea></div>
-            <div id="bc-preview-wrap" style="display:none;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px;margin-bottom:12px;font-size:13px;color:rgba(255,255,255,0.7);line-height:1.7">
-              <div style="font-size:10px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em">Preview ({{name}} = "Creator")</div>
-              <div id="bc-preview-body" style="white-space:pre-wrap"></div>
+
+            <div id="bc-upload-row" class="field" style="display:none">
+              <label>Upload email list (CSV or TXT, one email per line)</label>
+              <div style="border:2px dashed rgba(255,255,255,0.12);border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:border-color var(--transition)"
+                onclick="document.getElementById('bc-csv-input').click()"
+                ondragover="event.preventDefault();this.style.borderColor='var(--gold)'"
+                ondragleave="this.style.borderColor='rgba(255,255,255,0.12)'"
+                ondrop="bcHandleDrop(event)">
+                <input type="file" id="bc-csv-input" accept=".csv,.txt" style="display:none" onchange="bcReadFile(this.files[0])">
+                <div style="font-size:22px;margin-bottom:6px">&#128229;</div>
+                <div style="font-size:12.5px;color:var(--text2);margin-bottom:3px">Drop CSV/TXT here or click to browse</div>
+                <div style="font-size:11px;color:var(--text3)">One email per line or comma-separated</div>
+              </div>
+              <div id="bc-upload-status" style="margin-top:8px;font-size:12px;color:var(--teal);display:none"></div>
+              <textarea id="bc-email-list" rows="3" placeholder="Or paste emails directly: user@a.com, user@b.com" style="margin-top:8px;width:100%;background:var(--ink3);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-size:12px;padding:9px 12px;outline:none;resize:vertical"></textarea>
             </div>
+
+            <!-- Subject -->
+            <div class="field">
+              <label>Subject &mdash; use {{name}} to personalise</label>
+              <input type="text" id="bc-subject" placeholder="e.g. Big news from SceneForge!">
+            </div>
+
+            <!-- Mini editor toolbar -->
+            <div class="field">
+              <label>Message body</label>
+              <div style="border:1px solid var(--border2);border-radius:10px;overflow:hidden;background:var(--ink3)">
+                <!-- Toolbar -->
+                <div style="display:flex;align-items:center;gap:4px;padding:8px 10px;border-bottom:1px solid var(--border);flex-wrap:wrap;background:var(--ink2)">
+                  <button class="bc-tb-btn" title="Bold" onclick="bcFormat('bold')"><b>B</b></button>
+                  <button class="bc-tb-btn" title="Italic" onclick="bcFormat('italic')"><i>I</i></button>
+                  <button class="bc-tb-btn" title="Underline" onclick="bcFormat('underline')"><u>U</u></button>
+                  <div style="width:1px;height:18px;background:var(--border2);margin:0 2px"></div>
+                  <button class="bc-tb-btn" title="Bullet list" onclick="bcFormat('insertUnorderedList')">&#8226;&#8212;</button>
+                  <button class="bc-tb-btn" title="Numbered list" onclick="bcFormat('insertOrderedList')">1&#8212;</button>
+                  <div style="width:1px;height:18px;background:var(--border2);margin:0 2px"></div>
+                  <select onchange="bcFormat('fontSize',this.value);this.selectedIndex=0" title="Font size"
+                    style="background:var(--ink3);border:1px solid var(--border2);border-radius:5px;color:var(--text2);font-size:11px;padding:3px 5px;outline:none;cursor:pointer">
+                    <option value="">Size</option>
+                    <option value="1">Small</option>
+                    <option value="3">Normal</option>
+                    <option value="5">Large</option>
+                    <option value="7">Huge</option>
+                  </select>
+                  <select onchange="bcFormat('fontName',this.value);this.selectedIndex=0" title="Font"
+                    style="background:var(--ink3);border:1px solid var(--border2);border-radius:5px;color:var(--text2);font-size:11px;padding:3px 5px;outline:none;cursor:pointer">
+                    <option value="">Font</option>
+                    <option value="Arial">Arial</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Courier New">Courier</option>
+                    <option value="Verdana">Verdana</option>
+                  </select>
+                  <div style="width:1px;height:18px;background:var(--border2);margin:0 2px"></div>
+                  <button class="bc-tb-btn" title="Insert link" onclick="bcInsertLink()">&#128279;</button>
+                  <button class="bc-tb-btn" title="Insert personalisation tag" onclick="bcInsertTag()" style="font-size:10px;padding:3px 7px">{{name}}</button>
+                  <div style="margin-left:auto;display:flex;gap:4px">
+                    <button class="bc-tb-btn" title="Undo" onclick="bcFormat('undo')">&#8630;</button>
+                    <button class="bc-tb-btn" title="Redo" onclick="bcFormat('redo')">&#8631;</button>
+                  </div>
+                </div>
+                <!-- Editable area -->
+                <div id="bc-editor"
+                  contenteditable="true"
+                  style="min-height:160px;padding:14px;font-size:13.5px;color:var(--text);outline:none;line-height:1.7;font-family:'Instrument Sans',sans-serif"
+                  data-placeholder="Hi {{name}},&#10;&#10;We have exciting news...&#10;&#10;— SceneForge Team"
+                  oninput="bcEditorInput()"
+                ></div>
+              </div>
+              <div style="font-size:10.5px;color:var(--text3);margin-top:5px">
+                Use <code style="background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:3px">{{name}}</code> or
+                <code style="background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:3px">{{email}}</code> for personalisation
+              </div>
+            </div>
+
+            <!-- Preview -->
+            <div id="bc-preview-wrap" style="display:none;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:16px;margin-bottom:12px">
+              <div style="font-size:10px;color:var(--teal);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em;font-weight:600">&#128065; Preview ({{name}} = "Creator")</div>
+              <div id="bc-preview-body" style="font-size:13px;color:rgba(255,255,255,0.75);line-height:1.7"></div>
+            </div>
+
             <div style="display:flex;gap:8px;margin-bottom:12px">
-              <button class="btn btn-ghost btn-sm" onclick="toggleBcPreview()" style="flex:1">Preview message</button>
+              <button class="btn btn-ghost btn-sm" onclick="toggleBcPreview()" style="flex:1">&#128065; Preview</button>
+              <button class="btn btn-ghost btn-sm" onclick="bcClear()" style="flex:1">&#10006; Clear</button>
             </div>
-            <button class="btn btn-gold" style="width:100%;justify-content:center" onclick="doBroadcast()">Send broadcast &rarr;</button>
+
+            <button class="btn btn-gold" style="width:100%;justify-content:center;font-size:14px" onclick="doBroadcast()">
+              Send broadcast &rarr;
+            </button>
             <p style="font-size:11px;color:var(--text3);text-align:center;margin-top:10px">Suspended accounts are always skipped</p>
           </div>
         </div>
-        <div class="card">
-          <div class="card-hdr"><span class="card-title">Sent broadcasts</span><button class="btn btn-ghost btn-sm" onclick="loadBroadcasts()">Refresh</button></div>
-          <div id="broadcast-history"><div class="loading"></div></div>
+
+        <!-- RIGHT: History -->
+        <div class="card" style="display:flex;flex-direction:column">
+          <div class="card-hdr">
+            <span class="card-title">Sent broadcasts</span>
+            <button class="btn btn-ghost btn-sm" onclick="loadBroadcasts()">Refresh</button>
+          </div>
+          <div id="broadcast-history" style="flex:1;overflow-y:auto"></div>
+        </div>
+      </div>
+
+      <!-- Broadcast detail modal -->
+      <div id="bc-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(10,10,15,0.85);backdrop-filter:blur(8px);z-index:600;align-items:center;justify-content:center">
+        <div style="background:var(--ink2);border:1px solid var(--border2);border-radius:20px;width:100%;max-width:560px;overflow:hidden;animation:fadeUp .2s ease">
+          <div style="background:linear-gradient(135deg,rgba(201,168,76,0.12),rgba(45,212,191,0.06));padding:22px 28px;border-bottom:1px solid var(--border);position:relative">
+            <div style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent)"></div>
+            <button onclick="closeBcDetail()" style="position:absolute;top:14px;right:16px;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);color:var(--text3);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center">&times;</button>
+            <div id="bc-detail-badge" style="margin-bottom:10px"></div>
+            <div id="bc-detail-subject" style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--text);margin-bottom:4px"></div>
+            <div id="bc-detail-meta" style="font-size:12px;color:var(--text3)"></div>
+          </div>
+          <div style="padding:24px 28px;max-height:400px;overflow-y:auto">
+            <div style="font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;font-weight:600">Message body</div>
+            <div id="bc-detail-body" style="font-size:13.5px;color:var(--text2);line-height:1.75;white-space:pre-wrap"></div>
+          </div>
+          <div style="padding:16px 28px;border-top:1px solid var(--border);display:flex;gap:10px">
+            <button class="btn btn-teal btn-sm" onclick="bcReuseTemplate()" style="flex:1">&#9166; Reuse as template</button>
+            <button class="btn btn-ghost btn-sm" onclick="closeBcDetail()">Close</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1100,62 +1223,199 @@ async function doTopUp(){
 function setTopup(n){document.getElementById('topup-amount').value=n;}
 
 var BC_TARGET='all';
+var BC_UPLOADED_EMAILS=[];
+var BC_HISTORY=[];
+var BC_DETAIL=null;
+
 function setBcTarget(t){
   BC_TARGET=t;
-  ['all','plan','user'].forEach(function(x){
+  ['all','plan','user','upload'].forEach(function(x){
     var btn=document.getElementById('bt-'+x);
     if(btn)btn.className='btn btn-sm '+(x===t?'btn-teal':'btn-ghost');
   });
   document.getElementById('bc-plan-row').style.display=t==='plan'?'block':'none';
   document.getElementById('bc-user-row').style.display=t==='user'?'block':'none';
+  document.getElementById('bc-upload-row').style.display=t==='upload'?'block':'none';
 }
+
+// ── Editor helpers ────────────────────────────────────────────────────────────
+function bcFormat(cmd,val){
+  document.getElementById('bc-editor').focus();
+  document.execCommand(cmd,false,val||null);
+}
+function bcEditorInput(){
+  // keep placeholder logic handled by CSS :empty
+}
+function bcInsertLink(){
+  var url=prompt('Enter URL:','https://');
+  if(!url)return;
+  var text=prompt('Link text (leave blank to use URL):','')||url;
+  document.getElementById('bc-editor').focus();
+  document.execCommand('insertHTML',false,'<a href="'+url+'" style="color:#A78BFA">'+text+'</a>');
+}
+function bcInsertTag(){
+  document.getElementById('bc-editor').focus();
+  document.execCommand('insertText',false,'{{name}}');
+}
+function bcGetContent(){
+  return document.getElementById('bc-editor').innerHTML;
+}
+function bcGetText(){
+  return document.getElementById('bc-editor').innerText||'';
+}
+function bcClear(){
+  document.getElementById('bc-editor').innerHTML='';
+  document.getElementById('bc-subject').value='';
+  document.getElementById('bc-preview-wrap').style.display='none';
+  BC_UPLOADED_EMAILS=[];
+  document.getElementById('bc-upload-status').style.display='none';
+  document.getElementById('bc-email-list').value='';
+}
+
+// ── CSV upload ────────────────────────────────────────────────────────────────
+function bcReadFile(file){
+  if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    bcParseEmails(e.target.result);
+  };
+  reader.readAsText(file);
+}
+function bcHandleDrop(e){
+  e.preventDefault();
+  e.currentTarget.style.borderColor='rgba(255,255,255,0.12)';
+  var file=e.dataTransfer.files[0];
+  if(file)bcReadFile(file);
+}
+function bcParseEmails(text){
+  var emails=text.split(/[\n,;\r]+/).map(function(e){
+    return e.trim().replace(/^["']|["']$/g,'').toLowerCase();
+  }).filter(function(e){
+    return e.indexOf('@')>0 && e.indexOf('.')>1;
+  });
+  var unique=[...new Set(emails)];
+  BC_UPLOADED_EMAILS=unique;
+  var el=document.getElementById('bc-upload-status');
+  el.style.display='block';
+  el.textContent='✓ '+unique.length+' valid email'+(unique.length===1?'':'s')+' loaded';
+  document.getElementById('bc-email-list').value=unique.join('\n');
+}
+
+// ── Preview ───────────────────────────────────────────────────────────────────
 function toggleBcPreview(){
-  var w=document.getElementById('bc-preview-wrap'),msg=document.getElementById('bc-message').value;
-  if(w.style.display==='none'){
+  var w=document.getElementById('bc-preview-wrap');
+  if(w.style.display==='none'||!w.style.display){
     w.style.display='block';
-    document.getElementById('bc-preview-body').textContent=msg.replace(/{{name}}/g,'Creator').replace(/{{email}}/g,'creator@example.com');
+    var html=bcGetContent().replace(/{{name}}/g,'Creator').replace(/{{email}}/g,'creator@example.com');
+    document.getElementById('bc-preview-body').innerHTML=html;
   }else{w.style.display='none';}
 }
+
+// ── Send ──────────────────────────────────────────────────────────────────────
 async function doBroadcast(){
   var subj=document.getElementById('bc-subject').value.trim();
-  var msg=document.getElementById('bc-message').value.trim();
-  var plan=document.getElementById('bc-plan')&&document.getElementById('bc-plan').value;
-  var userId=document.getElementById('bc-user-id')&&document.getElementById('bc-user-id').value.trim();
-  if(!subj||!msg){showAlert('broadcast','Fill subject and message','error');return;}
-  if(BC_TARGET==='plan'&&!plan){showAlert('broadcast','Select a plan','error');return;}
-  if(BC_TARGET==='user'&&!userId){showAlert('broadcast','Enter a user ID','error');return;}
-  var label=BC_TARGET==='all'?'ALL users':BC_TARGET==='plan'?'all '+plan.toUpperCase()+' plan users':'user '+userId.slice(0,8)+'...';
+  var html=bcGetContent();
+  var text=bcGetText().trim();
+  if(!subj||!text){showAlert('broadcast','Fill subject and message','error');return;}
+
+  var body={subject:subj,message:text,html:html,target:BC_TARGET};
+
+  if(BC_TARGET==='plan'){
+    var plan=document.getElementById('bc-plan').value;
+    if(!plan){showAlert('broadcast','Select a plan','error');return;}
+    body.plan=plan;
+  } else if(BC_TARGET==='user'){
+    var userId=document.getElementById('bc-user-id').value.trim();
+    if(!userId){showAlert('broadcast','Enter a user ID or email','error');return;}
+    body.user_id=userId;
+  } else if(BC_TARGET==='upload'){
+    // Parse from textarea in case user typed directly
+    var rawList=document.getElementById('bc-email-list').value;
+    if(rawList.trim())bcParseEmails(rawList);
+    if(!BC_UPLOADED_EMAILS.length){showAlert('broadcast','Upload or paste email addresses first','error');return;}
+    body.email_list=BC_UPLOADED_EMAILS;
+    body.target='upload';
+  }
+
+  var label=BC_TARGET==='all'?'ALL users'
+    :BC_TARGET==='plan'?'all '+body.plan.toUpperCase()+' users'
+    :BC_TARGET==='user'?'user '+body.user_id.slice(0,12)+'...'
+    :BC_UPLOADED_EMAILS.length+' uploaded emails';
+
   if(!confirm('Send "'+subj+'" to '+label+'?\n\nThis cannot be undone.'))return;
+
   try{
-    var body={subject:subj,message:msg,target:BC_TARGET};
-    if(BC_TARGET==='plan')body.plan=plan;
-    if(BC_TARGET==='user')body.user_id=userId;
     var r=await apiFetch('/broadcast',{method:'POST',body:JSON.stringify(body)});
-    showAlert('broadcast','Sent '+r.sent+' | Failed '+r.failed+' | Skipped '+r.skipped+' (of '+r.total+' matched)','success');
-    document.getElementById('bc-subject').value='';
-    document.getElementById('bc-message').value='';
-    document.getElementById('bc-preview-wrap').style.display='none';
+    showAlert('broadcast','✅ Sent: '+r.sent+' | Failed: '+r.failed+' | Skipped: '+r.skipped,'success');
+    bcClear();
     loadBroadcasts();
   }catch(e){showAlert('broadcast',e.detail||'Broadcast failed','error');}
 }
+
+// ── History ───────────────────────────────────────────────────────────────────
+function bcTargetLabel(b){
+  if(b.target==='plan')return '📋 Plan: '+b.plan;
+  if(b.target==='user')return '👤 User';
+  if(b.target==='upload')return '📩 '+b.recipients+' uploaded emails';
+  return '🌐 All users';
+}
+
 async function loadBroadcasts(){
   try{
     var d=await apiFetch('/broadcasts'),list=d.broadcasts||[];
-    var targetLabel=function(b){
-      if(b.target==='plan')return'Plan: '+b.plan;
-      if(b.target==='user')return'User: '+(b.user_id||'').slice(0,8)+'...';
-      return'All users';
-    };
+    BC_HISTORY=list;
     document.getElementById('broadcast-history').innerHTML=list.length
-      ?list.map(function(b){
-        return'<div class="bc-item"><div class="bc-subj">'+b.subject+'</div>'
-          +'<div class="bc-meta">'+targetLabel(b)
+      ?list.map(function(b,idx){
+        return '<div class="bc-item" style="cursor:pointer" onclick="openBcDetail('+idx+')">'
+          +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">'
+          +'<div class="bc-subj">'+b.subject+'</div>'
+          +'<span style="font-size:10px;color:var(--text3);white-space:nowrap">'+ago(b.ts)+'</span>'
+          +'</div>'
+          +'<div class="bc-meta">'+bcTargetLabel(b)
           +' &middot; <span style="color:var(--teal)">'+b.sent+' sent</span>'
           +(b.failed>0?' &middot; <span style="color:var(--rose)">'+b.failed+' failed</span>':'')
-          +' &middot; '+ago(b.ts)+'</div></div>';
+          +'</div>'
+          +'<div style="margin-top:6px;display:flex;gap:6px">'
+          +'<span style="font-size:10px;color:var(--text3);background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:5px;padding:2px 8px">View &rarr;</span>'
+          +'<span style="font-size:10px;color:var(--teal);background:rgba(45,212,191,0.07);border:1px solid rgba(45,212,191,0.15);border-radius:5px;padding:2px 8px">Reuse</span>'
+          +'</div>'
+          +'</div>';
       }).join('')
       :'<div class="loading">No broadcasts yet</div>';
   }catch(e){document.getElementById('broadcast-history').innerHTML='<div class="loading">Failed</div>';}
+}
+
+function openBcDetail(idx){
+  var b=BC_HISTORY[idx];if(!b)return;
+  BC_DETAIL=b;
+  // Badge
+  var tl=bcTargetLabel(b);
+  document.getElementById('bc-detail-badge').innerHTML='<span style="display:inline-flex;align-items:center;gap:6px;background:rgba(201,168,76,0.1);border:1px solid rgba(201,168,76,0.2);border-radius:100px;padding:4px 12px;font-size:11px;color:var(--gold)">'+tl+'</span>';
+  document.getElementById('bc-detail-subject').textContent=b.subject;
+  document.getElementById('bc-detail-meta').innerHTML=
+    '<span style="color:var(--teal)">'+b.sent+' sent</span>'
+    +(b.failed>0?' &middot; <span style="color:var(--rose)">'+b.failed+' failed</span>':'')
+    +' &middot; '+ago(b.ts);
+  // Body - use html if available, else plain text
+  var bodyEl=document.getElementById('bc-detail-body');
+  if(b.html){bodyEl.innerHTML=b.html;bodyEl.style.whiteSpace='normal';}
+  else{bodyEl.textContent=b.message||b.body||'(no body stored)';bodyEl.style.whiteSpace='pre-wrap';}
+  var modal=document.getElementById('bc-detail-modal');
+  modal.style.display='flex';
+}
+function closeBcDetail(){document.getElementById('bc-detail-modal').style.display='none';}
+function bcReuseTemplate(){
+  if(!BC_DETAIL)return;
+  document.getElementById('bc-subject').value=BC_DETAIL.subject||'';
+  var editor=document.getElementById('bc-editor');
+  if(BC_DETAIL.html)editor.innerHTML=BC_DETAIL.html;
+  else editor.innerText=BC_DETAIL.message||BC_DETAIL.body||'';
+  closeBcDetail();
+  showAlert('broadcast','Template loaded — edit and send when ready','success');
+}
+function bcLoadTemplate(){
+  if(!BC_HISTORY.length){showAlert('broadcast','No broadcast history yet','error');return;}
+  openBcDetail(0); // open most recent
 }
 
 async function loadRevenue(){
@@ -1446,7 +1706,7 @@ function renderFeedback(){
         +'<div><div style="font-family:DM Mono,monospace;font-size:13px;font-weight:700;color:'+(COLS[i.rating]||'#fff')+'">'+STARS[i.rating]+' &nbsp;'+i.rating+'/5</div>'
         +'<div style="font-size:10.5px;color:var(--text3);margin-top:1px">'+(i.trigger==='video_complete'?'After render':'Time on screen')+' &middot; '+ago(i.ts)+'</div></div>'
         +'</div>'
-        +(i.user_id&&i.user_id!=='anonymous'?'<span style="font-size:10px;color:var(--text3);font-family:DM Mono,monospace">'+i.user_id.slice(0,8)+'...</span>':'')
+        +(function(){var u=USER_CACHE[i.user_id]||{};var name=u.full_name||i.user_name||'';var email=u.email||i.email||'';if(name||email){return '<span style="font-size:10px;color:var(--text3)">'+name+(email?' &middot; '+email:'')+'</span>';}return '';})()
         +'</div>'
         +(tags?'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">'+tags+'</div>':'')
         +(i.comment?'<div style="font-size:13px;color:var(--text2);background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:10px 12px;line-height:1.6">'+i.comment+'</div>':'')
@@ -1463,12 +1723,15 @@ async function exportFeedbackExcel(){
   var ws=wb.addWorksheet('Feedback');
   _xlsxHeader(ws,[
     {header:'Rating',width:10},{header:'Stars',width:14},{header:'Trigger',width:18},
-    {header:'Tags',width:36},{header:'Comment',width:48},{header:'User ID',width:16},{header:'Date',width:20}
+    {header:'Tags',width:36},{header:'Comment',width:48},
+    {header:'User name',width:22},{header:'Email',width:28},{header:'Date',width:20}
   ]);
   var STARS={1:'★☆☆☆☆',2:'★★☆☆☆',3:'★★★☆☆',4:'★★★★☆',5:'★★★★★'};
   FB_DATA.forEach(function(i){
+    var u=USER_CACHE[i.user_id]||{};
     ws.addRow([i.rating,STARS[i.rating]||'',i.trigger||'',(i.tags||[]).join(', '),i.comment||'',
-      (i.user_id||'').slice(0,8),i.ts?new Date(i.ts).toLocaleString():'']);
+      u.full_name||i.user_name||'—',u.email||i.email||'—',
+      i.ts?new Date(i.ts).toLocaleString():'']);
   });
 
   var ws2=wb.addWorksheet('Summary');
