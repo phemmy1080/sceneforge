@@ -7,24 +7,17 @@
 @layer base {
   :root {
     --font-display: 'Syne', system-ui, sans-serif;
-    --font-body:    'DM Sans', system-ui, sans-serif;
+    --font-body: 'DM Sans', system-ui, sans-serif;
   }
 
-  /* Override Tailwind Preflight font reset */
-  html {
-    font-family: 'DM Sans', system-ui, sans-serif;
-  }
-
-  body {
-    font-family: 'DM Sans', system-ui, sans-serif;
+  html, body {
+    font-family: var(--font-body);
     background: #0A0A0F;
     color: #F0F0FF;
     -webkit-font-smoothing: antialiased;
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'Syne', system-ui, sans-serif ;
-  }
+  /* REMOVED h1-h6 font rule entirely — handled by inline styles in components */
 
   * { box-sizing: border-box; }
   ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -34,8 +27,8 @@
 }
 
 @layer utilities {
-  .font-display { font-family: 'Syne', system-ui, sans-serif !important; }
-  .font-body    { font-family: 'DM Sans', system-ui, sans-serif !important; }
+  .font-display { font-family: var(--font-display); }
+  .font-body    { font-family: var(--font-body); }
   .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -44,7 +37,7 @@
   }
 }
 
-/* ── Accessibility: WCAG AA contrast fixes ───────────────────────────────── */
+/* Accessibility: WCAG AA contrast fixes */
 @layer utilities {
   .text-white\/20 { color: rgba(255,255,255,0.55) !important; }
   .text-white\/25 { color: rgba(255,255,255,0.55) !important; }
@@ -58,7 +51,7 @@ textarea::placeholder {
   color: rgba(255,255,255,0.50) !important;
 }
 
-/* ── Accessibility: Touch targets ────────────────────────────────────────── */
+/* Accessibility: Touch targets */
 button,
 [role="button"],
 select,
@@ -75,6 +68,7 @@ button.w-6, button.w-7, button.w-8 { position: relative; }
 button.w-6::after, button.w-7::after, button.w-8::after {
   content: ''; position: absolute; inset: -10px;
 }
+
 button.rounded-full {
   min-height: 36px;
   padding-left: 14px;
