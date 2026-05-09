@@ -23,16 +23,15 @@ function markShown() {
 }
 
 export function useFeedback(isActive: boolean, renderComplete: boolean) {
-  const [show, setShow]         = useState(false)
-  const [trigger, setTrigger]   = useState<Trigger>('time_on_screen')
-  const timerRef                = useRef<ReturnType<typeof setTimeout>>()
-  // Track whether auto-triggers have fired this session
-  // (manual trigger always works regardless)
-  const autoShownRef            = useRef(false)
+  const [show, setShow]       = useState(false)
+  const [trigger, setTrigger] = useState<Trigger>('time_on_screen')
+  const timerRef              = useRef<ReturnType<typeof setTimeout>>()
+  const autoShownRef          = useRef(false)
+  // Track whether we already fired the render-complete trigger this session
+  const renderFiredRef        = useRef(false)
 
   function openFeedback(t: Trigger) {
     if (t !== 'manual') {
-      // Auto triggers: respect cooldown and only fire once per session
       if (autoShownRef.current || !shouldShow()) return
       autoShownRef.current = true
       markShown()
@@ -41,21 +40,24 @@ export function useFeedback(isActive: boolean, renderComplete: boolean) {
     setShow(true)
   }
 
-  // Manually open — always works, no cooldown
-  function openManual() { openFeedback('manual') }
+  // Manual trigger — always works regardless of cooldown
+  function openManual() {
+    setTrigger('manual')
+    setShow(true)
+  }
 
-  // Trigger 1: render complete — watch for transition to true
-  const prevCompleteRef = useRef(false)
+  // Trigger 1: render complete
+  // Fires when renderComplete becomes true OR if it's already true on mount
   useEffect(() => {
-    if (renderComplete && !prevCompleteRef.current) {
-      // Fired the moment renderComplete flips to true
+    if (renderComplete && !renderFiredRef.current) {
+      renderFiredRef.current = true
       const t = setTimeout(() => openFeedback('video_complete'), 2000)
-      prevCompleteRef.current = true
       return () => clearTimeout(t)
     }
     if (!renderComplete) {
-      prevCompleteRef.current = false
+      renderFiredRef.current = false
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [renderComplete])
 
   // Trigger 2: time on screen
@@ -64,6 +66,7 @@ export function useFeedback(isActive: boolean, renderComplete: boolean) {
     if (!isActive) return
     timerRef.current = setTimeout(() => openFeedback('time_on_screen'), TIME_TRIGGER_MS)
     return () => clearTimeout(timerRef.current)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive])
 
   function closeFeedback() { setShow(false) }
