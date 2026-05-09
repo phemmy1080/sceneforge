@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useAuthStore } from './authStore'
 import { useStore } from './store'
@@ -25,7 +25,6 @@ import Plans from './pages/Plans'
 import PaymentCallback from './pages/PaymentCallback'
 import ErrorBoundary from './components/ErrorBoundary'
 import FeedbackModal from './components/FeedbackModal'
-import { useFeedback } from './hooks/useFeedback'
 import ToastContainer from './components/ToastContainer'
 
 const queryClient = new QueryClient({
@@ -62,11 +61,48 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
   const renderStatus  = useStore((s) => s.renderStatus)
   const [modalOpen, setModalOpen] = useState(false)
 
-  // Feedback fires when render completes OR after 3 min on a workflow step
+  // Feedback modal state
+  const [showFeedback, setShowFeedback]     = useState(false)
+  const [feedbackTrigger, setFeedbackTrigger] = useState<'video_complete'|'time_on_screen'|'manual'>('manual')
+  const feedbackShownRef = useRef(false)
+
+  function closeFeedback() { setShowFeedback(false) }
+
+  function triggerFeedback(t: 'video_complete'|'time_on_screen'|'manual') {
+    if (t !== 'manual') {
+      if (feedbackShownRef.current) return
+      try {
+        const last = localStorage.getItem('sceneforge:feedback_shown')
+        if (last) {
+          const days = (Date.now() - parseInt(last)) / (1000*60*60*24)
+          if (days < 14) return
+        }
+      } catch {}
+      feedbackShownRef.current = true
+      try { localStorage.setItem('sceneforge:feedback_shown', Date.now().toString()) } catch {}
+    }
+    setFeedbackTrigger(t)
+    setShowFeedback(true)
+  }
+
+  // Render complete trigger
+  const prevRenderRef = useRef(false)
+  useEffect(() => {
+    if (renderStatus === 'complete' && !prevRenderRef.current) {
+      prevRenderRef.current = true
+      const t = setTimeout(() => triggerFeedback('video_complete'), 2000)
+      return () => clearTimeout(t)
+    }
+    if (renderStatus !== 'complete') prevRenderRef.current = false
+  }, [renderStatus])
+
+  // Time on screen trigger (3 minutes on workflow steps)
   const isWorkflowStep = ['setup','ideas','script','scenes','voice','export'].includes(currentStep)
-  const renderComplete = renderStatus === 'complete'
-  const { show: showFeedback, trigger: feedbackTrigger, closeFeedback, openManual: openFeedback } =
-    useFeedback(isWorkflowStep, renderComplete)
+  useEffect(() => {
+    if (!isWorkflowStep) return
+    const t = setTimeout(() => triggerFeedback('time_on_screen'), 3 * 60 * 1000)
+    return () => clearTimeout(t)
+  }, [isWorkflowStep])
 
   useEffect(() => {
     const handler = () => setModalOpen(true)
@@ -75,10 +111,10 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
   }, [])
 
   useEffect(() => {
-    const handler = () => openFeedback()
+    const handler = () => triggerFeedback('manual')
     document.addEventListener('open-feedback-modal', handler)
     return () => document.removeEventListener('open-feedback-modal', handler)
-  }, [openFeedback])
+  }, [])
 
   return (
     <>
