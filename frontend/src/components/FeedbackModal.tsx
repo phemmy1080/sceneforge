@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
 
 interface Props {
-  trigger: 'video_complete' | 'time_on_screen'
+  trigger: 'video_complete' | 'time_on_screen' | 'manual'
   onClose: () => void
 }
 
@@ -106,7 +106,7 @@ export default function FeedbackModal({ trigger, onClose }: Props) {
                 }}
               >×</button>
 
-              {trigger === 'video_complete' && (
+              {(trigger === 'video_complete' || trigger === 'manual') && (
                 <div style={{
                   display: 'inline-flex', alignItems: 'center', gap: 7,
                   background: 'rgba(45,212,191,0.12)', border: '1px solid rgba(45,212,191,0.25)',
