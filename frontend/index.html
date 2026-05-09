@@ -14,7 +14,7 @@
     <meta name="author" content="SceneForge" />
     <link rel="canonical" href="https://sceneraforge.com/" />
 
-    <!-- Open Graph (Facebook, WhatsApp, LinkedIn) -->
+    <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://sceneraforge.com/" />
     <meta property="og:title" content="SceneForge — AI Video Studio" />
@@ -22,18 +22,31 @@
     <meta property="og:image" content="https://sceneraforge.com/og-image.png" />
     <meta property="og:site_name" content="SceneForge" />
 
-    <!-- Twitter / X card -->
+    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:url" content="https://sceneraforge.com/" />
     <meta name="twitter:title" content="SceneForge — AI Video Studio" />
     <meta name="twitter:description" content="Create viral TikTok and YouTube videos with AI. Script, voiceover, visuals — all in one click." />
     <meta name="twitter:image" content="https://sceneraforge.com/og-image.png" />
 
-    <!-- Robots -->
     <meta name="robots" content="index, follow" />
-
-    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!-- Preconnect to Google Fonts (speeds up font load) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- Load fonts directly in HTML so they're available before React renders -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Prevent flash of unstyled text -->
+    <style>
+      body { font-family: 'DM Sans', system-ui, sans-serif; }
+      .font-display, h1, h2, h3 { font-family: 'Syne', system-ui, sans-serif; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
