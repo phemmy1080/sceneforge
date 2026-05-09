@@ -24,6 +24,8 @@ import Upgrade from './pages/Upgrade'
 import Plans from './pages/Plans'
 import PaymentCallback from './pages/PaymentCallback'
 import ErrorBoundary from './components/ErrorBoundary'
+import FeedbackModal from './components/FeedbackModal'
+import { useFeedback } from './hooks/useFeedback'
 import ToastContainer from './components/ToastContainer'
 
 const queryClient = new QueryClient({
@@ -55,9 +57,16 @@ function applyDeepLink(): boolean {
 }
 
 function AppPages({ onLogout }: { onLogout: () => void }) {
-  const currentStep = useStore((s) => s.currentStep)
-  const setStep     = useStore((s) => s.setStep)
+  const currentStep   = useStore((s) => s.currentStep)
+  const setStep       = useStore((s) => s.setStep)
+  const renderStatus  = useStore((s) => s.renderStatus)
   const [modalOpen, setModalOpen] = useState(false)
+
+  // Feedback fires when render completes OR after 3 min on a workflow step
+  const isWorkflowStep = ['setup','ideas','script','scenes','voice','export'].includes(currentStep)
+  const renderComplete = renderStatus === 'complete'
+  const { show: showFeedback, trigger: feedbackTrigger, closeFeedback } =
+    useFeedback(isWorkflowStep, renderComplete)
 
   useEffect(() => {
     const handler = () => setModalOpen(true)
@@ -80,6 +89,11 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
         {currentStep === 'upgrade'  && <Plans onBack={() => setStep('setup')} />}
         {currentStep === 'plans'    && <Plans onBack={() => setStep('setup')} />}
       </Layout>
+
+      {/* Feedback modal — always mounted so it catches renderStatus from any step */}
+      {showFeedback && (
+        <FeedbackModal trigger={feedbackTrigger} onClose={closeFeedback} />
+      )}
     </>
   )
 }
