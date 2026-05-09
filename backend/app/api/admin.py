@@ -639,6 +639,38 @@ async def get_admin_logs(redis=Depends(get_redis), _=Depends(_require_admin)):
     return {"logs": logs[:50]}
 
 
+# ─── User feedback ────────────────────────────────────────────────────────────
+
+@router.get("/feedback")
+async def list_feedback(redis=Depends(get_redis), _=Depends(_require_admin)):
+    """Return last 100 feedback entries with user name/email resolved."""
+    raw_list = await redis.lrange("sceneforge:feedback", 0, 99)
+    items = []
+    for r in raw_list:
+        try:
+            item = json.loads(r)
+            # Resolve user name + email from Redis
+            uid = item.get("user_id", "")
+            if uid and uid != "anonymous":
+                user_raw = await redis.get(f"user:{uid}")
+                if user_raw:
+                    try:
+                        u = json.loads(user_raw)
+                        item["user_name"] = u.get("full_name", "")
+                        item["email"]     = u.get("email", "")
+                    except Exception:
+                        pass
+            items.append(item)
+        except Exception:
+            pass
+    avg = sum(i.get("rating", 0) for i in items) / len(items) if items else 0
+    return {
+        "feedback": items,
+        "total": len(items),
+        "avg_rating": round(avg, 2),
+    }
+
+
 # ─── Backfill utilities ───────────────────────────────────────────────────────
 
 @router.post("/transactions/backfill")
