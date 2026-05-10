@@ -27,8 +27,13 @@ export default function Export() {
   if (!jobId) {
     return (
       <div>
-        <PageHeader title="Export" subtitle="Complete the Voice & Visuals step to render your video" />
-        <div className="py-20 text-center text-white/30 text-sm">No render started yet.</div>
+        <PageHeader title="Export" subtitle="Download your finished video" />
+        <div className="py-16 text-center">
+          <div className="text-4xl mb-4">🎬</div>
+          <p className="text-white/50 text-sm mb-2">No render started yet.</p>
+          <p className="text-white/30 text-xs">Complete the Voice &amp; Visuals step to render your video.</p>
+          <p className="text-white/20 text-xs mt-4">If you previously rendered a video, open your project from the sidebar to restore it.</p>
+        </div>
       </div>
     )
   }
@@ -64,8 +69,32 @@ export default function Export() {
       {/* ── Failed ── */}
       {isFailed && (
         <div className="bg-red-500/10 border border-red-500/25 rounded-xl p-5 mb-6">
-          <p className="text-red-400 font-semibold">Render failed</p>
-          <p className="text-white/50 text-[13px] mt-1">Check your API keys and worker logs, then try again from Voice & Visuals.</p>
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0 text-red-400 text-sm mt-0.5">✕</div>
+            <div className="flex-1">
+              <p className="text-red-400 font-semibold text-[14px] mb-1">Video render failed</p>
+              <p className="text-white/60 text-[13px] leading-relaxed mb-3">
+                {renderStage && !renderStage.toLowerCase().includes('name') && !renderStage.includes('traceback')
+                  ? renderStage
+                  : 'Something went wrong while processing your video.'}
+              </p>
+              <div className="bg-white/5 border border-white/8 rounded-lg p-3 mb-3">
+                <p className="text-[11px] text-white/40 font-semibold uppercase tracking-wide mb-2">What to try</p>
+                <ul className="text-[12.5px] text-white/60 space-y-1.5 list-none">
+                  <li className="flex items-start gap-2"><span className="text-violet-400 mt-0.5">→</span>Go back to Voice &amp; Visuals and try a different visual source</li>
+                  <li className="flex items-start gap-2"><span className="text-violet-400 mt-0.5">→</span>Try fewer scenes or a shorter duration</li>
+                  <li className="flex items-start gap-2"><span className="text-violet-400 mt-0.5">→</span>Switch to Stock video (Pexels) if using AI images</li>
+                  <li className="flex items-start gap-2"><span className="text-violet-400 mt-0.5">→</span>Remove background music and try again</li>
+                </ul>
+              </div>
+              <button
+                onClick={() => useStore.getState().setStep('voice')}
+                className="text-[12.5px] font-semibold text-violet-400 hover:text-violet-300 flex items-center gap-1.5 transition-colors"
+              >
+                ← Back to Voice &amp; Visuals
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
