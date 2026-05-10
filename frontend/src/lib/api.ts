@@ -1,19 +1,83 @@
 import axios from 'axios'
 import { useAuthStore } from '../authStore'
-import { showError, showWarning } from '../hooks/useErrorToast'
 
 export const BASE = 'https://sceneforge-production-8d19.up.railway.app'
 
 export const api = axios.create({ baseURL: BASE })
 
 // Attach auth token to every request
+// ── Friendly error messages ──────────────────────────────────────────────────
+const ERROR_MESSAGES: Record<number, string> = {
+  400: 'Something went wrong with your request. Please check your input and try again.',
+  401: 'Your session has expired. Please log in again.',
+  403: 'You don't have permission to do that. Upgrade your plan to unlock this feature.',
+  404: 'The requested resource was not found.',
+  408: 'The request timed out. Please check your connection and try again.',
+  409: 'A conflict occurred. This item may already exist.',
+  413: 'The file or request is too large.',
+  422: 'The information provided is invalid. Please check and try again.',
+  429: 'You're going too fast! Please wait a moment before trying again.',
+  500: 'Our servers hit an unexpected error. Please try again in a moment.',
+  502: 'SceneForge is temporarily unavailable. Please try again shortly.',
+  503: 'The service is temporarily down for maintenance. Please check back soon.',
+  504: 'The server took too long to respond. Please try again.',
+}
+
+const NETWORK_MESSAGES: Record<string, string> = {
+  'Network Error':       'Unable to connect to SceneForge. Please check your internet connection.',
+  'timeout of':         'The request timed out. Please try again.',
+  'ECONNABORTED':       'Connection was aborted. Please try again.',
+}
+
+function getFriendlyError(error: any): string {
+  // Server returned a structured error
+  const serverMsg = error?.response?.data?.detail || error?.response?.data?.message
+  if (serverMsg && typeof serverMsg === 'string' && serverMsg.length < 200) {
+    // Don't show raw Python tracebacks
+    if (!serverMsg.includes('Traceback') && !serverMsg.includes('  File "')) {
+      return serverMsg
+    }
+  }
+
+  // Known HTTP status
+  const status = error?.response?.status
+  if (status && ERROR_MESSAGES[status]) return ERROR_MESSAGES[status]
+
+  // Network-level errors
+  const errMsg = error?.message || ''
+  for (const [key, msg] of Object.entries(NETWORK_MESSAGES)) {
+    if (errMsg.includes(key)) return msg
+  }
+
+  // Fallback
+  return 'Something went wrong. Please try again.'
+}
+
 api.interceptors.response.use(
   (r) => r,
   (error) => {
-    if (error?.response?.status === 429) {
-      const msg = error.response.data?.message || 'Too many requests. Please slow down.'
-      document.dispatchEvent(new CustomEvent('api-rate-limited', { detail: msg }))
+    const status  = error?.response?.status
+    const friendly = getFriendlyError(error)
+
+    // Rate limit — existing event
+    if (status === 429) {
+      document.dispatchEvent(new CustomEvent('api-rate-limited', { detail: friendly }))
     }
+
+    // Auth expired — redirect to login
+    if (status === 401) {
+      document.dispatchEvent(new CustomEvent('api-auth-expired', { detail: friendly }))
+    }
+
+    // All other errors — show toast
+    if (status !== 401) {
+      document.dispatchEvent(new CustomEvent('api-error', {
+        detail: { message: friendly, status, raw: error?.response?.data }
+      }))
+    }
+
+    // Attach friendly message to error so callers can use it
+    if (error) error.friendlyMessage = friendly
     return Promise.reject(error)
   }
 )
@@ -27,44 +91,13 @@ api.interceptors.request.use((config) => {
 })
 
 // Redirect on 401
-
-
 api.interceptors.response.use(
   (r) => r,
-  (error) => {
-    const status  = error?.response?.status
-    const detail  = error?.response?.data?.detail
-    const message = typeof detail === 'string' ? detail
-                  : detail?.message || error.message || 'Something went wrong'
-
-    // 429 Rate limit
-    if (status === 429) {
-      const msg = error.response.data?.message || 'Too many requests. Please slow down.'
-      document.dispatchEvent(new CustomEvent('api-rate-limited', { detail: msg }))
-      // Also show toast
-      showWarning('Rate limit reached', msg)
+  (err) => {
+    if (err.response?.status === 401) {
+      useAuthStore.getState().logout()
     }
-
-    // 500 Server error — always show toast
-    else if (status >= 500) {
-      showError('Server error', 'Something went wrong on our end. Please try again.')
-    }
-
-    // 503 Service unavailable
-    else if (status === 503) {
-      showError('Service unavailable', 'SceneForge is temporarily unavailable. Try again shortly.')
-    }
-
-    // Network error (no response at all)
-    else if (!error.response) {
-      showError('Connection error', 'Check your internet connection and try again.')
-    }
-
-    // 401 — handled separately (logout), don't show toast
-    // 403 — handled in Login.tsx (redirect to verify screen), don't show generic toast
-    // 400/404 — handled inline in each page component, don't show generic toast
-
-    return Promise.reject(error)
+    return Promise.reject(err)
   }
 )
 
@@ -122,7 +155,6 @@ export interface RenderRequest {
   platform: string
   uploaded_voice_path?: string | null
   prev_job_id?: string | null   // for free re-renders
-  project_id?: string
 }
 
 export interface JobStatus {
