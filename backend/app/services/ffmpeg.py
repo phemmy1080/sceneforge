@@ -245,6 +245,9 @@ async def render_full_pipeline(
     on_progress=None,
     platform: str | None = None,
 ) -> dict:
+    # Resolve music track name → local file path
+    resolved_music = await _resolve_music(music_path, output_dir)
+
     scene_outputs = []
 
     for i, (scene, audio, visual) in enumerate(zip(scenes, audio_files, visual_files)):
@@ -272,11 +275,11 @@ async def render_full_pipeline(
     final_path = str(Path(output_dir) / "final_video.mp4")
     await concat_scenes(scene_outputs, final_path)
 
-    if music_path and music_path != "none":
+    if resolved_music:
         if on_progress:
             await on_progress("Mixing background music...", 95)
         mixed_path = str(Path(output_dir) / "final_video_music.mp4")
-        await add_background_music(final_path, music_path, mixed_path)
+        await add_background_music(final_path, resolved_music, mixed_path)
         final_path = mixed_path
 
     return {
