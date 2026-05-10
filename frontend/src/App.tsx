@@ -66,7 +66,17 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
   const [feedbackTrigger, setFeedbackTrigger] = useState<'video_complete'|'time_on_screen'|'manual'>('video_complete')
   const feedbackShownRef = useRef(false)
 
-  function closeFeedback() { setShowFeedback(false) }
+  const [feedbackDismissed, setFeedbackDismissed] = useState(false)
+
+  function closeFeedback() {
+    setShowFeedback(false)
+    // Only show reminder if it wasn't a manual open
+    if (feedbackTrigger !== 'manual') {
+      setFeedbackDismissed(true)
+      // Auto-hide reminder after 30 seconds
+      setTimeout(() => setFeedbackDismissed(false), 30000)
+    }
+  }
 
   function triggerFeedback(t: 'video_complete'|'time_on_screen'|'manual') {
     if (t !== 'manual') {
@@ -85,15 +95,19 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
     setShowFeedback(true)
   }
 
-  // Render complete trigger
-  const prevRenderRef = useRef(false)
+  // Render complete trigger — fires 10s after render finishes
+  const prevRenderRef  = useRef(renderStatus === 'complete') // don't fire on stale 'complete' from previous session
+  const renderTimerRef = useRef<ReturnType<typeof setTimeout>>()
   useEffect(() => {
     if (renderStatus === 'complete' && !prevRenderRef.current) {
       prevRenderRef.current = true
-      const t = setTimeout(() => triggerFeedback('video_complete'), 2000)
-      return () => clearTimeout(t)
+      renderTimerRef.current = setTimeout(() => triggerFeedback('video_complete'), 10000)
     }
-    if (renderStatus !== 'complete') prevRenderRef.current = false
+    if (renderStatus === 'idle' || renderStatus === 'queued' || renderStatus === 'processing') {
+      prevRenderRef.current = false
+      clearTimeout(renderTimerRef.current)
+    }
+    return () => clearTimeout(renderTimerRef.current)
   }, [renderStatus])
 
   // Time on screen trigger (3 minutes on workflow steps)
@@ -135,6 +149,32 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
       {/* Feedback modal — always mounted so it catches renderStatus from any step */}
       {showFeedback && (
         <FeedbackModal trigger={feedbackTrigger} onClose={closeFeedback} />
+      )}
+
+      {feedbackDismissed && !showFeedback && (
+        <div
+          onClick={() => { setFeedbackDismissed(false); triggerFeedback('manual') }}
+          style={{
+            position: 'fixed', bottom: 24, right: 24, zIndex: 9998,
+            background: 'linear-gradient(135deg,#7C5CFF,#5B3FE0)',
+            color: '#fff', borderRadius: 100,
+            padding: '10px 18px 10px 14px',
+            display: 'flex', alignItems: 'center', gap: 8,
+            fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            boxShadow: '0 8px 24px rgba(124,92,255,0.35)',
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M14 2H2a1 1 0 00-1 1v8a1 1 0 001 1h3l3 3 3-3h3a1 1 0 001-1V3a1 1 0 00-1-1z"/>
+            <path d="M5 7h6M5 5h4"/>
+          </svg>
+          Share your feedback
+          <button
+            onClick={(e) => { e.stopPropagation(); setFeedbackDismissed(false) }}
+            style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: 18, height: 18, cursor: 'pointer', color: '#fff', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: 4 }}
+            aria-label="Dismiss"
+          >x</button>
+        </div>
       )}
     </>
   )
