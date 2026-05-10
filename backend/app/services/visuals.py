@@ -13,7 +13,15 @@ from app.config import get_settings
 from app.models.schemas import Scene, VisualSource, VisualResult
 
 settings = get_settings()
-openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
+_openai_client = None
+
+def _get_openai_client():
+    global _openai_client
+    if _openai_client is None:
+        if not settings.openai_api_key:
+            raise ValueError("OPENAI_API_KEY not set — DALL-E unavailable. Use 'pexels_video' as your visual source.")
+        _openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
+    return _openai_client
 
 PEXELS_BASE = "https://api.pexels.com"
 
@@ -68,13 +76,34 @@ async def download_pexels_video(video_url: str, output_path: str) -> str:
 
 
 async def fetch_pexels_for_scene(scene: Scene, output_dir: str) -> VisualFile:
-    """Search and download best Pexels video for a scene."""
-    results = await search_pexels_videos(scene.visual_keyword, per_page=3)
+    """Search and download best Pexels video for a scene.
+    Tries the exact keyword first, then progressively simpler fallback terms.
+    """
+    # Build a chain of fallback keywords — from specific to generic
+    keyword = scene.visual_keyword or "business"
+    # Strip down to just the first word as a last resort
+    first_word = keyword.split()[0] if keyword else "people"
+    fallbacks = [keyword, first_word, "people talking", "city background", "nature"]
+
+    results = []
+    used_keyword = keyword
+    for kw in fallbacks:
+        try:
+            results = await search_pexels_videos(kw, per_page=3)
+            if results:
+                used_keyword = kw
+                break
+            logger.warning("No Pexels results for '%s', trying next fallback", kw)
+        except Exception as e:
+            logger.warning("Pexels search error for '%s': %s", kw, str(e)[:80])
+            continue
+
     if not results:
-        raise ValueError(f"No Pexels results for: {scene.visual_keyword}")
+        raise ValueError(f"No Pexels results found after fallbacks for: {keyword}")
 
     best = results[0]
     out_path = str(Path(output_dir) / f"scene_{scene.id:02d}_visual.mp4")
+    logger.info("Pexels ✓ scene %s | keyword: '%s' → %s", scene.id, used_keyword, Path(out_path).name)
     await download_pexels_video(best.preview_url, out_path)
     return VisualFile(path=out_path, media_type="video", source="pexels")
 
@@ -90,7 +119,7 @@ async def generate_dalle_image(scene: Scene, output_dir: str) -> VisualFile:
         f"Clean, high contrast, visually striking."
     )
 
-    response = await openai_client.images.generate(
+    response = await _get_openai_client().images.generate(
         model="dall-e-3",
         prompt=prompt,
         size="1024x1792",
@@ -112,6 +141,42 @@ async def generate_dalle_image(scene: Scene, output_dir: str) -> VisualFile:
 
 # ─── Smart router ─────────────────────────────────────────────────────────────
 
+async def generate_placeholder_visual(scene: Scene, output_dir: str) -> VisualFile:
+    """
+    Generate a solid-colour 1080x1920 MP4 as a fallback visual.
+    Used when Pexels is unavailable and no OpenAI key is set.
+    Requires only FFmpeg — no external API.
+    """
+    import subprocess
+    from pathlib import Path
+
+    out_path = str(Path(output_dir) / f"scene_{scene.id:02d}_visual.mp4")
+    # Cycle through a few dark gradient colours based on scene type
+    colour_map = {
+        "hook":  "0x1a0533",
+        "intro": "0x0a1a2e",
+        "main":  "0x0d1117",
+        "cta":   "0x1a1a0a",
+    }
+    colour = colour_map.get(scene.type, "0x111118")
+
+    cmd = [
+        "ffmpeg", "-y",
+        "-f", "lavfi",
+        "-i", f"color=c={colour}:size=1080x1920:rate=30",
+        "-t", str(scene.duration),
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-preset", "ultrafast",
+        out_path,
+    ]
+    result = subprocess.run(cmd, capture_output=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"Placeholder visual failed: {result.stderr.decode()[:200]}")
+    logger.info("Placeholder visual ✓ scene %s → %s", scene.id, Path(out_path).name)
+    return VisualFile(path=out_path, media_type="video", source="placeholder")
+
+
 async def get_visual_for_scene(
     scene: Scene,
     output_dir: str,
@@ -122,16 +187,24 @@ async def get_visual_for_scene(
     mixed: try Pexels first, fall back to DALL-E.
     """
     if source == VisualSource.dalle:
-        return await generate_dalle_image(scene, output_dir)
+        # Fall back to Pexels if OPENAI_API_KEY not set
+        if not settings.openai_api_key:
+            logger.warning("OPENAI_API_KEY not set — falling back to Pexels for scene %s", scene.id)
+            return await fetch_pexels_for_scene(scene, output_dir)
+        try:
+            return await generate_dalle_image(scene, output_dir)
+        except Exception as e:
+            logger.warning("DALL-E failed for scene %s: %s — falling back to Pexels", scene.id, e)
+            return await fetch_pexels_for_scene(scene, output_dir)
 
     if source in (VisualSource.pexels_video, VisualSource.pexels_photo):
         return await fetch_pexels_for_scene(scene, output_dir)
 
-    # mixed: Pexels first, DALL-E fallback
+    # mixed: Pexels first, solid-color placeholder fallback (no DALL-E needed)
     try:
         return await fetch_pexels_for_scene(scene, output_dir)
     except Exception:
-        return await generate_dalle_image(scene, output_dir)
+        return await generate_placeholder_visual(scene, output_dir)
 
 
 async def get_visuals_for_all_scenes(
