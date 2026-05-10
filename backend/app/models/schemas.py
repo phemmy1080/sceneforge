@@ -102,7 +102,7 @@ class RenderRequest(BaseModel):
     project_title: str = Field(default="Untitled")
     platform: str = Field(default="TikTok (9:16, 60s)")
     uploaded_voice_path: Optional[str] = None  # path to user-uploaded voiceover file
-    project_id: Optional[str] = None
+    project_id: Optional[str] = None  # active project ID for linking
 
 
 class RenderJobResponse(BaseModel):
