@@ -58,7 +58,6 @@ function applyDeepLink(): boolean {
 function AppPages({ onLogout }: { onLogout: () => void }) {
   const currentStep   = useStore((s) => s.currentStep)
   const setStep       = useStore((s) => s.setStep)
-  const renderStatus  = useStore((s) => s.renderStatus)
   const [modalOpen, setModalOpen] = useState(false)
 
   // Feedback modal state
@@ -95,20 +94,12 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
     setShowFeedback(true)
   }
 
-  // Render complete trigger — fires 10s after render finishes
-  const prevRenderRef  = useRef(renderStatus === 'complete') // don't fire on stale 'complete' from previous session
-  const renderTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  // Render complete trigger — fired directly by useJobPoller after 10s delay
   useEffect(() => {
-    if (renderStatus === 'complete' && !prevRenderRef.current) {
-      prevRenderRef.current = true
-      renderTimerRef.current = setTimeout(() => triggerFeedback('video_complete'), 10000)
-    }
-    if (renderStatus === 'idle' || renderStatus === 'queued' || renderStatus === 'processing') {
-      prevRenderRef.current = false
-      clearTimeout(renderTimerRef.current)
-    }
-    return () => clearTimeout(renderTimerRef.current)
-  }, [renderStatus])
+    const handler = () => triggerFeedback('video_complete')
+    document.addEventListener('sceneforge:video-complete', handler)
+    return () => document.removeEventListener('sceneforge:video-complete', handler)
+  }, [])
 
   // Time on screen trigger (3 minutes on workflow steps)
   const isWorkflowStep = ['setup','ideas','script','scenes','voice','export'].includes(currentStep)
