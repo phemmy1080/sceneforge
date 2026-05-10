@@ -77,6 +77,8 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
     }
   }
 
+  const triggerFeedbackRef = useRef<(t: 'video_complete'|'time_on_screen'|'manual') => void>()
+
   function triggerFeedback(t: 'video_complete'|'time_on_screen'|'manual') {
     if (t !== 'manual') {
       if (feedbackShownRef.current) return
@@ -94,9 +96,12 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
     setShowFeedback(true)
   }
 
+  // Always keep ref fresh so event listeners don't capture stale closure
+  triggerFeedbackRef.current = triggerFeedback
+
   // Render complete trigger — fired directly by useJobPoller after 10s delay
   useEffect(() => {
-    const handler = () => triggerFeedback('video_complete')
+    const handler = () => triggerFeedbackRef.current?.('video_complete')
     document.addEventListener('sceneforge:video-complete', handler)
     return () => document.removeEventListener('sceneforge:video-complete', handler)
   }, [])
@@ -105,7 +110,7 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
   const isWorkflowStep = ['setup','ideas','script','scenes','voice','export'].includes(currentStep)
   useEffect(() => {
     if (!isWorkflowStep) return
-    const t = setTimeout(() => triggerFeedback('time_on_screen'), 3 * 60 * 1000)
+    const t = setTimeout(() => triggerFeedbackRef.current?.('time_on_screen'), 3 * 60 * 1000)
     return () => clearTimeout(t)
   }, [isWorkflowStep])
 
@@ -116,7 +121,7 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
   }, [])
 
   useEffect(() => {
-    const handler = () => triggerFeedback('manual')
+    const handler = () => triggerFeedbackRef.current?.('manual')
     document.addEventListener('open-feedback-modal', handler)
     return () => document.removeEventListener('open-feedback-modal', handler)
   }, [])
