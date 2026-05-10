@@ -181,13 +181,18 @@ async def get_visual_for_scene(
     scene: Scene,
     output_dir: str,
     source: VisualSource = VisualSource.mixed,
+    user_plan: str = "free",
 ) -> VisualFile:
     """
     Route visual sourcing based on preference.
-    mixed: try Pexels first, fall back to DALL-E.
+    DALL-E is only available for pro and studio plans.
+    mixed: try Pexels first, fall back to placeholder.
     """
     if source == VisualSource.dalle:
-        # Fall back to Pexels if OPENAI_API_KEY not set
+        # Gate DALL-E to pro and studio plans only
+        if user_plan not in {"pro", "studio"}:
+            logger.info("DALL-E requires pro/studio plan (user is '%s') — using Pexels", user_plan)
+            return await fetch_pexels_for_scene(scene, output_dir)
         if not settings.openai_api_key:
             logger.warning("OPENAI_API_KEY not set — falling back to Pexels for scene %s", scene.id)
             return await fetch_pexels_for_scene(scene, output_dir)
