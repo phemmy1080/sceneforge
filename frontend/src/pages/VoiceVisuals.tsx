@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useStore } from '../store'
+import { useAuthStore } from '../authStore'
 import { getTokenBalance, startRender, type TokenBalance } from '../lib/api'
 import { Button, Card, CardTitle, Chip, PageHeader } from '../components/ui'
 import VoiceDropdown from '../components/VoiceDropdown'
@@ -7,15 +8,18 @@ import { getVoiceByName } from '../lib/voice_config'
 
 const STABILITY_OPTIONS = ['high', 'medium', 'low']
 const VISUAL_SOURCES = [
-  { value: 'mixed',        label: 'Mixed (Pexels + AI)' },
-  { value: 'pexels_video', label: 'Stock video (Pexels)' },
-  { value: 'pexels_photo', label: 'Stock photos (Pexels)' },
-  { value: 'dalle',        label: 'AI images (DALL-E 3)' },
+  { value: 'mixed',        label: 'Mixed (Pexels + AI)',    plan: 'free' },
+  { value: 'pexels_video', label: 'Stock video (Pexels)',   plan: 'free' },
+  { value: 'pexels_photo', label: 'Stock photos (Pexels)',  plan: 'free' },
+  { value: 'dalle',        label: 'AI images (DALL-E 3)',   plan: 'pro'  },
 ]
 const SUBTITLE_STYLES = ['viral', 'minimal', 'karaoke', 'none']
 const MUSIC_OPTIONS   = ['none', 'upbeat', 'cinematic', 'lofi', 'inspiring']
 
 export default function VoiceVisuals() {
+  const user              = useAuthStore((s) => s.user)
+  const userPlan          = user?.plan || 'free'
+  const canUseDalle       = userPlan === 'pro' || userPlan === 'studio'
   const voiceConfig       = useStore((s) => s.voiceConfig)
   const setVoiceConfig    = useStore((s) => s.setVoiceConfig)
   const getRenderRequest  = useStore((s) => s.getRenderRequest)
@@ -133,9 +137,15 @@ export default function VoiceVisuals() {
           {VISUAL_SOURCES.map((s) => (
             <Chip
               key={s.value}
-              label={s.label}
+              label={s.value === 'dalle' && !canUseDalle ? s.label + ' 🔒' : s.label}
               selected={voiceConfig.visual_source === s.value}
-              onClick={() => setVoiceConfig({ visual_source: s.value as any })}
+              onClick={() => {
+                if (s.value === 'dalle' && !canUseDalle) {
+                  document.dispatchEvent(new CustomEvent('show-upgrade-prompt', { detail: { reason: 'ai_images' } }))
+                  return
+                }
+                setVoiceConfig({ visual_source: s.value as any })
+              }}
             />
           ))}
         </div>
