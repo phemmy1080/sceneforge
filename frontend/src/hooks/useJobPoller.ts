@@ -36,6 +36,13 @@ export function useJobPoller(jobId: string | null) {
           }
           markStepComplete('export')
 
+          // ── Trigger feedback modal after 10 seconds ──────────────────────
+          setTimeout(() => {
+            try {
+              document.dispatchEvent(new CustomEvent('sceneforge:video-complete'))
+            } catch {}
+          }, 10000)
+
           if (intervalRef.current) clearInterval(intervalRef.current)
         }
 
