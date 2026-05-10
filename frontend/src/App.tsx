@@ -26,7 +26,6 @@ import PaymentCallback from './pages/PaymentCallback'
 import ErrorBoundary from './components/ErrorBoundary'
 import FeedbackModal from './components/FeedbackModal'
 import ErrorToast from './components/ErrorToast'
-import ToastContainer from './components/ToastContainer'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -266,7 +265,6 @@ export default function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <Root />
-        <ToastContainer />
       </QueryClientProvider>
     </ErrorBoundary>
   )
