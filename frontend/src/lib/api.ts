@@ -155,6 +155,7 @@ export interface RenderRequest {
   platform: string
   uploaded_voice_path?: string | null
   prev_job_id?: string | null   // for free re-renders
+  project_id?: string | null    // active project ID
 }
 
 export interface JobStatus {
