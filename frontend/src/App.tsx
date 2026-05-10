@@ -25,6 +25,7 @@ import Plans from './pages/Plans'
 import PaymentCallback from './pages/PaymentCallback'
 import ErrorBoundary from './components/ErrorBoundary'
 import FeedbackModal from './components/FeedbackModal'
+import ErrorToast from './components/ErrorToast'
 import ToastContainer from './components/ToastContainer'
 
 const queryClient = new QueryClient({
@@ -91,7 +92,7 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
         if (data.date !== today) { data.date = today; data.count = 0; data.shown = 0 }
         data.count += 1
         // Show feedback once per 3 renders
-        if (data.count % 3 !== 0) {
+        if (data.count % 2 !== 0) {
           localStorage.setItem(key, JSON.stringify(data))
           return
         }
@@ -180,6 +181,8 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
           >x</button>
         </div>
       )}
+      {/* Global API error toasts */}
+      <ErrorToast />
     </>
   )
 }
