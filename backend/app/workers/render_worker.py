@@ -71,6 +71,16 @@ async def render_video(ctx, job_id: str, payload: dict):
 
         # ── Stage 2: Fetch visuals ────────────────────────────────────────────
         await _set_progress(redis, job_id, "Fetching visuals...", 42)
+        # Resolve user plan for feature gating (DALL-E = pro/studio only)
+        _visual_user_plan = "free"
+        if user_id:
+            try:
+                _raw = await redis.get(f"user:{user_id}")
+                if _raw:
+                    _visual_user_plan = json.loads(_raw).get("plan", "free")
+            except Exception:
+                pass
+
         visual_files = []
         for i, scene in enumerate(req.scenes):
             try:
@@ -78,6 +88,7 @@ async def render_video(ctx, job_id: str, payload: dict):
                     scene=scene,
                     output_dir=str(output_dir),
                     source=req.visual_source,
+                    user_plan=_visual_user_plan,
                 )
                 visual_files.append(visual)
                 pct = 42 + int(((i + 1) / len(req.scenes)) * 12)
