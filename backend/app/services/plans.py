@@ -15,7 +15,7 @@ PLAN_LIMITS = {
     },
     "starter": {
         "max_scenes": 20,
-        "max_renders_per_day": 10,
+        "max_renders_per_day": -1,   # unlimited
         "max_resolution": "1080p",
         "ai_voices": True,
         "upload_footage": True,
