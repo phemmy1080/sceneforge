@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import asyncio
+import logging
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -13,6 +14,7 @@ from app.config import get_settings
 from app.models.schemas import Scene, VisualSource, VisualResult
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 _openai_client = None
 
 def _get_openai_client():
