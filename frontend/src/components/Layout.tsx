@@ -355,6 +355,7 @@ export default function Layout({ children, onLogout, onNewProject }: LayoutProps
               {upgradePrompt.reason === 'upload_footage' && 'Upload your own footage and voiceover on paid plans.'}
               {upgradePrompt.reason === 'ai_voices' && 'Natural AI voices are available on paid plans.'}
               {upgradePrompt.reason === 'daily_limit' && 'Free plan allows 3 renders per day.'}
+              {upgradePrompt.reason === 'ai_images' && 'AI image generation with DALL-E 3 is available on Pro and Studio plans.'}
             </p>
             <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', margin: '0 0 24px' }}>
               Upgrade for unlimited scenes, AI voices, 1080p exports, and more.
