@@ -329,7 +329,9 @@ export const useStore = create<AppState>()(
 
         setVideoUrl: (url) => {
           const { activeProjectId, jobId } = get()
-          set({ videoUrl: url })
+          set({ videoUrl: url, renderStatus: 'complete' })
+          // Notify UI to refresh video count and token balance
+          try { document.dispatchEvent(new CustomEvent('sceneforge:render-complete')) } catch {}
           if (activeProjectId) {
             // Save job_id + video_url on the project so openProject can restore it
             set((s) => ({
