@@ -38,18 +38,18 @@ export function useJobPoller(jobId: string | null) {
 
           // ── Trigger feedback modal after 10 seconds ──────────────────────
           setTimeout(() => {
-            console.log('[SceneForge] Dispatching sceneforge:video-complete event')
             try {
               document.dispatchEvent(new CustomEvent('sceneforge:video-complete'))
-            } catch (e) {
-              console.error('[SceneForge] Failed to dispatch event:', e)
-            }
+            } catch {}
           }, 10000)
 
           if (intervalRef.current) clearInterval(intervalRef.current)
         }
 
         if (status.status === 'failed') {
+          // Store error message for display
+          const errMsg = status.error || status.stage || 'Render failed'
+          setRenderProgress(status.progress, errMsg, 'failed')
           if (intervalRef.current) clearInterval(intervalRef.current)
         }
       } catch {
