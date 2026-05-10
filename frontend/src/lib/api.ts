@@ -9,14 +9,14 @@ export const api = axios.create({ baseURL: BASE })
 // ── Friendly error messages ──────────────────────────────────────────────────
 const ERROR_MESSAGES: Record<number, string> = {
   400: 'Something went wrong with your request. Please check your input and try again.',
-  401: 'Your session has expired. Please log in again.',
-  403: 'You don't have permission to do that. Upgrade your plan to unlock this feature.',
+  401: "Your session has expired. Please log in again.",
+  403: "You don't have permission to do that. Upgrade your plan to unlock this feature.",
   404: 'The requested resource was not found.',
   408: 'The request timed out. Please check your connection and try again.',
   409: 'A conflict occurred. This item may already exist.',
   413: 'The file or request is too large.',
   422: 'The information provided is invalid. Please check and try again.',
-  429: 'You're going too fast! Please wait a moment before trying again.',
+  429: "You're going too fast! Please wait a moment before trying again.",
   500: 'Our servers hit an unexpected error. Please try again in a moment.',
   502: 'SceneForge is temporarily unavailable. Please try again shortly.',
   503: 'The service is temporarily down for maintenance. Please check back soon.',
