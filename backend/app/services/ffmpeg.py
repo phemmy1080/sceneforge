@@ -234,6 +234,44 @@ async def add_background_music(
     return output_path
 
 
+
+
+# ── Music track resolver ───────────────────────────────────────────────────────
+_MUSIC_TRACKS: dict[str, str] = {
+    "upbeat":     "https://cdn.pixabay.com/audio/2023/06/19/audio_da6bcd29f4.mp3",
+    "cinematic":  "https://cdn.pixabay.com/audio/2022/10/25/audio_f8f68d9867.mp3",
+    "lofi":       "https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3",
+    "corporate":  "https://cdn.pixabay.com/audio/2022/08/04/audio_2dde668d05.mp3",
+    "energetic":  "https://cdn.pixabay.com/audio/2023/03/22/audio_cff1e5c14e.mp3",
+    "inspiring":  "https://cdn.pixabay.com/audio/2022/11/17/audio_aec9d0d80d.mp3",
+}
+
+
+async def _resolve_music(music_path: str, output_dir: str):
+    """Resolve a music track name or URL to a local file. Returns None to skip."""
+    if not music_path or music_path == "none":
+        return None
+    if os.path.exists(music_path):
+        return music_path
+    track_url = _MUSIC_TRACKS.get(music_path.lower())
+    if track_url:
+        import httpx
+        local_path = str(Path(output_dir) / f"music_{music_path}.mp3")
+        if not os.path.exists(local_path):
+            try:
+                async with httpx.AsyncClient(timeout=30) as client:
+                    r = await client.get(track_url)
+                    r.raise_for_status()
+                    with open(local_path, "wb") as f:
+                        f.write(r.content)
+                logger.info("Downloaded music track: %s", music_path)
+            except Exception as e:
+                logger.warning("Music download failed for %s: %s — skipping music", music_path, e)
+                return None
+        return local_path
+    logger.warning("Unknown music track '%s' — skipping", music_path)
+    return None
+
 # ── Full pipeline ─────────────────────────────────────────────────────────────
 async def render_full_pipeline(
     scenes: list[Scene],
