@@ -83,14 +83,22 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
     if (t !== 'manual') {
       if (feedbackShownRef.current) return
       try {
-        const last = localStorage.getItem('sceneforge:feedback_shown')
-        if (last) {
-          const days = (Date.now() - parseInt(last)) / (1000*60*60*24)
-          if (days < 14) return
+        const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+        const key   = 'sceneforge:renders_today'
+        const raw   = localStorage.getItem(key)
+        const data  = raw ? JSON.parse(raw) : { date: today, count: 0, shown: 0 }
+        // Reset if it's a new day
+        if (data.date !== today) { data.date = today; data.count = 0; data.shown = 0 }
+        data.count += 1
+        // Show feedback once per 3 renders
+        if (data.count % 3 !== 0) {
+          localStorage.setItem(key, JSON.stringify(data))
+          return
         }
+        data.shown += 1
+        localStorage.setItem(key, JSON.stringify(data))
       } catch {}
       feedbackShownRef.current = true
-      try { localStorage.setItem('sceneforge:feedback_shown', Date.now().toString()) } catch {}
     }
     setFeedbackTrigger(t)
     setShowFeedback(true)
