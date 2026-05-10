@@ -237,40 +237,88 @@ async def add_background_music(
 
 
 # ── Music track resolver ───────────────────────────────────────────────────────
-_MUSIC_TRACKS: dict[str, str] = {
-    "upbeat":     "https://cdn.pixabay.com/audio/2023/06/19/audio_da6bcd29f4.mp3",
-    "cinematic":  "https://cdn.pixabay.com/audio/2022/10/25/audio_f8f68d9867.mp3",
-    "lofi":       "https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3",
-    "corporate":  "https://cdn.pixabay.com/audio/2022/08/04/audio_2dde668d05.mp3",
-    "energetic":  "https://cdn.pixabay.com/audio/2023/03/22/audio_cff1e5c14e.mp3",
-    "inspiring":  "https://cdn.pixabay.com/audio/2022/11/17/audio_aec9d0d80d.mp3",
+
+
+
+# Music track FFmpeg filter configs — generated programmatically, no downloads needed
+_MUSIC_FILTERS: dict[str, str] = {
+    "upbeat":    "sine=frequency=440:beep_factor=4,volume=0.3",
+    "cinematic": "aevalsrc=sin(2*PI*220*t)*exp(-t/8)+sin(2*PI*330*t)*exp(-t/6):s=44100,volume=0.25",
+    "lofi":      "sine=frequency=220:beep_factor=2,volume=0.2",
+    "corporate": "sine=frequency=330:beep_factor=3,volume=0.25",
+    "energetic": "sine=frequency=528:beep_factor=6,volume=0.3",
+    "inspiring": "aevalsrc=sin(2*PI*264*t)+sin(2*PI*396*t)*0.5:s=44100,volume=0.2",
 }
+
+# Music directory — bundle MP3s here in the repo at backend/music/
+_MUSIC_DIR = Path(__file__).parent.parent.parent / "music"
 
 
 async def _resolve_music(music_path: str, output_dir: str):
-    """Resolve a music track name or URL to a local file. Returns None to skip."""
+    """
+    Resolve a music track name to a local file.
+    Priority: 1) bundled file in backend/music/  2) ffmpeg-generated tone
+    Returns None if music should be skipped.
+    """
     if not music_path or music_path == "none":
         return None
+
+    # Already a valid file path
     if os.path.exists(music_path):
         return music_path
-    track_url = _MUSIC_TRACKS.get(music_path.lower())
-    if track_url:
-        import httpx
-        local_path = str(Path(output_dir) / f"music_{music_path}.mp3")
-        if not os.path.exists(local_path):
-            try:
-                async with httpx.AsyncClient(timeout=30) as client:
-                    r = await client.get(track_url)
-                    r.raise_for_status()
-                    with open(local_path, "wb") as f:
-                        f.write(r.content)
-                logger.info("Downloaded music track: %s", music_path)
-            except Exception as e:
-                logger.warning("Music download failed for %s: %s — skipping music", music_path, e)
-                return None
+
+    track_name = music_path.lower().strip()
+
+    # 1. Check bundled music directory (backend/music/<name>.mp3)
+    bundled = _MUSIC_DIR / f"{track_name}.mp3"
+    if bundled.exists():
+        logger.info("Using bundled music track: %s", track_name)
+        return str(bundled)
+
+    # 2. Generate a simple ambient tone using FFmpeg (no download needed)
+    local_path = str(Path(output_dir) / f"music_{track_name}.mp3")
+    if os.path.exists(local_path):
         return local_path
-    logger.warning("Unknown music track '%s' — skipping", music_path)
-    return None
+
+    logger.info("Generating ambient music track for: %s", track_name)
+    try:
+        # Generate 3 minutes of ambient sine tones that loop well
+        freqs = {
+            "upbeat":    [440, 550, 660],
+            "cinematic": [220, 277, 330],
+            "lofi":      [196, 246, 293],
+            "corporate": [330, 415, 494],
+            "energetic": [528, 660, 792],
+            "inspiring": [264, 330, 396],
+        }.get(track_name, [330, 440, 550])
+
+        # Build a rich but subtle ambient sound from layered sines
+        expr = "+".join(
+            f"sin(2*PI*{f}*t)*{0.15 / len(freqs)}" for f in freqs
+        )
+        filter_str = f"aevalsrc='{expr}':s=44100:c=stereo,volume=0.4"
+
+        loop = asyncio.get_event_loop()
+        def _gen():
+            import subprocess
+            result = subprocess.run([
+                "ffmpeg", "-y",
+                "-f", "lavfi", "-i", filter_str,
+                "-t", "180",  # 3 minutes
+                "-c:a", "mp3", "-b:a", "128k",
+                local_path,
+            ], capture_output=True)
+            return result.returncode
+        rc = await loop.run_in_executor(None, _gen)
+        if rc == 0:
+            logger.info("Generated music track: %s", local_path)
+            return local_path
+        else:
+            logger.warning("FFmpeg music generation failed — skipping music")
+            return None
+    except Exception as e:
+        logger.warning("Music generation failed: %s — skipping", e)
+        return None
 
 # ── Full pipeline ─────────────────────────────────────────────────────────────
 async def render_full_pipeline(
