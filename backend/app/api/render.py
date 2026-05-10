@@ -52,7 +52,11 @@ async def start_render(
     redis = await _get_redis()
     user_id = _extract_user_id(authorization)
 
+    # ── Token check ──────────────────────────────────────────────────────────
+    # Generate a new job_id — each render start gets a fresh one
     job_id = str(uuid.uuid4())
+
+    # If the request carries a previous job_id (re-render), check if already charged
     prev_job_id = getattr(req, "prev_job_id", None)
 
     if user_id:
@@ -71,6 +75,7 @@ async def start_render(
                 }
             )
 
+        # ── Plan feature limits ───────────────────────────────────────────────
         import json as _json
         raw_user = await redis.get(f"user:{user_id}")
         user_plan = "free"
@@ -79,6 +84,7 @@ async def start_render(
 
         limits = get_limits(user_plan)
 
+        # Scene count limit (skip for re-renders)
         if not prev_job_id:
             scene_count = len(req.scenes)
             allowed, max_scenes = check_scene_limit(user_plan, scene_count)
@@ -94,6 +100,7 @@ async def start_render(
                     }
                 )
 
+            # Daily render limit
             max_daily = limits["max_renders_per_day"]
             if max_daily != -1:
                 import datetime
@@ -108,13 +115,14 @@ async def start_render(
                         status_code=403,
                         detail={
                             "error": "daily_limit_exceeded",
-                            "message": f"Free plan allows {max_daily} renders per day. You've used all {max_daily} today. Upgrade or try again tomorrow.",
+                            "message": f"{limits['label']} plan allows {max_daily} renders per day. You've used all {max_daily} today. Try again tomorrow.",
                             "daily_limit": max_daily,
                             "used_today": daily_count,
                             "upgrade_required": True,
                         }
                     )
 
+                # Increment daily counter (expires after 25 hours for safety)
                 await redis.incr(daily_key)
                 await redis.expire(daily_key, 90000)
 
@@ -123,26 +131,23 @@ async def start_render(
             job_id, user_id, check.get("is_re_render"), check["tokens_remaining"],
         )
 
-    # Queue job
+    # ── Queue job ────────────────────────────────────────────────────────────
     await redis.set(
         f"job:{job_id}:progress",
         json.dumps({"status": "queued", "stage": "Queued", "pct": 0}),
         ex=3600,
     )
 
+    # Store user_id alongside the job so the worker can deduct after success
     if user_id:
         await redis.set(f"job:{job_id}:user_id", user_id, ex=86400)
     if prev_job_id:
         await redis.set(f"job:{job_id}:prev_job_id", prev_job_id, ex=86400)
-
+    # Store niche for analytics
     niche = getattr(req, "niche", None) or ""
     if niche:
         await redis.set(f"job:{job_id}:niche", niche, ex=86400)
 
-    project_id = getattr(req, "project_id", None) or ""
-    if project_id:
-        await redis.set(f"job:{job_id}:project_id", project_id, ex=86400)
-   
     pool = await arq.create_pool(
         arq.connections.RedisSettings.from_dsn(settings.redis_url)
     )
