@@ -65,7 +65,8 @@ export default function VoiceVisuals() {
           detail: { reason: 'daily_limit', max: detail.daily_limit }
         }))
       } else {
-        setRenderError('Render failed to start. Check your server logs.')
+        const friendly = (e as any)?.friendlyMessage || 'Unable to start render. Please try again.'
+        setRenderError(friendly)
       }
       console.error(e)
     } finally {
