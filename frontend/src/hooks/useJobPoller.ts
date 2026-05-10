@@ -38,9 +38,12 @@ export function useJobPoller(jobId: string | null) {
 
           // ── Trigger feedback modal after 10 seconds ──────────────────────
           setTimeout(() => {
+            console.log('[SceneForge] Dispatching sceneforge:video-complete event')
             try {
               document.dispatchEvent(new CustomEvent('sceneforge:video-complete'))
-            } catch {}
+            } catch (e) {
+              console.error('[SceneForge] Failed to dispatch event:', e)
+            }
           }, 10000)
 
           if (intervalRef.current) clearInterval(intervalRef.current)
