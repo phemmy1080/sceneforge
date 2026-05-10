@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAuthStore } from '../authStore'
-import { updateMe } from '../lib/api'
+import { updateMe, getMe } from '../lib/api'
 import { useStore } from '../store'
 
 interface UserMenuProps {
@@ -30,6 +30,18 @@ export default function UserMenu({ onLogout }: UserMenuProps) {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
+
+  // Refresh video count immediately when a render completes
+  useEffect(() => {
+    const handler = async () => {
+      try {
+        const updated = await getMe()
+        updateUser(updated)
+      } catch {}
+    }
+    document.addEventListener('sceneforge:render-complete', handler)
+    return () => document.removeEventListener('sceneforge:render-complete', handler)
+  }, [updateUser])
 
   function handleLogout() { logout(); onLogout() }
 
