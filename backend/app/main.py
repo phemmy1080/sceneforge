@@ -23,6 +23,7 @@ from app.api.niches import router as niches_router
 from app.api.projects import router as projects_router
 from app.api.voice_router import router as voice_sample_router
 from app.api import feedback
+from app.api import chat
 
 settings = get_settings()
 
@@ -124,6 +125,8 @@ app.include_router(admin_auth_router,   prefix="/api/admin-auth", tags=["AdminAu
 app.include_router(niches_router,       prefix="/api/niches",     tags=["Niches"])
 app.include_router(projects_router,     prefix="/api/projects",   tags=["Projects"])
 app.include_router(voice_sample_router, prefix="/api/voice",      tags=["Voice"])
+app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
+
 
 app.include_router(feedback.router, prefix="/api/feedback", tags=["feedback"])
 
