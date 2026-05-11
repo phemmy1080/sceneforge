@@ -26,6 +26,7 @@ import PaymentCallback from './pages/PaymentCallback'
 import ErrorBoundary from './components/ErrorBoundary'
 import FeedbackModal from './components/FeedbackModal'
 import ErrorToast from './components/ErrorToast'
+import ChatBot from './components/ChatBot'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -73,7 +74,7 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
     if (feedbackTrigger !== 'manual') {
       setFeedbackDismissed(true)
       // Auto-hide reminder after 30 seconds
-      setTimeout(() => setFeedbackDismissed(false), 30000)
+      setTimeout(() => setFeedbackDismissed(false), 60000)
     }
   }
 
@@ -182,6 +183,8 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
       )}
       {/* Global API error toasts */}
       <ErrorToast />
+      {/* AI chatbot assistant */}
+      <ChatBot />
     </>
   )
 }
