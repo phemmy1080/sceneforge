@@ -175,7 +175,7 @@ export default function ChatBot() {
               <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>SceneForge Assistant</div>
               <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#34D399', display: 'inline-block' }} />
-                Online · Powered by Groq
+                Online
               </div>
             </div>
             <button
