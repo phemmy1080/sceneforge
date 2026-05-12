@@ -1,4 +1,5 @@
 import { useStore } from '../store'
+import SharePanel from '../components/SharePanel'
 import { useJobPoller } from '../hooks/useJobPoller'
 import { exportUrl, voiceUrl } from '../lib/api'
 import { Badge, ProgressBar, PageHeader } from '../components/ui'
@@ -13,6 +14,8 @@ export default function Export() {
   const selectedIdea   = useStore((s) => s.selectedIdea)
   const activeProjectId = useStore((s) => s.activeProjectId)
   const projects       = useStore((s) => s.projects)
+  const config         = useStore((s) => s.config)
+  const script         = useStore((s) => s.script)
 
   useJobPoller(jobId)
 
@@ -190,6 +193,17 @@ export default function Export() {
           <p className="text-[11px] text-white/25 mb-8">
             Audio extracted from your rendered video — ready for podcasts, voiceover reuse, or archiving
           </p>
+
+          {/* Share panel */}
+          {videoUrl && (
+            <SharePanel
+              videoUrl={videoUrl}
+              niche={config?.niche}
+              platform={config?.platform}
+              projectTitle={projectTitle}
+              script={script}
+            />
+          )}
 
           {/* New project */}
           <div className="pt-5 border-t border-white/[0.07] flex items-center justify-between">
