@@ -92,17 +92,17 @@ function ScrollRow({ children, speed = 40 }: { children: React.ReactNode; speed?
 
 export default function Landing({ onLogin, onSignup }: LandingProps) {
   return (
-    <div style={{ minHeight: '100vh', background: '#07070E', color: '#F0F0FF', overflowX: 'hidden', fontFamily: 'var(--font-body)' }}>
+    <div style={{ minHeight: '100vh', background: '#07070E', color: '#F0F0FF', overflowX: 'hidden', fontFamily: "DM Sans, system-ui, sans-serif" }}>
 
       {/* NAV */}
       <nav aria-label="Main navigation" style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 clamp(20px, 5vw, 64px)', height: 64,
+        padding: '0 clamp(16px, 4vw, 64px)', height: 60,
         borderBottom: '1px solid rgba(255,255,255,0.06)',
         position: 'sticky', top: 0, zIndex: 100,
         background: 'rgba(7,7,14,0.92)', backdropFilter: 'blur(16px)',
       }}>
-        <div style={{ fontFamily: "'Syne', system-ui, sans-serif", fontSize: 20, fontWeight: 800, letterSpacing: '-0.5px' }}>
+        <div style={{ fontFamily: "Syne, system-ui, sans-serif", fontSize: 20, fontWeight: 800, letterSpacing: '-0.5px' }}>
           Scene<span style={{ color: '#A78BFA' }}>Forge</span>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -138,9 +138,9 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
               </span>
             </div>
             <h1 id="hero-heading" style={{
-              fontFamily: "'Syne', system-ui, sans-serif",
-              fontSize: 'clamp(32px, 3.5vw, 52px)',
-              fontWeight: 800, lineHeight: 1.1, letterSpacing: '-1px',
+              fontFamily: "Syne, system-ui, sans-serif",
+              fontSize: 'clamp(40px, 7.5vw, 84px)',
+              fontWeight: 800, lineHeight: 1.0, letterSpacing: 'clamp(-1px, -0.04em, -3px)',
               margin: '0 auto 28px', maxWidth: 920,
             }}>
               Go from idea to{' '}
@@ -171,10 +171,10 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
           borderTop: '1px solid rgba(255,255,255,0.06)', borderBottom: '1px solid rgba(255,255,255,0.06)',
           background: 'rgba(255,255,255,0.02)',
         }}>
-          <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 clamp(20px, 4vw, 48px)', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 clamp(20px, 4vw, 48px)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))' }}>
             {STATS.map((s, i) => (
-              <div key={i} style={{ textAlign: 'center', padding: '28px 16px', borderRight: i < 3 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
-                <div style={{ fontFamily: "'Syne', system-ui, sans-serif", fontSize: 30, fontWeight: 800, color: '#A78BFA', letterSpacing: '-1px', marginBottom: 4 }}>{s.value}</div>
+              <div key={i} style={{ textAlign: 'center', padding: '28px 16px', borderRight: 'none', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontFamily: "Syne, system-ui, sans-serif", fontSize: 30, fontWeight: 800, color: '#A78BFA', letterSpacing: '-1px', marginBottom: 4 }}>{s.value}</div>
                 <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.60)' }}>{s.label}</div>
               </div>
             ))}
@@ -219,7 +219,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
             <p style={sectionEyebrow}>How it works</p>
             <h2 id="steps-heading" style={sectionTitle}>Four steps. One perfect video.</h2>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
             {STEPS.map((step, i) => (
               <div key={i} style={{
                 background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
@@ -230,7 +230,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
                   width: 36, height: 36, borderRadius: 10,
                   background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.2)', marginBottom: 16,
                 }}>
-                  <span style={{ fontFamily: "'Syne', system-ui, sans-serif", fontSize: 12, fontWeight: 800, color: '#A78BFA' }}>{step.num}</span>
+                  <span style={{ fontFamily: "Syne, system-ui, sans-serif", fontSize: 12, fontWeight: 800, color: '#A78BFA' }}>{step.num}</span>
                 </div>
                 <p style={{ fontSize: 14, fontWeight: 700, color: '#FFFFFF', marginBottom: 6, lineHeight: 1.3 }}>{step.label}</p>
                 <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.60)', lineHeight: 1.5, margin: 0 }}>{step.sub}</p>
@@ -248,7 +248,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
             <p style={sectionEyebrow}>Features</p>
             <h2 id="features-heading" style={sectionTitle}>Everything you need to create</h2>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
             {FEATURES.map((f, i) => (
               <div key={i} style={{
                 background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
@@ -316,10 +316,10 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
           <div style={{ position: 'relative', zIndex: 1 }}>
             <p style={sectionEyebrow}>Get started today</p>
             <h2 id="cta-heading" style={{
-              fontFamily: "'Syne', system-ui, sans-serif",
-              fontSize: 'clamp(28px, 2.8vw, 42px)',
-              fontWeight: 800, letterSpacing: '-1px',
-              margin: '0 auto 16px', maxWidth: 920, color: '#FFFFFF', lineHeight: 1.1,
+              fontFamily: "Syne, system-ui, sans-serif",
+              fontSize: 'clamp(32px, 5vw, 54px)',
+              fontWeight: 800, letterSpacing: '-1.5px',
+              margin: '0 auto 16px', maxWidth: 640, color: '#FFFFFF', lineHeight: 1.1,
             }}>
               Your next viral video is one click away
             </h2>
@@ -345,7 +345,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
         padding: 'clamp(20px, 3vw, 28px) clamp(20px, 4vw, 64px)',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12,
       }}>
-        <span aria-label="SceneForge" style={{ fontFamily: "'Syne', system-ui, sans-serif", fontSize: 15, fontWeight: 800, color: 'rgba(255,255,255,0.80)' }}>
+        <span aria-label="SceneForge" style={{ fontFamily: "Syne, system-ui, sans-serif", fontSize: 15, fontWeight: 800, color: 'rgba(255,255,255,0.80)' }}>
           Scene<span style={{ color: '#A78BFA' }}>Forge</span>
         </span>
         <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
@@ -360,7 +360,7 @@ const primaryBtn: React.CSSProperties = {
   background: 'linear-gradient(135deg, #7C5CFF 0%, #6344E8 100%)',
   color: '#fff', border: 'none', borderRadius: 12,
   padding: '11px 22px', minHeight: 44, fontSize: 14, fontWeight: 600,
-  cursor: 'pointer', fontFamily: 'var(--font-body)',
+  cursor: 'pointer', fontFamily: "DM Sans, system-ui, sans-serif",
   transition: 'opacity 0.15s, transform 0.15s',
   boxShadow: '0 0 0 1px rgba(124,92,255,0.4)',
 }
@@ -371,7 +371,7 @@ const ghostBtn: React.CSSProperties = {
   border: '1px solid rgba(255,255,255,0.18)',
   borderRadius: 12, padding: '11px 20px', minHeight: 44,
   fontSize: 14, fontWeight: 500, cursor: 'pointer',
-  fontFamily: 'var(--font-body)', transition: 'border-color 0.15s',
+  fontFamily: "DM Sans, system-ui, sans-serif", transition: 'border-color 0.15s',
 }
 
 const sectionEyebrow: React.CSSProperties = {
@@ -380,9 +380,9 @@ const sectionEyebrow: React.CSSProperties = {
 }
 
 const sectionTitle: React.CSSProperties = {
-  fontFamily: "'Syne', system-ui, sans-serif",
-  fontSize: 'clamp(22px, 2vw, 30px)',
-  fontWeight: 800, letterSpacing: '-0.5px',
+  fontFamily: "Syne, system-ui, sans-serif",
+  fontSize: 'clamp(26px, 4vw, 36px)',
+  fontWeight: 800, letterSpacing: '-1px',
   color: '#FFFFFF', margin: '0 auto', lineHeight: 1.15,
 }
 
