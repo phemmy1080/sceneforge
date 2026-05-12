@@ -103,6 +103,9 @@ class RenderRequest(BaseModel):
     platform: str = Field(default="TikTok (9:16, 60s)")
     uploaded_voice_path: Optional[str] = None  # path to user-uploaded voiceover file
     project_id: Optional[str] = None  # active project ID for linking
+    motion: str = "auto"            # "auto" | "kenburns_in" | "kenburns_out" | "pan_left" | "pan_right" | "none"
+    transition: str = "fade"        # "fade" | "blur" | "none"
+    transition_duration: float = 0.4
 
 
 class RenderJobResponse(BaseModel):
