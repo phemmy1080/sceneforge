@@ -156,6 +156,9 @@ export interface RenderRequest {
   uploaded_voice_path?: string | null
   prev_job_id?: string | null   // for free re-renders
   project_id?: string | null    // active project ID
+  motion?: string               // "auto" | "kenburns_in" | "kenburns_out" | "pan_left" | "pan_right" | "none"
+  transition?: string           // "fade" | "blur" | "none"
+  transition_duration?: number
 }
 
 export interface JobStatus {
