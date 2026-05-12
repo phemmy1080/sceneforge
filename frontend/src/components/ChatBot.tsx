@@ -108,7 +108,7 @@ export default function ChatBot() {
         onClick={() => setOpen(o => !o)}
         aria-label="Open SceneForge assistant"
         style={{
-          position: 'fixed', bottom: 24, right: 24, zIndex: 9990,
+          position: 'fixed', bottom: 24, right: 16, zIndex: 9990,
           width: 52, height: 52, borderRadius: '50%',
           background: open ? '#5B3FE0' : 'linear-gradient(135deg,#7C5CFF,#5B3FE0)',
           border: 'none', cursor: 'pointer',
@@ -142,8 +142,8 @@ export default function ChatBot() {
       {/* Chat panel */}
       {open && (
         <div style={{
-          position: 'fixed', bottom: 86, right: 24, zIndex: 9989,
-          width: 360, maxHeight: '70vh',
+          position: 'fixed', bottom: 86, right: 16, zIndex: 9989,
+          width: 'min(360px, calc(100vw - 32px))', maxHeight: '70vh',
           background: 'linear-gradient(180deg,#16141f 0%,#111118 100%)',
           border: '1px solid rgba(255,255,255,0.09)',
           borderRadius: 20,
