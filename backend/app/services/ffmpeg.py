@@ -505,6 +505,9 @@ async def render_full_pipeline(
     music_path: str = None,
     on_progress=None,
     platform: str | None = None,
+    motion: str = "auto",
+    transition: str = "fade",
+    transition_duration: float = 0.4,
 ) -> dict:
     # Resolve music track name → local file path
     resolved_music = await _resolve_music(music_path, output_dir)
@@ -536,7 +539,11 @@ async def render_full_pipeline(
         await on_progress("Normalising and concatenating scenes...", 82)
 
     final_path = str(Path(output_dir) / "final_video.mp4")
-    await concat_scenes(scene_outputs, final_path)
+    await concat_scenes(
+            scene_outputs, final_path,
+            transition=transition,
+            transition_duration=transition_duration,
+        )
 
     if resolved_music:
         if on_progress:
