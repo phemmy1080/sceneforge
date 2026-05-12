@@ -106,6 +106,51 @@ async def normalize_scene(input_path: str, output_path: str) -> str:
 
 
 # ── Scene renderer ────────────────────────────────────────────────────────────
+# ── Cinematic motion presets ──────────────────────────────────────────────────
+# Each preset returns a zoompan filter string for the given width/height/duration
+# used to add Ken Burns, pan, or zoom-out effects to images and video clips.
+
+def _motion_filter(motion: str, w: int, h: int, duration: float) -> str:
+    """Return a zoompan vf string for the requested motion effect."""
+    fps   = 30
+    frames = int(duration * fps)
+
+    if motion == "kenburns_in":
+        # Slow zoom in from 1.0 to 1.12 over the scene
+        return (
+            f"scale={w*2}:{h*2},"
+            f"zoompan=z='min(zoom+0.0008,1.12)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+            f":d={frames}:s={w}x{h}:fps={fps}"
+        )
+    elif motion == "kenburns_out":
+        # Start zoomed in, slowly pull back
+        return (
+            f"scale={w*2}:{h*2},"
+            f"zoompan=z='if(eq(on,1),1.12,max(zoom-0.0008,1.0))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+            f":d={frames}:s={w}x{h}:fps={fps}"
+        )
+    elif motion == "pan_left":
+        # Pan left — start right, drift left
+        return (
+            f"scale={int(w*1.2)}:{h},"
+            f"zoompan=z='1.0':x='if(eq(on,1),iw*0.1,x-iw*0.1/{frames})'"
+            f":y='0':d={frames}:s={w}x{h}:fps={fps}"
+        )
+    elif motion == "pan_right":
+        return (
+            f"scale={int(w*1.2)}:{h},"
+            f"zoompan=z='1.0':x='if(eq(on,1),0,x+iw*0.1/{frames})'"
+            f":y='0':d={frames}:s={w}x{h}:fps={fps}"
+        )
+    else:
+        # none — just scale/crop
+        return f"scale=w={w}:h={h}:force_original_aspect_ratio=increase,crop={w}:{h}"
+
+
+# Rotate through motion effects per scene index for variety
+_MOTION_CYCLE = ["kenburns_in", "pan_left", "kenburns_out", "pan_right"]
+
+
 async def render_scene(
     scene: Scene,
     visual_path: str,
@@ -114,14 +159,23 @@ async def render_scene(
     subtitle_style: str = "viral",
     is_image: bool = False,
     platform: str | None = None,
+    motion: str = "auto",   # "auto" | "kenburns_in" | "kenburns_out" | "pan_left" | "pan_right" | "none"
+    scene_index: int = 0,
 ) -> str:
-    # Resolve dimensions for this platform
-    w, h = _dims(platform)
-    scale_vf = (
-        f"scale=w={w}:h={h}:force_original_aspect_ratio=increase,"
-        f"crop={w}:{h}"
-    )
+    w, h   = _dims(platform)
+    duration = max(float(scene.duration or 10), 3.0)
 
+    # Resolve motion effect
+    if motion == "auto":
+        motion = _MOTION_CYCLE[scene_index % len(_MOTION_CYCLE)]
+
+    # Build video filter chain
+    if motion != "none":
+        motion_vf = _motion_filter(motion, w, h, duration)
+    else:
+        motion_vf = f"scale=w={w}:h={h}:force_original_aspect_ratio=increase,crop={w}:{h}"
+
+    # Add subtitles on top of motion filter
     if subtitle_style != "none" and _HAS_DRAWTEXT:
         words = scene.text.replace("\n", " ").split()
         lines, current = [], []
@@ -134,81 +188,200 @@ async def render_scene(
             lines.append(" ".join(current))
         safe = (
             "\n".join(lines[:2])
-            .replace("'",  "\u2019")
-            .replace(":",  "\\:")
-            .replace("%",  "\\%")
+            .replace("\'",  "\u2019")
+            .replace(":",   "\\:")
+            .replace("%",   "\\%")
         )
         style_map = {
             "viral":   "fontsize=52:fontcolor=white:borderw=4:bordercolor=black:x=(w-text_w)/2:y=h*0.80",
             "minimal": "fontsize=40:fontcolor=white:borderw=1:bordercolor=black@0.4:x=(w-text_w)/2:y=h*0.85",
             "karaoke": "fontsize=48:fontcolor=yellow:borderw=3:bordercolor=black:x=(w-text_w)/2:y=h*0.82",
         }
-        style = style_map.get(subtitle_style, style_map["viral"])
-        vf = f"{scale_vf},drawtext=fontfile='{_FONT_PATH}':text='{safe}':{style}"
+        sub_style = style_map.get(subtitle_style, style_map["viral"])
+        vf = f"{motion_vf},drawtext=fontfile='{_FONT_PATH}':text='{safe}':{sub_style}"
     else:
-        vf = scale_vf
+        vf = motion_vf
 
     cmd = [
         "ffmpeg", "-y",
-        *(["-loop", "1"] if is_image else []),
+        *(["-loop", "1", "-t", str(duration)] if is_image else []),
         "-i", visual_path,
+        "-t", str(duration),
         "-i", audio_path,
         "-map", "0:v:0",
         "-map", "1:a:0",
         "-vf", vf,
         "-c:v", "libx264",
         "-preset", "ultrafast",
-        "-crf", "28",
+        "-crf", "26",
         "-threads", "2",
+        "-r", "30",
         "-c:a", "aac",
         "-ar", "44100",
         "-ac", "2",
-        "-b:a", "96k",
-        "-t", str(max(float(scene.duration or 10), 3.0)),
+        "-b:a", "128k",
         "-pix_fmt", "yuv420p",
         "-avoid_negative_ts", "make_zero",
+        "-async", "1",
+        "-vsync", "cfr",
+        "-shortest",
         output_path,
     ]
 
-    logger.info("Scene %s | platform=%s | dims=%dx%d | duration=%s",
-                scene.id, platform, w, h, scene.duration)
+    logger.info("Scene %s | motion=%s | platform=%s | %dx%d | %.1fs",
+                scene.id, motion, platform, w, h, duration)
     await run_ffmpeg(cmd)
     logger.info("Rendered scene %s → %s", scene.id, Path(output_path).name)
     return output_path
 
 
 # ── Concatenation ─────────────────────────────────────────────────────────────
-async def concat_scenes(scene_files: list[str], output_path: str) -> str:
+async def concat_scenes(
+    scene_files: list[str],
+    output_path: str,
+    transition: str = "fade",   # "fade" | "blur" | "none"
+    transition_duration: float = 0.4,
+) -> str:
+    """
+    Concatenate scene files with optional xfade transitions between them.
+    transition="fade"  → smooth crossfade (cinematic)
+    transition="blur"  → blur + fade (modern)
+    transition="none"  → plain cut (fastest)
+    """
     output_dir = Path(output_path).parent
     normalized: list[str] = []
 
+    # Step 1: normalize all scenes to identical codec/resolution/fps
     for i, sf in enumerate(scene_files):
         norm_path = str(output_dir / f"norm_{i+1:02d}.mp4")
         logger.info("Normalising scene %d/%d…", i + 1, len(scene_files))
         await normalize_scene(sf, norm_path)
         normalized.append(norm_path)
 
-    concat_list = str(output_dir / "concat_list.txt")
-    with open(concat_list, "w") as f:
-        for nf in normalized:
-            f.write(f"file '{os.path.abspath(nf)}'\n")
+    n = len(normalized)
 
-    await run_ffmpeg([
-        "ffmpeg", "-y",
-        "-f", "concat", "-safe", "0",
-        "-i", concat_list,
-        "-c", "copy",
-        "-movflags", "+faststart",
-        output_path,
-    ])
+    # Step 2: plain cut if only 1 scene or transitions disabled
+    if n == 1 or transition == "none":
+        concat_list = str(output_dir / "concat_list.txt")
+        with open(concat_list, "w") as f:
+            for nf in normalized:
+                f.write(f"file '{os.path.abspath(nf)}'\n")
+        await run_ffmpeg([
+            "ffmpeg", "-y",
+            "-f", "concat", "-safe", "0",
+            "-i", concat_list,
+            "-c", "copy",
+            "-movflags", "+faststart",
+            output_path,
+        ])
+        try: Path(concat_list).unlink()
+        except: pass
+        for nf in normalized:
+            try: Path(nf).unlink()
+            except: pass
+        logger.info("Concatenated %d scenes (no transitions) → %s", n, Path(output_path).name)
+        return output_path
+
+    # Step 3: build xfade filter graph
+    # We need to know each scene duration to compute xfade offsets
+    import json as _json
+
+    async def _get_duration(path: str) -> float:
+        """Probe duration of a video file using ffprobe."""
+        loop = asyncio.get_event_loop()
+        def _probe():
+            import subprocess
+            r = subprocess.run(
+                ["ffprobe", "-v", "quiet", "-print_format", "json",
+                 "-show_streams", path],
+                capture_output=True, text=True
+            )
+            data = _json.loads(r.stdout)
+            for s in data.get("streams", []):
+                if s.get("codec_type") == "video":
+                    return float(s.get("duration", 5.0))
+            return 5.0
+        return await loop.run_in_executor(None, _probe)
+
+    durations = []
+    for nf in normalized:
+        d = await _get_duration(nf)
+        durations.append(d)
+
+    td = transition_duration
+
+    # Map transition name to xfade filter name
+    xfade_map = {
+        "fade":  "fade",
+        "blur":  "fadeblur",   # gaussian blur fade (xfade built-in)
+    }
+    xfade_name = xfade_map.get(transition, "fade")
+
+    # Build complex filter:
+    # [0][1] xfade at offset=(d0-td), [prev][2] xfade at offset=(d0+d1-2*td), etc.
+    inputs = []
+    for nf in normalized:
+        inputs += ["-i", nf]
+
+    filter_parts = []
+    # label streams: [0:v],[0:a],[1:v],[1:a],...
+    offset = 0.0
+    prev_v = "[0:v]"
+    prev_a = "[0:a]"
+
+    for i in range(1, n):
+        offset += durations[i-1] - td
+        offset = max(offset, 0.01)
+        out_v = f"[v{i}]" if i < n-1 else "[vout]"
+        out_a = f"[a{i}]" if i < n-1 else "[aout]"
+        filter_parts.append(
+            f"{prev_v}[{i}:v]xfade=transition={xfade_name}:duration={td}:offset={offset:.3f}{out_v}"
+        )
+        filter_parts.append(
+            f"{prev_a}[{i}:a]acrossfade=d={td}{out_a}"
+        )
+        prev_v = out_v
+        prev_a = out_a
+
+    filter_str = ";".join(filter_parts)
+
+    cmd = (
+        ["ffmpeg", "-y"]
+        + inputs
+        + [
+            "-filter_complex", filter_str,
+            "-map", "[vout]",
+            "-map", "[aout]",
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "26",
+            "-r", "30", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
+            "-movflags", "+faststart",
+            output_path,
+        ]
+    )
+
+    try:
+        await run_ffmpeg(cmd)
+        logger.info("Concatenated %d scenes with '%s' transitions → %s",
+                    n, transition, Path(output_path).name)
+    except Exception as e:
+        # Fallback to plain cut if xfade fails
+        logger.warning("xfade failed (%s) — falling back to plain cut", e)
+        concat_list = str(output_dir / "concat_list_fb.txt")
+        with open(concat_list, "w") as f:
+            for nf in normalized:
+                f.write(f"file '{os.path.abspath(nf)}'\n")
+        await run_ffmpeg([
+            "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+            "-i", concat_list, "-c", "copy", "-movflags", "+faststart", output_path,
+        ])
+        try: Path(concat_list).unlink()
+        except: pass
 
     for nf in normalized:
         try: Path(nf).unlink()
         except: pass
-    try: Path(concat_list).unlink()
-    except: pass
 
-    logger.info("Concatenated %d scenes → %s", len(scene_files), Path(output_path).name)
     return output_path
 
 
@@ -350,6 +523,8 @@ async def render_full_pipeline(
             subtitle_style=subtitle_style,
             is_image=is_image,
             platform=platform,
+            motion=motion,
+            scene_index=i,
         )
         scene_outputs.append(scene_out)
 
