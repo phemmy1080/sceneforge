@@ -16,6 +16,8 @@ export interface VoiceConfig {
   visual_source: 'pexels_video' | 'pexels_photo' | 'dalle' | 'mixed'
   subtitle_style: 'viral' | 'minimal' | 'karaoke' | 'none'
   music: string
+  motion: string
+  transition: string
 }
 
 export interface Project {
@@ -107,6 +109,7 @@ const DEFAULT_CONFIG: ProjectConfig = {
 const DEFAULT_VOICE: VoiceConfig = {
   voice_name: 'Marcus', voice_speed: 1.0, voice_stability: 'medium',
   visual_source: 'mixed', subtitle_style: 'viral', music: 'none',
+  motion: 'auto', transition: 'fade',
 }
 
 // Shared workflow reset — used by addProject and openProject
@@ -364,6 +367,9 @@ export const useStore = create<AppState>()(
             platform: config.platform,
             uploaded_voice_path: uploadedVoicePath ?? null,
             project_id: activeProjectId ?? undefined,
+            motion:     voiceConfig.motion      ?? 'auto',
+            transition: voiceConfig.transition  ?? 'fade',
+            transition_duration: 0.4,
           }
         },
 
