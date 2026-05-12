@@ -95,9 +95,11 @@ async def normalize_scene(input_path: str, output_path: str) -> str:
         "-i", input_path,
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "-threads", "2",
         "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "96k",
+        "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
         "-avoid_negative_ts", "make_zero",
         "-fflags", "+genpts",
+        "-async", "1",    # resample audio to fix drift
+        "-vsync", "cfr",  # constant frame rate
         output_path,
     ])
     return output_path
