@@ -180,6 +180,64 @@ export default function VoiceVisuals() {
         </Card>
       </div>
 
+      {/* ── Cinematic effects ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <Card className="mb-0">
+          <CardTitle>
+            Cinematic motion
+            <span className="ml-2 text-[10px] font-normal text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded-full">New</span>
+          </CardTitle>
+          <div className="flex flex-col gap-2">
+            {MOTION_OPTIONS.map((m) => (
+              <button
+                key={m.value}
+                onClick={() => setVoiceConfig({ motion: m.value })}
+                className={`w-full flex items-start gap-3 px-3 py-2.5 rounded-lg border text-left transition-all ${
+                  (voiceConfig.motion ?? 'auto') === m.value
+                    ? 'bg-violet-500/15 border-violet-500/30 text-violet-300'
+                    : 'border-transparent hover:bg-white/4 text-white/60'
+                }`}
+              >
+                <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+                  (voiceConfig.motion ?? 'auto') === m.value ? 'bg-violet-400' : 'bg-white/20'
+                }`} />
+                <div>
+                  <div className="text-[12.5px] font-medium leading-tight">{m.label}</div>
+                  <div className="text-[11px] text-white/40 mt-0.5">{m.desc}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </Card>
+        <Card className="mb-0">
+          <CardTitle>
+            Scene transitions
+            <span className="ml-2 text-[10px] font-normal text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded-full">New</span>
+          </CardTitle>
+          <div className="flex flex-col gap-2">
+            {TRANSITION_OPTIONS.map((t) => (
+              <button
+                key={t.value}
+                onClick={() => setVoiceConfig({ transition: t.value })}
+                className={`w-full flex items-start gap-3 px-3 py-2.5 rounded-lg border text-left transition-all ${
+                  (voiceConfig.transition ?? 'fade') === t.value
+                    ? 'bg-teal-500/15 border-teal-500/30 text-teal-300'
+                    : 'border-transparent hover:bg-white/4 text-white/60'
+                }`}
+              >
+                <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+                  (voiceConfig.transition ?? 'fade') === t.value ? 'bg-teal-400' : 'bg-white/20'
+                }`} />
+                <div>
+                  <div className="text-[12.5px] font-medium leading-tight">{t.label}</div>
+                  <div className="text-[11px] text-white/40 mt-0.5">{t.desc}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </Card>
+      </div>
+
       {/* ── Render summary ── */}
       <div className="bg-[#1A1A24] rounded-xl p-4 mb-4 border border-white/[0.07]">
         <p className="text-[11px] text-white/35 uppercase tracking-widest font-semibold mb-2">
