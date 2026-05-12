@@ -16,6 +16,19 @@ const VISUAL_SOURCES = [
 const SUBTITLE_STYLES = ['viral', 'minimal', 'karaoke', 'none']
 const MUSIC_OPTIONS   = ['none', 'upbeat', 'cinematic', 'lofi', 'inspiring']
 
+const MOTION_OPTIONS = [
+  { value: 'auto',        label: 'Auto (varied)',  desc: 'Cycles Ken Burns + pan per scene' },
+  { value: 'kenburns_in', label: 'Ken Burns zoom', desc: 'Slow zoom in on every scene' },
+  { value: 'pan_left',    label: 'Pan',            desc: 'Gentle camera pan across scene' },
+  { value: 'none',        label: 'Static',         desc: 'No motion — plain footage' },
+]
+
+const TRANSITION_OPTIONS = [
+  { value: 'fade', label: 'Crossfade', desc: 'Smooth cinematic fade between scenes' },
+  { value: 'blur', label: 'Blur fade', desc: 'Blur wipe — modern feel' },
+  { value: 'none', label: 'Cut',       desc: 'Instant cut — fastest render' },
+]
+
 export default function VoiceVisuals() {
   const user              = useAuthStore((s) => s.user)
   const userPlan          = user?.plan || 'free'
