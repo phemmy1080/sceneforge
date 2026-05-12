@@ -301,7 +301,7 @@ export default function ChatBot() {
               <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>SceneForge Co-pilot</div>
               <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#34D399', display: 'inline-block' }} />
-                {currentStep ? `On ${currentStep} step` : 'Ready to help'} · Groq
+                {currentStep ? `On ${currentStep} step` : 'Ready to help'}
               </div>
             </div>
             <button onClick={() => setOpen(false)} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', width: 26, height: 26, cursor: 'pointer', color: 'rgba(255,255,255,0.5)', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Close">×</button>
