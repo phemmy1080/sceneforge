@@ -53,7 +53,16 @@ async def search_pexels_videos(keyword: str, per_page: int = 6) -> list[VisualRe
     for v in data.get("videos", []):
         # Pick HD file
         hd_files = [f for f in v["video_files"] if f.get("quality") == "hd"]
-        file = sorted(hd_files, key=lambda x: x.get("width", 0), reverse=True)[0] if hd_files else v["video_files"][0]
+        if hd_files:
+            # Prefer portrait orientation (height > width) for 9:16 videos
+            portrait = [f for f in hd_files if f.get("height", 0) >= f.get("width", 1)]
+            if portrait:
+                file = sorted(portrait, key=lambda x: x.get("height", 0), reverse=True)[0]
+            else:
+                # No portrait available — take highest resolution, ffmpeg will crop
+                file = sorted(hd_files, key=lambda x: x.get("height", 0), reverse=True)[0]
+        else:
+            file = v["video_files"][0]
 
         results.append(VisualResult(
             id=str(v["id"]),
