@@ -112,7 +112,7 @@ export default function ChatBot() {
     if (scenes.length > 0)     parts.push(`Scenes: ${scenes.length} scenes, est. ${scenes.reduce((s,sc)=>s+(sc.duration||0),0)}s total`)
     if (script?.length > 20)   parts.push(`Script preview: "${script.slice(0,120)}..."`)
     return parts.join(' | ')
-  }, [activeProject, currentStep, config, scenes, script])
+  }, [activeProject, currentStep, config, scenes, script, ideas, selectedIdea])
 
   const [open, setOpen]         = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
