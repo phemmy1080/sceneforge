@@ -11,7 +11,7 @@ interface Message {
 
 const STEP_GREETINGS: Record<string, { title: string; sub: string }> = {
   setup:  { title: "Let's set up your video!",        sub: "I can suggest niches, styles, and platforms that perform well right now." },
-  ideas:  { title: "Pick the strongest idea.",         sub: "I can tell you which angle will get the most engagement for your niche." },
+  ideas:  { title: "Ideas are ready!",                  sub: "I can analyse each idea and tell you which one will perform best for your niche and platform." },
   script: { title: "Your script is looking good!",    sub: "Want me to sharpen the hook, shorten it, or make it more emotional?" },
   scenes: { title: "Scenes are ready to edit.",       sub: "I can spot pacing issues and suggest stronger visual prompts per scene." },
   voice:  { title: "Almost ready to render!",         sub: "I can recommend the best voice and music combo for your niche and platform." },
@@ -27,9 +27,10 @@ const STEP_ACTIONS: Record<string, Array<{ label: string; prompt: string; icon: 
     { label: 'Style for my niche',       prompt: 'What video style works best for my chosen niche?', icon: '🎬' },
   ],
   ideas: [
-    { label: 'Which idea is strongest',  prompt: 'Looking at my niche and platform, which type of idea will get the most views?', icon: '💡' },
-    { label: 'Hook ideas',               prompt: 'Give me 3 powerful hook ideas for my niche that stop the scroll immediately.', icon: '🎣' },
-    { label: 'Viral angles',             prompt: 'What makes a video go viral in my niche? What angle should I focus on?', icon: '🔥' },
+    { label: 'Pick the best idea',       prompt: 'Based on the ideas I generated, which one will perform best on my platform and niche? Be specific about why.', icon: '🏆' },
+    { label: 'Compare all ideas',        prompt: 'Compare all the ideas I generated. Give each a score out of 10 for viral potential and explain your reasoning.', icon: '📊' },
+    { label: 'Improve the hooks',        prompt: 'For each of my generated ideas, suggest a stronger hook that stops the scroll in 3 seconds.', icon: '⚡' },
+    { label: 'Which is most unique',     prompt: 'Which of my generated ideas is the most unique and least likely to be duplicated by competitors?', icon: '💎' },
   ],
   script: [
     { label: 'Improve hook',             prompt: 'Rewrite my script hook to be more attention-grabbing in the first 3 seconds.', icon: '⚡' },
@@ -67,11 +68,13 @@ const DEFAULT_ACTIONS = [
 let msgId = 0
 
 export default function ChatBot() {
-  const currentStep   = useStore((s) => s.currentStep)
-  const config        = useStore((s) => s.config)
-  const scenes        = useStore((s) => s.scenes)
-  const script        = useStore((s) => s.script)
-  const projects      = useStore((s) => s.projects)
+  const currentStep    = useStore((s) => s.currentStep)
+  const config         = useStore((s) => s.config)
+  const scenes         = useStore((s) => s.scenes)
+  const script         = useStore((s) => s.script)
+  const ideas          = useStore((s) => s.ideas)
+  const selectedIdea   = useStore((s) => s.selectedIdea)
+  const projects       = useStore((s) => s.projects)
   const activeProjectId = useStore((s) => s.activeProjectId)
 
   const activeProject = projects.find(p => p.id === activeProjectId)
@@ -79,6 +82,9 @@ export default function ChatBot() {
   const stepActions   = STEP_ACTIONS[currentStep]   || DEFAULT_ACTIONS
 
   const getGreeting = useCallback(() => {
+    if (currentStep === 'ideas' && ideas.length > 0) {
+      return { title: `${ideas.length} ideas generated!`, sub: 'Ask me which one will perform best — I can analyse all of them for you.' }
+    }
     if (currentStep === 'script' && config.niche) {
       return { title: `Script ready for ${config.niche}!`, sub: stepInfo.sub }
     }
@@ -86,7 +92,7 @@ export default function ChatBot() {
       return { title: `${scenes.length} scenes loaded — looking good!`, sub: stepInfo.sub }
     }
     return stepInfo
-  }, [currentStep, config.niche, scenes.length, stepInfo])
+  }, [currentStep, config.niche, scenes.length, ideas.length, stepInfo])
 
   const buildContext = useCallback(() => {
     const parts: string[] = []
@@ -96,6 +102,13 @@ export default function ChatBot() {
     if (config.style)          parts.push(`Style: ${config.style}`)
     if (config.platform)       parts.push(`Platform: ${config.platform}`)
     if (config.tone)           parts.push(`Tone: ${config.tone}`)
+    if (ideas.length > 0) {
+      const ideaList = ideas.map((idea, i) =>
+        `${i+1}. "${idea.title}" — Hook: ${idea.hook} | Angle: ${idea.angle}`
+      ).join(' || ')
+      parts.push(`Generated ideas (${ideas.length} total): ${ideaList}`)
+    }
+    if (selectedIdea) parts.push(`Selected idea: "${selectedIdea.title}" — ${selectedIdea.hook}`)
     if (scenes.length > 0)     parts.push(`Scenes: ${scenes.length} scenes, est. ${scenes.reduce((s,sc)=>s+(sc.duration||0),0)}s total`)
     if (script?.length > 20)   parts.push(`Script preview: "${script.slice(0,120)}..."`)
     return parts.join(' | ')
