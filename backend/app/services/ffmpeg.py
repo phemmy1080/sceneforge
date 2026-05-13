@@ -112,39 +112,54 @@ async def normalize_scene(input_path: str, output_path: str) -> str:
 
 def _motion_filter(motion: str, w: int, h: int, duration: float) -> str:
     """Return a zoompan vf string for the requested motion effect."""
-    fps   = 30
+    fps    = 30
     frames = int(duration * fps)
+    # Scale preserving aspect ratio then crop to exact target — no stretching
+    # We scale to 2x target size while preserving AR, then zoompan crops to exact output
+    safe_scale = (
+        f"scale=w={w*2}:h={h*2}:force_original_aspect_ratio=increase,"
+        f"crop={w*2}:{h*2}"
+    )
 
     if motion == "kenburns_in":
-        # Slow zoom in from 1.0 to 1.12 over the scene
         return (
-            f"scale={w*2}:{h*2},"
-            f"zoompan=z='min(zoom+0.0008,1.12)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+            f"{safe_scale},"
+            f"zoompan=z='min(zoom+0.0006,1.12)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
             f":d={frames}:s={w}x{h}:fps={fps}"
         )
     elif motion == "kenburns_out":
-        # Start zoomed in, slowly pull back
         return (
-            f"scale={w*2}:{h*2},"
-            f"zoompan=z='if(eq(on,1),1.12,max(zoom-0.0008,1.0))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+            f"{safe_scale},"
+            f"zoompan=z='if(eq(on,1),1.12,max(zoom-0.0006,1.0))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
             f":d={frames}:s={w}x{h}:fps={fps}"
         )
     elif motion == "pan_left":
-        # Pan left — start right, drift left
+        # Scale wider to allow horizontal pan without hitting edges
+        pan_scale = (
+            f"scale=w={int(w*1.4)}:h={h*2}:force_original_aspect_ratio=increase,"
+            f"crop={int(w*1.4)}:{h}"
+        )
         return (
-            f"scale={int(w*1.2)}:{h},"
-            f"zoompan=z='1.0':x='if(eq(on,1),iw*0.1,x-iw*0.1/{frames})'"
-            f":y='0':d={frames}:s={w}x{h}:fps={fps}"
+            f"{pan_scale},"
+            f"zoompan=z='1.0':x='if(eq(on,1),iw*0.15,x-iw*0.15/{frames})'"
+            f":y='(ih-{h})/2':d={frames}:s={w}x{h}:fps={fps}"
         )
     elif motion == "pan_right":
+        pan_scale = (
+            f"scale=w={int(w*1.4)}:h={h*2}:force_original_aspect_ratio=increase,"
+            f"crop={int(w*1.4)}:{h}"
+        )
         return (
-            f"scale={int(w*1.2)}:{h},"
-            f"zoompan=z='1.0':x='if(eq(on,1),0,x+iw*0.1/{frames})'"
-            f":y='0':d={frames}:s={w}x{h}:fps={fps}"
+            f"{pan_scale},"
+            f"zoompan=z='1.0':x='if(eq(on,1),0,x+iw*0.15/{frames})'"
+            f":y='(ih-{h})/2':d={frames}:s={w}x{h}:fps={fps}"
         )
     else:
-        # none — just scale/crop
-        return f"scale=w={w}:h={h}:force_original_aspect_ratio=increase,crop={w}:{h}"
+        # none — scale preserving AR then crop to exact size
+        return (
+            f"scale=w={w}:h={h}:force_original_aspect_ratio=increase,"
+            f"crop={w}:{h}"
+        )
 
 
 # Rotate through motion effects per scene index for variety
@@ -173,7 +188,7 @@ async def render_scene(
     if motion != "none":
         motion_vf = _motion_filter(motion, w, h, duration)
     else:
-        motion_vf = f"scale=w={w}:h={h}:force_original_aspect_ratio=increase,crop={w}:{h}"
+        motion_vf = f"scale=w={w}:h={h}:force_original_aspect_ratio=increase,crop={w}:{h},setsar=1"
 
     # Add subtitles on top of motion filter
     if subtitle_style != "none" and _HAS_DRAWTEXT:
