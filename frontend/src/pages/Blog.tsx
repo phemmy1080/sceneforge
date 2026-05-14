@@ -98,7 +98,6 @@ export default function Blog() {
 
   function openPost(slug: string) {
     window.history.pushState({}, '', `/blog/${slug}`)
-    window.dispatchEvent(new PopStateEvent('popstate'))
   }
 
   return (
