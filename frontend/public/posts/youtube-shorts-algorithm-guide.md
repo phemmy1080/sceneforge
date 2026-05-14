@@ -1,18 +1,18 @@
 ---
-title: "The YouTube Shorts Algorithm in 2025: What Actually Drives Views"
+title: "The YouTube Shorts Algorithm in 2026: What Actually Drives Views"
 slug: "youtube-shorts-algorithm-guide"
-description: "A practical guide to the YouTube Shorts algorithm in 2025 — what signals matter, what to optimise, and how to get your videos recommended to new viewers."
-date: "2025-05-12"
+description: "A practical guide to the YouTube Shorts algorithm in 2026 — what signals matter, what to optimise, and how to get your videos recommended to new viewers."
+date: "2026-05-12"
 category: "strategy"
 tags: ["youtube shorts", "algorithm", "views", "growth"]
 readTime: 7
 ---
 
-# The YouTube Shorts Algorithm in 2025: What Actually Drives Views
+# The YouTube Shorts Algorithm in 2026: What Actually Drives Views
 
 YouTube Shorts crossed 70 billion daily views in 2024. The platform is actively pushing Shorts to compete with TikTok — which means creators who understand the algorithm right now have a massive opportunity.
 
-Here's what actually drives views on YouTube Shorts in 2025.
+Here's what actually drives views on YouTube Shorts in 2026.
 
 ## The Two Phases of Shorts Distribution
 
@@ -60,7 +60,7 @@ YouTube tracks whether new viewers subscribe after watching your Short. High sub
 
 ## Creating Shorts at Scale with AI
 
-The creators dominating YouTube Shorts in 2025 post frequently — often daily. The production bottleneck is real, but AI video tools have eliminated it for many creators.
+The creators dominating YouTube Shorts in 2026 post frequently — often daily. The production bottleneck is real, but AI video tools have eliminated it for many creators.
 
 With SceneForge, you can produce a complete YouTube Short in under 60 seconds — script, voiceover, stock footage, subtitles, and music included. The tool exports in 9:16 format ready for direct upload.
 
