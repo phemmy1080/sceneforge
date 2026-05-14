@@ -1,18 +1,18 @@
 ---
-title: "How Content Creators Monetise in 2025: 7 Revenue Streams That Actually Work"
+title: "How Content Creators Monetise in 2026: 7 Revenue Streams That Actually Work"
 slug: "content-creator-monetisation-guide"
-description: "A practical guide to the revenue streams that work for content creators in 2025 — from platform monetisation to digital products, affiliate income, and beyond."
-date: "2025-05-15"
+description: "A practical guide to the revenue streams that work for content creators in 2026 — from platform monetisation to digital products, affiliate income, and beyond."
+date: "2026-05-15"
 category: "strategy"
 tags: ["monetisation", "content creator", "income", "digital products"]
 readTime: 9
 ---
 
-# How Content Creators Monetise in 2025: 7 Revenue Streams That Actually Work
+# How Content Creators Monetise in 2026: 7 Revenue Streams That Actually Work
 
 Most content creator income guides are written by people who don't actually create content. This one isn't.
 
-Here are the seven monetisation streams that consistently work in 2025 — ranked by how accessible they are when you're starting out.
+Here are the seven monetisation streams that consistently work in 2026 — ranked by how accessible they are when you're starting out.
 
 ## 1. Platform Monetisation Programs
 
