@@ -37,7 +37,7 @@ function TokenGateBar({ onUpgrade }: { onUpgrade: () => void }) {
       })
     }
     load()
-    const id = setInterval(load, 30000)
+    const id = setInterval(load, 300000)
     return () => clearInterval(id)
   }, [])
 
