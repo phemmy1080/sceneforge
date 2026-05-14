@@ -111,7 +111,15 @@ class CreateCouponRequest(BaseModel):
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async def _all_users(redis) -> list[dict]:
+# Cache _all_users for 60 seconds to avoid repeated full Redis scans
+_all_users_cache: dict = {"ts": 0.0, "data": []}
+_ALL_USERS_TTL = 60  # seconds
+
+async def _all_users(redis, force: bool = False) -> list[dict]:
+    import time
+    now = time.time()
+    if not force and now - _all_users_cache["ts"] < _ALL_USERS_TTL:
+        return _all_users_cache["data"]
     users = []
     cursor = 0
     while True:
@@ -128,6 +136,8 @@ async def _all_users(redis) -> list[dict]:
                         pass
         if cursor == 0:
             break
+    _all_users_cache["ts"]   = now
+    _all_users_cache["data"] = users
     return users
 
 
