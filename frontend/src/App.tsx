@@ -192,17 +192,31 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
 }
 
 function Root() {
-  // Special URL routes — check before any hooks
+  // Track pathname as state so URL changes trigger re-render
+  const [pathname, setPathname] = useState(window.location.pathname)
+
+  useEffect(() => {
+    const handler = () => setPathname(window.location.pathname)
+    window.addEventListener('popstate', handler)
+    // Patch pushState to also trigger re-render
+    const origPush = window.history.pushState.bind(window.history)
+    window.history.pushState = (...args) => {
+      origPush(...args)
+      setPathname(window.location.pathname)
+    }
+    return () => window.removeEventListener('popstate', handler)
+  }, [])
+
   // Blog routes — public, no auth required
-  if (window.location.pathname === '/blog') {
+  if (pathname === '/blog') {
     return <Blog />
   }
-  if (window.location.pathname.startsWith('/blog/')) {
-    const slug = window.location.pathname.replace('/blog/', '').replace(/\/+$/, '')
+  if (pathname.startsWith('/blog/')) {
+    const slug = pathname.replace('/blog/', '').replace(/\/+$/, '')
     return <BlogPost slug={slug} />
   }
 
-  if (window.location.pathname === '/payment/callback') {
+  if (pathname === '/payment/callback') {
     return <PaymentCallback />
   }
   if (window.location.pathname === '/reset-password') {
