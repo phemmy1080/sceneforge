@@ -28,7 +28,7 @@ import Blog from './pages/Blog'
 import BlogPost from './pages/BlogPost'
 import FeedbackModal from './components/FeedbackModal'
 import ErrorToast from './components/ErrorToast'
-import CoPilot from './components/CoPilot'
+import ChatBot from './components/ChatBot'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -186,7 +186,7 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
       {/* Global API error toasts */}
       <ErrorToast />
       {/* AI Co-pilot */}
-      <CoPilot />
+      <ChatBot />
     </>
   )
 }
