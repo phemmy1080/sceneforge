@@ -106,6 +106,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
           Scene<span style={{ color: '#A78BFA' }}>Forge</span>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <a href="/blog" style={{ ...ghostBtn, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>Blog</a>
           <button onClick={onLogin} style={ghostBtn}>Log in</button>
           <button onClick={onSignup} style={primaryBtn}>Start free →</button>
         </div>
