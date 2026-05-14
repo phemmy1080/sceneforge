@@ -24,9 +24,11 @@ import Upgrade from './pages/Upgrade'
 import Plans from './pages/Plans'
 import PaymentCallback from './pages/PaymentCallback'
 import ErrorBoundary from './components/ErrorBoundary'
+import Blog from './pages/Blog'
+import BlogPost from './pages/BlogPost'
 import FeedbackModal from './components/FeedbackModal'
 import ErrorToast from './components/ErrorToast'
-import ChatBot from './components/ChatBot'
+import CoPilot from './components/CoPilot'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -74,7 +76,7 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
     if (feedbackTrigger !== 'manual') {
       setFeedbackDismissed(true)
       // Auto-hide reminder after 30 seconds
-      setTimeout(() => setFeedbackDismissed(false), 60000)
+      setTimeout(() => setFeedbackDismissed(false), 30000)
     }
   }
 
@@ -183,14 +185,23 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
       )}
       {/* Global API error toasts */}
       <ErrorToast />
-      {/* AI chatbot assistant */}
-      <ChatBot />
+      {/* AI Co-pilot */}
+      <CoPilot />
     </>
   )
 }
 
 function Root() {
   // Special URL routes — check before any hooks
+  // Blog routes — public, no auth required
+  if (window.location.pathname === '/blog') {
+    return <Blog />
+  }
+  if (window.location.pathname.startsWith('/blog/')) {
+    const slug = window.location.pathname.replace('/blog/', '').replace(/\/+$/, '')
+    return <BlogPost slug={slug} />
+  }
+
   if (window.location.pathname === '/payment/callback') {
     return <PaymentCallback />
   }
