@@ -26,6 +26,7 @@ import PaymentCallback from './pages/PaymentCallback'
 import ErrorBoundary from './components/ErrorBoundary'
 import Blog from './pages/Blog'
 import BlogPost from './pages/BlogPost'
+import AuthorPage from './pages/AuthorPage'
 import FeedbackModal from './components/FeedbackModal'
 import ErrorToast from './components/ErrorToast'
 import ChatBot from './components/ChatBot'
@@ -210,6 +211,10 @@ function Root() {
   // Blog routes — public, no auth required
   if (pathname === '/blog') {
     return <Blog />
+  }
+  if (pathname.startsWith('/blog/author/')) {
+    const authorSlug = pathname.replace('/blog/author/', '').replace(/\/+$/, '')
+    return <AuthorPage authorSlug={authorSlug} />
   }
   if (pathname.startsWith('/blog/')) {
     const slug = pathname.replace('/blog/', '').replace(/\/+$/, '')
