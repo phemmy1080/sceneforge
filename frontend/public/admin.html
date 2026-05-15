@@ -289,7 +289,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .two-col .card{margin-bottom:0}
 
 /* ── PLAN GRID ────────────────────────────── */
-.plan-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+.plan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:18px}
 .plan-card{background:var(--ink3);border:1px solid var(--border2);border-radius:12px;padding:16px;transition:border-color var(--transition)}
 .plan-card:hover{border-color:rgba(201,168,76,0.3)}
 
@@ -399,7 +399,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   transition:all var(--transition);
 }
 .nb:hover{background:rgba(255,255,255,0.04);color:var(--text)}
-.nb.active,.nb:focus-visible{
+.nb.on,.nb.active,.nb:focus-visible{
   background:rgba(201,168,76,0.08);color:var(--gold);
   border-left-color:var(--gold);
 }
@@ -610,7 +610,8 @@ input:focus,select:focus,textarea:focus{
 ══════════════════════════════════════════════════ -->
 <div id="admin-shell">
   <!-- SIDEBAR -->
-  <aside class="sb">
+  <div class="sb-overlay" id="sb-overlay" onclick="toggleSidebar()"></div>
+  <aside class="sb" id="sidebar">
     <div class="sb-brand">
       <div class="sb-logo" style="display:flex;align-items:center;justify-content:space-between">Scene<em>Forge</em></div>
       <div class="sb-tag">Command Center</div>
@@ -697,7 +698,7 @@ input:focus,select:focus,textarea:focus{
   </aside>
 
   <!-- MAIN CONTENT -->
-  <main class="main">
+  <main class="main" id="main-content">
   <!-- Mobile topbar -->
   <div class="mobile-topbar" id="mobile-topbar">
     <button class="hamburger" onclick="toggleSidebar()" aria-label="Open menu">
@@ -783,13 +784,13 @@ input:focus,select:focus,textarea:focus{
       </div>
       <div id="alert-users" class="alert"></div>
       <div class="card">
-        <table><thead><tr>
+        <div class="tbl-wrap"><table><thead><tr>
           <th style="width:30%">User</th><th style="width:14%">Plan</th>
           <th style="width:13%">Tokens</th><th style="width:8%">Videos</th>
           <th style="width:12%">Joined</th><th style="width:14%">Actions</th>
         </tr></thead>
         <tbody id="users-tbody"><tr><td colspan="6"><div class="loading"></div></td></tr></tbody>
-        </table>
+        </table></div>
       </div>
     </div>
 
@@ -797,7 +798,7 @@ input:focus,select:focus,textarea:focus{
     <div class="pg" id="pg-topup">
       <div class="ph"><div class="ph-title">Token top-up</div><div class="ph-sub">Manually credit tokens to any user account</div></div>
       <div id="alert-topup" class="alert"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px">
         <div class="card">
           <div class="card-hdr"><span class="card-title">Credit tokens</span></div>
           <div style="padding:20px">
@@ -968,7 +969,9 @@ input:focus,select:focus,textarea:focus{
             <span class="card-title">Sent broadcasts</span>
             <button class="btn btn-ghost btn-sm" onclick="loadBroadcasts()">Refresh</button>
           </div>
-          <div class="tbl-wrap"><div id="broadcast-history" style="flex:1;overflow-y:auto"></div>
+          <div class="tbl-wrap">
+            <div id="broadcast-history" style="overflow-y:auto;max-height:500px"></div>
+          </div>
         </div>
       </div>
 
@@ -1035,13 +1038,13 @@ input:focus,select:focus,textarea:focus{
         </div>
       </div>
       <div class="card">
-        <table><thead><tr>
+        <div class="tbl-wrap"><table><thead><tr>
           <th style="width:26%">Transaction ID</th><th style="width:16%">Plan</th>
           <th style="width:14%">Amount</th><th style="width:12%">Tokens</th>
           <th style="width:20%">User</th><th style="width:12%">Time</th>
         </tr></thead>
         <tbody id="tx-tbody"><tr><td colspan="6"><div class="loading"></div></td></tr></tbody>
-        </table>
+        </table></div>
       </div>
     </div>
 
@@ -1052,7 +1055,7 @@ input:focus,select:focus,textarea:focus{
       <div id="plan-grid" class="plan-grid"><div class="loading"></div></div>
       <div class="card">
         <div class="card-hdr"><span class="card-title">Add new plan</span></div>
-        <div style="padding:20px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:12px;align-items:end">
+        <div style="padding:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;align-items:end">
           <div class="field" style="margin:0"><label>Key</label><input type="text" id="new-key" placeholder="enterprise"></div>
           <div class="field" style="margin:0"><label>Label</label><input type="text" id="new-label" placeholder="Enterprise"></div>
           <div class="field" style="margin:0"><label>Amount (NGN)</label><input type="number" id="new-amount" placeholder="10000"></div>
@@ -1102,12 +1105,12 @@ input:focus,select:focus,textarea:focus{
         </div>
         <div class="card">
           <div class="card-hdr"><span class="card-title">Active coupons</span><button class="btn btn-ghost btn-sm" onclick="loadCoupons()">Refresh</button></div>
-          <table><thead><tr>
+          <div class="tbl-wrap"><table><thead><tr>
             <th style="width:30%">Code</th><th style="width:20%">Tokens</th>
             <th style="width:22%">Uses</th><th style="width:16%">Status</th><th style="width:12%"></th>
           </tr></thead>
           <tbody id="coupons-tbody"><tr><td colspan="5"><div class="loading"></div></td></tr></tbody>
-          </table>
+          </table></div>
         </div>
       </div>
     </div>
@@ -1209,12 +1212,12 @@ input:focus,select:focus,textarea:focus{
         <div>
           <div class="card" style="margin-bottom:14px">
             <div class="card-hdr"><span class="card-title">Team</span><button class="btn btn-ghost btn-sm" onclick="loadAdmins()">Refresh</button></div>
-            <table><thead><tr>
+            <div class="tbl-wrap"><table><thead><tr>
               <th style="width:32%">Name</th><th style="width:30%">Email</th>
               <th style="width:20%">Role</th><th style="width:18%">Actions</th>
             </tr></thead>
             <tbody id="admins-tbody"><tr><td colspan="4"><div class="loading"></div></td></tr></tbody>
-            </table>
+            </table></div>
           </div>
           <div class="card">
             <div class="card-hdr"><span class="card-title">Role permissions</span></div>
