@@ -48,6 +48,7 @@ export default function BlogPost({ slug }: { slug: string }) {
   const meta = ALL_META.find(p => p.slug === slug)
 
   useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
     if (!meta) return
     document.title = `${meta.title} — SceneForge Blog`
     // Set meta description
@@ -88,7 +89,10 @@ export default function BlogPost({ slug }: { slug: string }) {
         setContent(stripped)
         setLoading(false)
       })
-      .catch(() => setLoading(false))
+      .catch(() => {
+        setContent('> This article content could not be loaded. Please try refreshing the page.')
+        setLoading(false)
+      })
   }, [slug, meta])
 
   if (!meta) {
