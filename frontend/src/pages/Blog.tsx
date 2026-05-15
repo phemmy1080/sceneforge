@@ -130,6 +130,7 @@ export default function Blog() {
 
   function openPost(slug: string) {
     window.history.pushState({}, '', `/blog/${slug}`)
+    window.scrollTo({ top: 0, behavior: 'instant' })
   }
 
   return (
