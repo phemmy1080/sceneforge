@@ -120,7 +120,12 @@ input,select,textarea,button{font-family:'Instrument Sans',sans-serif}
   border-right:1px solid var(--border);
   display:flex;flex-direction:column;
   position:fixed;top:0;bottom:0;left:0;
-  overflow-y:auto;z-index:100;
+  overflow-y:auto;z-index:200;
+  transition:transform var(--transition);
+}
+.sb-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);
+  z-index:199;backdrop-filter:blur(4px);
 }
 .sb-brand{
   padding:22px 20px 16px;
@@ -173,7 +178,7 @@ input,select,textarea,button{font-family:'Instrument Sans',sans-serif}
 .logout-btn:hover{background:rgba(248,113,113,0.14);color:var(--rose);border-color:rgba(248,113,113,0.3)}
 
 /* ── MAIN ─────────────────────────────────── */
-.main{margin-left:220px;flex:1;min-height:100vh;padding:32px 36px}
+.main{margin-left:220px;flex:1;min-height:100vh;padding:28px 32px;transition:margin var(--transition)}
 
 /* ── PAGE HEADER ──────────────────────────── */
 .ph{margin-bottom:28px}
@@ -218,7 +223,7 @@ input,select,textarea,button{font-family:'Instrument Sans',sans-serif}
 .card-actions{display:flex;gap:8px;align-items:center}
 
 /* ── TABLE ────────────────────────────────── */
-table{width:100%;border-collapse:collapse;table-layout:fixed}
+table{width:100%;border-collapse:collapse;table-layout:auto;min-width:540px}
 th{
   text-align:left;font-family:DM Mono,monospace;font-size:9.5px;
   font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.12em;
@@ -280,7 +285,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .modal-row input:focus,.modal-row select:focus{border-color:var(--gold)}
 
 /* ── TWO-COL ──────────────────────────────── */
-.two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.two-col{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px}
 .two-col .card{margin-bottom:0}
 
 /* ── PLAN GRID ────────────────────────────── */
@@ -341,6 +346,195 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .bc-subj{font-weight:600;font-size:13px;margin-bottom:3px}
 .bc-meta{font-size:11.5px;color:var(--text3)}
 
+
+/* ── Professional polish ────────────────────────────────────── */
+
+/* Stat cards */
+.stat-card{
+  background:var(--ink2);border:1px solid var(--border);border-radius:14px;
+  padding:18px 20px;position:relative;overflow:hidden;
+  transition:border-color var(--transition),transform var(--transition);
+}
+.stat-card:hover{border-color:var(--border2);transform:translateY(-1px)}
+.stat-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--gold),transparent);
+  opacity:0;transition:opacity var(--transition);
+}
+.stat-card:hover::before{opacity:1}
+.stat-label{font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);margin-bottom:8px}
+.stat-val{font-family:Syne,sans-serif;font-size:28px;font-weight:800;letter-spacing:-1px;color:var(--text)}
+.stat-sub{font-size:11px;color:var(--text3);margin-top:4px}
+
+/* Card improvements */
+.card{
+  background:var(--ink2);border:1px solid var(--border);
+  border-radius:14px;overflow:hidden;
+  transition:border-color var(--transition);
+}
+.card:hover{border-color:var(--border2)}
+.card-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;border-bottom:1px solid var(--border);
+  background:rgba(255,255,255,0.02);
+}
+.card-title{font-size:13px;font-weight:700;letter-spacing:-.2px}
+
+/* Sidebar improvements */
+.sb-logo{
+  padding:18px 20px 14px;
+  border-bottom:1px solid var(--border);
+  font-family:Syne,sans-serif;font-size:16px;font-weight:800;letter-spacing:-0.5px;
+}
+.sb-logo em{font-style:normal;color:var(--gold)}
+.sb-section{
+  font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--text3);padding:14px 20px 6px;
+}
+.nb{
+  width:100%;display:flex;align-items:center;gap:10px;
+  padding:8px 20px;border:none;background:none;cursor:pointer;
+  color:var(--text2);font-size:13px;font-weight:500;text-align:left;
+  border-left:2px solid transparent;
+  transition:all var(--transition);
+}
+.nb:hover{background:rgba(255,255,255,0.04);color:var(--text)}
+.nb.active,.nb:focus-visible{
+  background:rgba(201,168,76,0.08);color:var(--gold);
+  border-left-color:var(--gold);
+}
+.nb-icon{width:16px;height:16px;flex-shrink:0;opacity:.7}
+
+/* Table improvements */
+th{
+  text-align:left;font-size:10.5px;font-weight:700;
+  letter-spacing:.07em;text-transform:uppercase;
+  color:var(--text3);padding:10px 14px;
+  background:rgba(255,255,255,0.02);
+  border-bottom:1px solid var(--border);white-space:nowrap;
+}
+td{
+  padding:12px 14px;font-size:13px;border-bottom:1px solid var(--border);
+  color:var(--text2);vertical-align:middle;
+}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,0.02)}
+
+/* Button improvements */
+.btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:8px 14px;border-radius:9px;font-size:13px;font-weight:600;
+  cursor:pointer;transition:all var(--transition);border:1px solid transparent;
+  font-family:inherit;white-space:nowrap;
+}
+.btn-gold{background:linear-gradient(135deg,var(--gold),#b8952a);color:#000;border-color:transparent}
+.btn-gold:hover{filter:brightness(1.1);transform:translateY(-1px)}
+.btn-teal{background:rgba(45,212,191,0.15);color:var(--teal);border-color:rgba(45,212,191,0.25)}
+.btn-teal:hover{background:rgba(45,212,191,0.22)}
+.btn-ghost{background:rgba(255,255,255,0.06);color:var(--text2);border-color:var(--border2)}
+.btn-ghost:hover{background:rgba(255,255,255,0.1);color:var(--text)}
+.btn-rose{background:rgba(248,113,113,0.12);color:var(--rose);border-color:rgba(248,113,113,0.2)}
+.btn-xs{padding:5px 9px;font-size:11px;border-radius:7px}
+.btn-sm{padding:7px 12px;font-size:12px;border-radius:8px}
+
+/* Alert improvements */
+.alert{
+  border-radius:10px;padding:12px 16px;margin-bottom:16px;
+  font-size:13px;display:none;align-items:center;gap:10px;
+  border:1px solid transparent;
+}
+.alert.on{display:flex}
+.alert.success{background:rgba(45,212,191,0.1);color:var(--teal);border-color:rgba(45,212,191,0.2)}
+.alert.error{background:rgba(248,113,113,0.1);color:var(--rose);border-color:rgba(248,113,113,0.2)}
+
+/* Page header */
+.ph{padding:24px 32px 16px}
+.ph-title{font-family:Syne,sans-serif;font-size:24px;font-weight:800;letter-spacing:-0.8px}
+.ph-sub{font-size:13px;color:var(--text3);margin-top:4px}
+
+/* Badge */
+.badge-plan{
+  display:inline-block;font-size:10px;font-weight:700;letter-spacing:.05em;
+  text-transform:uppercase;padding:2px 8px;border-radius:100px;
+}
+.badge-free{background:rgba(255,255,255,0.07);color:var(--text3)}
+.badge-starter{background:rgba(45,212,191,0.12);color:var(--teal)}
+.badge-pro{background:rgba(167,139,250,0.12);color:var(--violet)}
+.badge-studio{background:rgba(201,168,76,0.12);color:var(--gold)}
+
+/* Input focus ring */
+input:focus,select:focus,textarea:focus{
+  outline:none;border-color:var(--gold) !important;
+  box-shadow:0 0 0 3px rgba(201,168,76,0.1);
+}
+
+/* Loading skeleton */
+.skeleton{
+  background:linear-gradient(90deg,var(--ink3) 25%,var(--ink2) 50%,var(--ink3) 75%);
+  background-size:200% 100%;animation:shimmer 1.5s infinite;
+  border-radius:6px;
+}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ── Mobile topbar ─────────────────────────────────────────── */
+.mobile-topbar{
+  display:none;align-items:center;gap:12px;
+  padding:12px 16px;background:var(--ink2);
+  border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:50;
+}
+.mobile-topbar .logo-text{font-size:15px}
+.hamburger{
+  background:none;border:none;cursor:pointer;
+  color:var(--text2);padding:6px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  transition:background var(--transition);
+}
+.hamburger:hover{background:var(--ink3)}
+.hamburger svg{width:20px;height:20px}
+
+/* Table scroll wrapper */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px}
+
+/* Card actions responsive */
+.card-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+
+/* ── Responsive breakpoints ─────────────────────────────────── */
+@media(max-width:900px){
+  .two-col{grid-template-columns:1fr}
+  .stat-row{grid-template-columns:repeat(2,1fr)}
+}
+
+@media(max-width:768px){
+    #sb-close-btn{display:flex !important}
+  .sb{transform:translateX(-100%)}
+  .sb.open{transform:translateX(0)}
+  .sb-overlay.open{display:block}
+  .main{margin-left:0;padding:0}
+  .pg{padding:16px}
+  .mobile-topbar{display:flex}
+  .ph{padding:16px 16px 8px}
+  .ph-title{font-size:20px}
+  .stat-row{grid-template-columns:repeat(2,1fr);gap:8px}
+  .two-col{grid-template-columns:1fr;gap:12px}
+  .card-hdr{flex-wrap:wrap;gap:8px}
+  .btn{font-size:12px;padding:7px 12px}
+  .btn-sm{font-size:11px;padding:5px 9px}
+  .nb{padding:7px 14px}
+  .nb-label{font-size:12px}
+  .alert{margin:0 16px 12px}
+  .user-row{grid-template-columns:1fr}
+  /* Hide less important table columns on mobile */
+  .hide-mobile{display:none}
+}
+
+@media(max-width:480px){
+  .stat-row{grid-template-columns:1fr 1fr}
+  .login-title{font-size:26px}
+  .login-card{padding:0 4px}
+  .modal-inner{margin:12px;padding:20px 16px}
+  .bc-item{padding:10px 12px}
+}
 </style>
 </head>
 <body>
@@ -418,7 +612,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <!-- SIDEBAR -->
   <aside class="sb">
     <div class="sb-brand">
-      <div class="sb-logo">Scene<em>Forge</em></div>
+      <div class="sb-logo" style="display:flex;align-items:center;justify-content:space-between">Scene<em>Forge</em></div>
       <div class="sb-tag">Command Center</div>
     </div>
 
@@ -504,6 +698,16 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 
   <!-- MAIN CONTENT -->
   <main class="main">
+  <!-- Mobile topbar -->
+  <div class="mobile-topbar" id="mobile-topbar">
+    <button class="hamburger" onclick="toggleSidebar()" aria-label="Open menu">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M2 5h16M2 10h16M2 15h16"/>
+      </svg>
+    </button>
+    <div class="logo-text">Scene<em>Forge</em> <span style="font-size:10px;color:var(--text3);font-family:DM Mono,monospace">Admin</span></div>
+    <div id="mobile-role-badge" style="margin-left:auto;font-size:10px;color:var(--gold);background:rgba(201,168,76,0.1);border:1px solid rgba(201,168,76,0.2);border-radius:20px;padding:3px 10px"></div>
+  </div>
 
     <!-- DASHBOARD -->
     <div class="pg on" id="pg-dashboard">
@@ -764,7 +968,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
             <span class="card-title">Sent broadcasts</span>
             <button class="btn btn-ghost btn-sm" onclick="loadBroadcasts()">Refresh</button>
           </div>
-          <div id="broadcast-history" style="flex:1;overflow-y:auto"></div>
+          <div class="tbl-wrap"><div id="broadcast-history" style="flex:1;overflow-y:auto"></div>
         </div>
       </div>
 
@@ -1403,6 +1607,24 @@ function openBcDetail(idx){
   var modal=document.getElementById('bc-detail-modal');
   modal.style.display='flex';
 }
+function toggleSidebar(){
+  var sb=document.getElementById('sidebar');
+  var ov=document.getElementById('sb-overlay');
+  sb.classList.toggle('open');
+  ov.classList.toggle('open');
+  document.body.style.overflow=sb.classList.contains('open')?'hidden':'';
+}
+
+function closeSidebarOnMobile(){
+  if(window.innerWidth<=768) toggleSidebar();
+}
+
+// Update mobile role badge when logged in
+function updateMobileRole(){
+  var badge=document.getElementById('mobile-role-badge');
+  if(badge&&ROLE) badge.textContent=ROLE.toUpperCase();
+}
+
 function closeBcDetail(){document.getElementById('bc-detail-modal').style.display='none';}
 function bcReuseTemplate(){
   if(!BC_DETAIL)return;
