@@ -70,6 +70,16 @@ const POSTS_META: Omit<Post, 'content'>[] = [
     author: 'sceneforge-team',
   },
   {
+    slug: 'how-to-create-a-video-with-sceneforge-step-by-step',
+    title: 'How to Create a Video with SceneForge: A Complete Step-by-Step Guide (2026)',
+    description: 'A complete visual walkthrough of SceneForge — from project setup to downloading your finished video. Every step shown with screenshots.',
+    date: '2026-01-20',
+    category: 'tutorials',
+    tags: ['tutorial', 'how to', 'sceneforge', 'step by step', '2026'],
+    readTime: 12,
+    author: 'daniel-osei',
+  },
+  {
     slug: 'ai-video-creation-future-2026',
     title: 'The Future of AI Video Creation in 2026: What Every Creator Needs to Know',
     description: 'AI video generation has changed everything for content creators in 2026. Here is what is working right now, what is coming next, and how to stay ahead.',
