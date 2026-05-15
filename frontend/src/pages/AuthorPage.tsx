@@ -18,7 +18,7 @@ export const AUTHORS: Record<string, {
     initials: 'DO',
     color: '#7C5CFF',
     twitter: 'danielosei',
-    posts: ['ai-video-creation-future-2026', 'how-to-create-viral-tiktok-videos-with-ai', 'ai-video-tools-comparison-2025'],
+    posts: ['ai-video-creation-future-2026', 'how-to-create-viral-tiktok-videos-with-ai', 'ai-video-tools-comparison-2026'],
   },
   'amara-diallo': {
     name: 'Amara Diallo',
@@ -28,7 +28,7 @@ export const AUTHORS: Record<string, {
     initials: 'AD',
     color: '#2DD4BF',
     twitter: 'amaradiallo',
-    posts: ['tiktok-content-strategy-guide-2026', 'best-niches-for-content-creators-2025', 'youtube-shorts-algorithm-guide', 'content-creator-monetisation-guide'],
+    posts: ['tiktok-content-strategy-guide-2026', 'best-niches-for-content-creators-2026', 'youtube-shorts-algorithm-guide', 'content-creator-monetisation-guide'],
   },
   'sceneforge-team': {
     name: 'SceneForge Team',
@@ -42,11 +42,11 @@ export const AUTHORS: Record<string, {
 }
 
 const ALL_POSTS_META: Record<string, { title: string; date: string; category: string; readTime: number }> = {
-  'how-to-create-viral-tiktok-videos-with-ai':     { title: 'How to Create Viral TikTok Videos with AI in Under 60 Seconds', date: '2025-05-01', category: 'tutorials', readTime: 6 },
-  'best-niches-for-content-creators-2025':          { title: 'The 7 Best Content Niches for Creators in 2025', date: '2025-05-05', category: 'strategy', readTime: 8 },
-  'ai-video-tools-comparison-2025':                 { title: 'AI Video Creation Tools Compared: Which One is Right for You?', date: '2025-05-08', category: 'strategy', readTime: 7 },
-  'youtube-shorts-algorithm-guide':                 { title: 'The YouTube Shorts Algorithm in 2026: What Actually Drives Views', date: '2025-05-12', category: 'strategy', readTime: 7 },
-  'content-creator-monetisation-guide':             { title: 'How Content Creators Monetise: 7 Revenue Streams That Work', date: '2025-05-15', category: 'strategy', readTime: 9 },
+  'how-to-create-viral-tiktok-videos-with-ai':     { title: 'How to Create Viral TikTok Videos with AI in Under 60 Seconds', date: '2026-05-01', category: 'tutorials', readTime: 6 },
+  'best-niches-for-content-creators-2026':          { title: 'The 7 Best Content Niches for Creators in 2026', date: '2026-05-05', category: 'strategy', readTime: 8 },
+  'ai-video-tools-comparison-2026':                 { title: 'AI Video Creation Tools Compared: Which One is Right for You?', date: '2026-05-08', category: 'strategy', readTime: 7 },
+  'youtube-shorts-algorithm-guide':                 { title: 'The YouTube Shorts Algorithm in 2026: What Actually Drives Views', date: '2026-05-12', category: 'strategy', readTime: 7 },
+  'content-creator-monetisation-guide':             { title: 'How Content Creators Monetise: 7 Revenue Streams That Work', date: '2026-05-15', category: 'strategy', readTime: 9 },
   'how-to-make-money-as-content-creator-with-ai':   { title: 'How to Make Money as a Content Creator Using AI Video Tools', date: '2026-01-05', category: 'strategy', readTime: 10 },
   'ai-video-creation-future-2026':                  { title: 'The Future of AI Video Creation in 2026', date: '2026-01-08', category: 'tutorials', readTime: 8 },
   'tiktok-content-strategy-guide-2026':             { title: 'The Complete TikTok Content Strategy Guide for 2026', date: '2026-01-15', category: 'strategy', readTime: 9 },
@@ -127,7 +127,7 @@ export default function AuthorPage({ authorSlug }: { authorSlug: string }) {
             <a
               key={post.slug}
               href={`/blog/${post.slug}`}
-              onClick={e => { e.preventDefault(); window.history.pushState({}, '', `/blog/${post.slug}`) }}
+              onClick={e => { e.preventDefault(); window.history.pushState({}, '', `/blog/${post.slug}`); window.scrollTo({ top: 0, behavior: 'instant' }) }}
               style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '16px 20px', textDecoration: 'none', display: 'flex', gap: 16, alignItems: 'center', transition: 'border-color .15s' }}
               onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(167,139,250,0.3)')}
               onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)')}
