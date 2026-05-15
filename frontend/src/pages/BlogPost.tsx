@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import BlogThumbnail from '../components/BlogThumbnail'
 import { AUTHORS } from '../pages/AuthorPage'
+import { STEP_IMAGES } from '../components/StepImages'
 
 interface PostMeta {
   slug: string
@@ -11,6 +12,7 @@ interface PostMeta {
   tags: string[]
   readTime: number
   author?: string
+  hasStepImages?: boolean
 }
 
 const ALL_META: PostMeta[] = [
@@ -20,6 +22,7 @@ const ALL_META: PostMeta[] = [
   { slug:'youtube-shorts-algorithm-guide', title:'The YouTube Shorts Algorithm in 2026: What Actually Drives Views', description:'A practical guide to the YouTube Shorts algorithm — what signals matter, what to optimise, and how to get recommended to new viewers.', date:'2026-05-12', category:'strategy', tags:['youtube shorts','algorithm','views','growth'], readTime:7 },
   { slug:'content-creator-monetisation-guide', title:'How Content Creators Monetise in 2026: 7 Revenue Streams That Work', description:'A practical guide to the revenue streams that actually work for content creators — platform income, digital products, affiliate marketing, and more.', date:'2026-05-15', category:'strategy', tags:['monetisation','content creator','income','digital products'], readTime:9 },
   { slug:'how-to-make-money-as-content-creator-with-ai', title:'How to Make Money as a Content Creator Using AI Video Tools in 2026', description:'A complete guide to monetising your content creator journey using AI video tools.', date:'2026-01-05', category:'strategy', tags:['monetisation','ai video','content creator'], readTime:10, author:'sceneforge-team' },
+  { slug:'how-to-create-a-video-with-sceneforge-step-by-step', title:'How to Create a Video with SceneForge: A Complete Step-by-Step Guide (2026)', description:'A complete visual walkthrough of SceneForge — every step shown with screenshots.', date:'2026-01-20', category:'tutorials', tags:['tutorial','how to','sceneforge','step by step'], readTime:12, author:'daniel-osei', hasStepImages:true },
   { slug:'ai-video-creation-future-2026', title:'The Future of AI Video Creation in 2026: What Every Creator Needs to Know', description:'AI video generation has changed everything for content creators in 2026.', date:'2026-01-08', category:'tutorials', tags:['ai video','content creation','2026'], readTime:8, author:'daniel-osei' },
   { slug:'tiktok-content-strategy-guide-2026', title:'The Complete TikTok Content Strategy Guide for 2026', description:'Everything you need to build a TikTok audience in 2026.', date:'2026-01-15', category:'strategy', tags:['tiktok','content strategy','2026'], readTime:9, author:'amara-diallo' },
 ]
@@ -149,10 +152,33 @@ export default function BlogPost({ slug }: { slug: string }) {
         {loading ? (
           <div style={{ color: 'rgba(255,255,255,0.3)', padding: '60px 0', textAlign: 'center' }}>Loading...</div>
         ) : (
-          <div
-            style={{ fontSize: 16, lineHeight: 1.8, color: 'rgba(255,255,255,0.72)' }}
-            dangerouslySetInnerHTML={{ __html: `<p style="font-size:16px;line-height:1.8;color:rgba(255,255,255,0.72);margin:0 0 20px">${renderMarkdown(content)}</p>` }}
-          />
+          {meta.hasStepImages ? (
+            // For step-by-step posts: split on ::step-image:: markers and render components inline
+            <div style={{ fontSize: 16, lineHeight: 1.8, color: 'rgba(255,255,255,0.72)' }}>
+              {content.replace(/^---[\s\S]+?---\n/, '').split(/^::step-image::(.+)$/m).map((part, i) => {
+                if (i % 2 === 0) {
+                  return part.trim() ? (
+                    <div key={i} dangerouslySetInnerHTML={{ __html: `<p style="font-size:16px;line-height:1.8;color:rgba(255,255,255,0.72);margin:0 0 20px">${renderMarkdown(part)}</p>` }} />
+                  ) : null
+                }
+                const key = part.trim()
+                const Comp = STEP_IMAGES[key]
+                return Comp ? (
+                  <div key={i} style={{ margin: '24px 0' }}>
+                    <Comp />
+                    <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginTop: 8, fontStyle: 'italic' }}>
+                      SceneForge — {key.replace('step', 'Step ').replace('-', ': ').replace(/-/g,' ')}
+                    </p>
+                  </div>
+                ) : null
+              })}
+            </div>
+          ) : (
+            <div
+              style={{ fontSize: 16, lineHeight: 1.8, color: 'rgba(255,255,255,0.72)' }}
+              dangerouslySetInnerHTML={{ __html: `<p style="font-size:16px;line-height:1.8;color:rgba(255,255,255,0.72);margin:0 0 20px">${renderMarkdown(content)}</p>` }}
+            />
+          )}
         )}
 
         {/* Tags */}
