@@ -135,7 +135,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
             }}>
               <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: '50%', background: '#A78BFA', display: 'inline-block' }} />
               <span style={{ fontSize: 12, fontWeight: 600, color: '#C4B5FD', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                AI Video Studio
+                AI Powered Video Studio
               </span>
             </div>
             <h1 id="hero-heading" style={{
