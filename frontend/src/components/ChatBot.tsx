@@ -160,7 +160,13 @@ export default function ChatBot() {
   }, [open])
 
   useEffect(() => {
-    if (open) { setUnread(0); setTimeout(() => inputRef.current?.focus(), 100) }
+    if (open) {
+      setUnread(0)
+      setTimeout(() => {
+        inputRef.current?.focus()
+        bottomRef.current?.scrollIntoView({ behavior: 'instant' })
+      }, 50)
+    }
   }, [open])
 
   useEffect(() => {
