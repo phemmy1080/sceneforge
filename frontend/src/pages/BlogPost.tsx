@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import BlogThumbnail from '../components/BlogThumbnail'
+import { AUTHORS } from '../pages/AuthorPage'
 
 interface PostMeta {
   slug: string
@@ -8,6 +10,7 @@ interface PostMeta {
   category: string
   tags: string[]
   readTime: number
+  author?: string
 }
 
 const ALL_META: PostMeta[] = [
@@ -16,6 +19,9 @@ const ALL_META: PostMeta[] = [
   { slug:'ai-video-tools-comparison-2026', title:'AI Video Creation Tools Compared: Which One is Right for You in 2026?', description:'An honest comparison of the top AI video creation tools in 2026 — features, pricing, and which works best for short-form content creators.', date:'2026-05-08', category:'strategy', tags:['ai tools','comparison','video creation','review'], readTime:7 },
   { slug:'youtube-shorts-algorithm-guide', title:'The YouTube Shorts Algorithm in 2026: What Actually Drives Views', description:'A practical guide to the YouTube Shorts algorithm — what signals matter, what to optimise, and how to get recommended to new viewers.', date:'2026-05-12', category:'strategy', tags:['youtube shorts','algorithm','views','growth'], readTime:7 },
   { slug:'content-creator-monetisation-guide', title:'How Content Creators Monetise in 2026: 7 Revenue Streams That Work', description:'A practical guide to the revenue streams that actually work for content creators — platform income, digital products, affiliate marketing, and more.', date:'2026-05-15', category:'strategy', tags:['monetisation','content creator','income','digital products'], readTime:9 },
+  { slug:'how-to-make-money-as-content-creator-with-ai', title:'How to Make Money as a Content Creator Using AI Video Tools in 2026', description:'A complete guide to monetising your content creator journey using AI video tools.', date:'2026-01-05', category:'strategy', tags:['monetisation','ai video','content creator'], readTime:10, author:'sceneforge-team' },
+  { slug:'ai-video-creation-future-2026', title:'The Future of AI Video Creation in 2026: What Every Creator Needs to Know', description:'AI video generation has changed everything for content creators in 2026.', date:'2026-01-08', category:'tutorials', tags:['ai video','content creation','2026'], readTime:8, author:'daniel-osei' },
+  { slug:'tiktok-content-strategy-guide-2026', title:'The Complete TikTok Content Strategy Guide for 2026', description:'Everything you need to build a TikTok audience in 2026.', date:'2026-01-15', category:'strategy', tags:['tiktok','content strategy','2026'], readTime:9, author:'amara-diallo' },
 ]
 
 function formatDate(d: string) {
@@ -112,6 +118,28 @@ export default function BlogPost({ slug }: { slug: string }) {
           <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>{formatDate(meta.date)}</span>
           <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginLeft: 'auto' }}>{meta.readTime} min read</span>
         </div>
+
+        {/* Hero thumbnail */}
+        <div style={{ marginBottom: 28 }}>
+          <BlogThumbnail slug={slug} title={meta.title} category={meta.category} size="hero" />
+        </div>
+
+        {/* Author byline */}
+        {meta.author && AUTHORS[meta.author] && (
+          <a
+            href={`/blog/author/${meta.author}`}
+            onClick={e => { e.preventDefault(); window.history.pushState({}, '', `/blog/author/${meta.author}`) }}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28, textDecoration: 'none' }}
+          >
+            <div style={{ width: 38, height: 38, borderRadius: '50%', background: `${AUTHORS[meta.author].color}25`, border: `1.5px solid ${AUTHORS[meta.author].color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: AUTHORS[meta.author].color, flexShrink: 0 }}>
+              {AUTHORS[meta.author].initials}
+            </div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#F0F0FF' }}>{AUTHORS[meta.author].name}</div>
+              <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.4)' }}>{AUTHORS[meta.author].role} · {new Date(meta.date).getFullYear()}</div>
+            </div>
+          </a>
+        )}
 
         {/* Content */}
         {loading ? (
