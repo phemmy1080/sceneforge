@@ -152,6 +152,7 @@ export default function BlogPost({ slug }: { slug: string }) {
         {loading ? (
           <div style={{ color: 'rgba(255,255,255,0.3)', padding: '60px 0', textAlign: 'center' }}>Loading...</div>
         ) : (
+          <>
           {meta.hasStepImages ? (
             // For step-by-step posts: split on ::step-image:: markers and render components inline
             <div style={{ fontSize: 16, lineHeight: 1.8, color: 'rgba(255,255,255,0.72)' }}>
@@ -179,6 +180,7 @@ export default function BlogPost({ slug }: { slug: string }) {
               dangerouslySetInnerHTML={{ __html: `<p style="font-size:16px;line-height:1.8;color:rgba(255,255,255,0.72);margin:0 0 20px">${renderMarkdown(content)}</p>` }}
             />
           )}
+          </>
         )}
 
         {/* Tags */}
