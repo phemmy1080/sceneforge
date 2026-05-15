@@ -1,2063 +1,393 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SceneForge — Command Center</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<style>
-:root {
-  --ink: #0a0a0f;
-  --ink2: #111118;
-  --ink3: #1a1a24;
-  --border: rgba(255,255,255,0.06);
-  --border2: rgba(255,255,255,0.1);
-  --gold: #c9a84c;
-  --gold2: #e8c97a;
-  --gold-dim: rgba(201,168,76,0.15);
-  --teal: #2dd4bf;
-  --rose: #f87171;
-  --violet: #a78bfa;
-  --text: #f0f0f8;
-  --text2: rgba(240,240,248,0.6);
-  --text3: rgba(240,240,248,0.35);
-  --sb: 64px;
-  --transition: 200ms cubic-bezier(0.4,0,0.2,1);
-}
-*{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
-body{font-family:'Instrument Sans',sans-serif;background:var(--ink);color:var(--text);min-height:100vh;overflow-x:hidden}
-input,select,textarea,button{font-family:'Instrument Sans',sans-serif}
-::selection{background:var(--gold-dim);color:var(--gold2)}
+import React, { useEffect, useRef, useState } from 'react'
 
-/* Scrollbar */
-::-webkit-scrollbar{width:4px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
-
-/* ── LOGIN ────────────────────────────────── */
-#login-screen {
-  min-height:100vh;display:flex;flex-direction:column;
-  background:var(--ink);
-}
-.login-nav {
-  padding:20px 36px;display:flex;align-items:center;justify-content:space-between;
-  border-bottom:1px solid var(--border);
-}
-.logo-text{font-family:Syne,sans-serif;font-weight:800;font-size:18px;letter-spacing:-0.5px}
-.logo-text em{font-style:normal;color:var(--gold)}
-.nav-tag{font-family:DM Mono,monospace;font-size:10px;letter-spacing:.15em;color:var(--text3);text-transform:uppercase;border:1px solid var(--border2);padding:3px 10px;border-radius:20px}
-.login-body{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 20px;position:relative}
-.login-body::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 50% at 50% 40%, rgba(201,168,76,0.04) 0%, transparent 70%)}
-.login-card{width:100%;max-width:420px;position:relative;z-index:1}
-.login-eyebrow{font-family:DM Mono,monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin-bottom:12px;display:flex;align-items:center;gap:8px}
-.login-eyebrow::before{content:'';width:20px;height:1px;background:var(--gold)}
-.login-title{font-family:Syne,sans-serif;font-size:36px;font-weight:800;letter-spacing:-1.5px;line-height:1.05;margin-bottom:8px}
-.login-sub{font-size:14px;color:var(--text3);margin-bottom:36px;line-height:1.6}
-.inp-wrap{margin-bottom:16px}
-.inp-wrap label{display:block;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px}
-.inp-field{position:relative}
-.inp-field input{
-  width:100%;background:var(--ink2);border:1px solid var(--border2);border-radius:10px;
-  color:var(--text);font-size:14px;padding:13px 16px;outline:none;transition:border-color var(--transition),box-shadow var(--transition);
-  font-family:'Instrument Sans',sans-serif;
-}
-.inp-field input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,168,76,0.1)}
-.inp-field .show-btn{position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;font-family:DM Mono,monospace;letter-spacing:.05em;transition:color var(--transition)}
-.inp-field .show-btn:hover{color:var(--text2)}
-#login-error{background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--rose);margin-bottom:16px;display:none}
-#login-error.on{display:block}
-.login-btn{
-  width:100%;background:var(--gold);color:var(--ink);border:none;border-radius:10px;
-  padding:14px;font-size:14px;font-weight:700;cursor:pointer;
-  font-family:Syne,sans-serif;letter-spacing:.02em;
-  transition:all var(--transition);margin-top:4px;
-  display:flex;align-items:center;justify-content:center;gap:8px;
-}
-.login-btn:hover{background:var(--gold2);transform:translateY(-1px);box-shadow:0 8px 24px rgba(201,168,76,0.2)}
-.login-btn svg{transition:transform var(--transition)}
-.login-btn:hover svg{transform:translateX(3px)}
-.login-divider{display:flex;align-items:center;gap:12px;margin-top:28px}
-.login-divider span{font-size:11px;color:var(--text3);white-space:nowrap}
-.login-divider::before,.login-divider::after{content:'';flex:1;height:1px;background:var(--border2)}
-.back-link{
-  display:inline-flex;align-items:center;gap:6px;text-decoration:none;
-  color:var(--text3);font-size:12px;transition:color var(--transition);margin-top:20px;
-}
-.back-link:hover{color:var(--text2)}
-
-/* ── RESET OVERLAY ────────────────────────── */
-#reset-overlay{
-  display:none;position:fixed;inset:0;background:rgba(10,10,15,0.92);
-  backdrop-filter:blur(12px);z-index:9999;align-items:center;justify-content:center;
-}
-#reset-overlay.on{display:flex}
-.reset-card{
-  width:100%;max-width:420px;background:var(--ink2);
-  border:1px solid var(--border2);border-radius:20px;overflow:hidden;
-}
-.reset-head{
-  background:linear-gradient(135deg,#1f1500,#0a1020);
-  padding:28px 32px;border-bottom:1px solid var(--border);
-}
-.reset-body{padding:28px 32px}
-#reset-error{background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--rose);margin-bottom:14px;display:none}
-#reset-error.on{display:block}
-.strength-track{height:3px;background:rgba(255,255,255,0.07);border-radius:2px;margin-top:6px;margin-bottom:2px;overflow:hidden}
-.strength-fill{height:100%;border-radius:2px;transition:all .4s}
-
-/* ── SHELL ────────────────────────────────── */
-#admin-shell{display:none;min-height:100vh}
-#admin-shell.on{display:flex}
-
-/* ── SIDEBAR ──────────────────────────────── */
-.sb{
-  width:220px;flex-shrink:0;background:var(--ink2);
-  border-right:1px solid var(--border);
-  display:flex;flex-direction:column;
-  position:fixed;top:0;bottom:0;left:0;
-  overflow-y:auto;z-index:200;
-  transition:transform var(--transition);
-}
-.sb-overlay{
-  display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);
-  z-index:199;backdrop-filter:blur(4px);
-}
-.sb-brand{
-  padding:22px 20px 16px;
-  border-bottom:1px solid var(--border);
-}
-.sb-logo{font-family:Syne,sans-serif;font-weight:800;font-size:16px;letter-spacing:-0.5px;margin-bottom:4px}
-.sb-logo em{font-style:normal;color:var(--gold)}
-.sb-tag{font-family:DM Mono,monospace;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--rose);background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.2);padding:2px 7px;border-radius:4px;display:inline-block}
-.sb-section{
-  font-family:DM Mono,monospace;font-size:9px;letter-spacing:.18em;text-transform:uppercase;
-  color:var(--text3);padding:18px 20px 6px;
-}
-.nb{
-  width:100%;display:flex;align-items:center;gap:10px;
-  padding:8px 20px;border:none;background:none;
-  color:var(--text3);font-size:12.5px;cursor:pointer;text-align:left;
-  transition:all var(--transition);font-family:'Instrument Sans',sans-serif;
-  font-weight:500;border-left:2px solid transparent;position:relative;
-}
-.nb:hover{color:var(--text);background:rgba(255,255,255,0.03)}
-.nb.on{color:var(--gold);background:var(--gold-dim);border-left-color:var(--gold)}
-.nb .nb-icon{width:15px;height:15px;flex-shrink:0;opacity:.6;transition:opacity var(--transition)}
-.nb:hover .nb-icon,.nb.on .nb-icon{opacity:1}
-.nb-badge{
-  margin-left:auto;font-family:DM Mono,monospace;font-size:9px;
-  background:rgba(201,168,76,0.15);color:var(--gold);padding:2px 6px;border-radius:4px;
-}
-.sb-footer{
-  margin-top:auto;border-top:1px solid var(--border);padding:14px;
-}
-.user-pill{
-  display:flex;align-items:center;gap:10px;padding:10px 6px;margin-bottom:8px;
-}
-.user-av{
-  width:32px;height:32px;border-radius:50%;
-  background:linear-gradient(135deg,#7c3aed,#0891b2);
-  display:flex;align-items:center;justify-content:center;
-  font-family:Syne,sans-serif;font-size:12px;font-weight:700;color:#fff;
-  flex-shrink:0;
-}
-.user-info{min-width:0;flex:1}
-.user-name{font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.user-role{font-size:10.5px;color:var(--text3);margin-top:1px}
-.logout-btn{
-  width:100%;display:flex;align-items:center;justify-content:center;gap:7px;
-  padding:8px;background:rgba(248,113,113,0.07);border:1px solid rgba(248,113,113,0.15);
-  border-radius:8px;color:rgba(248,113,113,0.7);font-size:11.5px;font-weight:600;
-  cursor:pointer;font-family:'Instrument Sans',sans-serif;transition:all var(--transition);
-}
-.logout-btn:hover{background:rgba(248,113,113,0.14);color:var(--rose);border-color:rgba(248,113,113,0.3)}
-
-/* ── MAIN ─────────────────────────────────── */
-.main{margin-left:220px;flex:1;min-height:100vh;padding:28px 32px;transition:margin var(--transition)}
-
-/* ── PAGE HEADER ──────────────────────────── */
-.ph{margin-bottom:28px}
-.ph-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px}
-.ph-title{font-family:Syne,sans-serif;font-size:26px;font-weight:800;letter-spacing:-1px}
-.ph-sub{font-size:13px;color:var(--text3)}
-.ph-actions{display:flex;gap:8px}
-
-/* ── PAGE SHOW/HIDE ───────────────────────── */
-.pg{display:none;animation:fadeUp .25s ease}
-.pg.on{display:block}
-@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-
-/* ── STAT CARDS ───────────────────────────── */
-.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
-.stat{
-  background:var(--ink2);border:1px solid var(--border);border-radius:14px;
-  padding:20px;position:relative;overflow:hidden;transition:border-color var(--transition);
-}
-.stat:hover{border-color:var(--border2)}
-.stat::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent,var(--gold)),transparent);opacity:.5}
-.stat.gold{--accent:var(--gold)}
-.stat.teal{--accent:var(--teal)}
-.stat.rose{--accent:var(--rose)}
-.stat.violet{--accent:var(--violet)}
-.stat-label{font-family:DM Mono,monospace;font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--text3);margin-bottom:10px}
-.stat-val{font-family:Syne,sans-serif;font-size:32px;font-weight:800;letter-spacing:-1.5px;line-height:1;margin-bottom:6px}
-.stat.gold .stat-val{color:var(--gold)}
-.stat.teal .stat-val{color:var(--teal)}
-.stat.rose .stat-val{color:var(--rose)}
-.stat.violet .stat-val{color:var(--violet)}
-.stat-meta{font-size:11.5px;color:var(--text3)}
-.stat-icon{position:absolute;bottom:14px;right:16px;opacity:.07;font-size:40px}
-
-/* ── CARDS ────────────────────────────────── */
-.card{background:var(--ink2);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:18px}
-.card-hdr{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:16px 20px;border-bottom:1px solid var(--border);
-}
-.card-title{font-family:Syne,sans-serif;font-size:14px;font-weight:700;letter-spacing:-.3px}
-.card-actions{display:flex;gap:8px;align-items:center}
-
-/* ── TABLE ────────────────────────────────── */
-table{width:100%;border-collapse:collapse;table-layout:auto;min-width:540px}
-th{
-  text-align:left;font-family:DM Mono,monospace;font-size:9.5px;
-  font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.12em;
-  padding:10px 20px;border-bottom:1px solid var(--border);
-}
-td{padding:12px 20px;font-size:12.5px;color:var(--text2);border-bottom:1px solid var(--border);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-tr:last-child td{border-bottom:none}
-tr:hover td{background:rgba(255,255,255,0.02)}
-
-/* ── BADGES ───────────────────────────────── */
-.tag{display:inline-flex;align-items:center;font-family:DM Mono,monospace;font-size:9.5px;font-weight:500;padding:3px 8px;border-radius:5px;letter-spacing:.04em}
-.tag-free{background:rgba(255,255,255,0.06);color:var(--text3)}
-.tag-starter{background:rgba(167,139,250,0.1);color:var(--violet)}
-.tag-pro{background:rgba(201,168,76,0.12);color:var(--gold)}
-.tag-studio{background:rgba(45,212,191,0.1);color:var(--teal)}
-.tag-red{background:rgba(248,113,113,0.1);color:var(--rose)}
-.tag-green{background:rgba(74,222,128,0.1);color:#4ade80}
-
-/* ── BUTTONS ──────────────────────────────── */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;border:none;transition:all var(--transition);font-family:'Instrument Sans',sans-serif;white-space:nowrap}
-.btn-gold{background:var(--gold);color:var(--ink);font-weight:700}.btn-gold:hover{background:var(--gold2)}
-.btn-ghost{background:rgba(255,255,255,0.05);color:var(--text2);border:1px solid var(--border2)}.btn-ghost:hover{background:rgba(255,255,255,0.09);color:var(--text)}
-.btn-danger{background:rgba(248,113,113,0.1);color:var(--rose);border:1px solid rgba(248,113,113,0.2)}.btn-danger:hover{background:rgba(248,113,113,0.18)}
-.btn-teal{background:rgba(45,212,191,0.1);color:var(--teal);border:1px solid rgba(45,212,191,0.2)}.btn-teal:hover{background:rgba(45,212,191,0.18)}
-.btn-sm{padding:5px 12px;font-size:11.5px;border-radius:7px}
-.btn-xs{padding:3px 9px;font-size:11px;border-radius:6px}
-
-/* ── FORMS ────────────────────────────────── */
-.field{margin-bottom:14px}
-.field label{display:block;font-family:DM Mono,monospace;font-size:9.5px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
-.field input,.field select,.field textarea{width:100%;background:var(--ink3);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-size:13px;padding:10px 13px;outline:none;transition:border-color var(--transition),box-shadow var(--transition)}
-.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,168,76,0.08)}
-.field select option{background:var(--ink2)}
-.field textarea{resize:vertical;min-height:90px}
-
-/* ── ALERTS ───────────────────────────────── */
-.alert{padding:11px 16px;border-radius:9px;font-size:13px;margin-bottom:14px;display:none;animation:fadeUp .2s ease}
-.alert.on{display:block}
-.alert-ok{background:rgba(45,212,191,0.08);border:1px solid rgba(45,212,191,0.2);color:var(--teal)}
-.alert-err{background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);color:var(--rose)}
-
-/* ── SEARCH ───────────────────────────────── */
-.search-wrap{display:flex;gap:10px;margin-bottom:16px}
-.search-inp{flex:1;background:var(--ink2);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-size:13px;padding:9px 14px;outline:none;transition:border-color var(--transition)}
-.search-inp:focus{border-color:var(--gold)}
-
-/* ── MODAL ────────────────────────────────── */
-.modal-overlay{position:fixed;inset:0;background:rgba(10,10,15,0.8);backdrop-filter:blur(8px);z-index:500;display:none;align-items:center;justify-content:center}
-.modal-overlay.on{display:flex}
-.modal{background:var(--ink2);border:1px solid var(--border2);border-radius:18px;padding:28px;width:100%;max-width:460px;animation:fadeUp .2s ease}
-.modal-title{font-family:Syne,sans-serif;font-size:16px;font-weight:700;margin-bottom:4px;letter-spacing:-.3px}
-.modal-sub{font-size:12.5px;color:var(--text3);margin-bottom:20px}
-.modal-metas{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
-.modal-meta{background:var(--ink3);border-radius:10px;padding:12px}
-.modal-meta-val{font-family:Syne,sans-serif;font-size:22px;font-weight:800;letter-spacing:-1px;margin-bottom:2px}
-.modal-meta-lbl{font-size:10.5px;color:var(--text3)}
-.modal-row{display:flex;gap:8px;align-items:center;margin-bottom:10px}
-.modal-row input,.modal-row select{flex:1;background:var(--ink3);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:12.5px;padding:8px 12px;outline:none;font-family:'Instrument Sans',sans-serif;transition:border-color var(--transition)}
-.modal-row input:focus,.modal-row select:focus{border-color:var(--gold)}
-
-/* ── TWO-COL ──────────────────────────────── */
-.two-col{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px}
-.two-col .card{margin-bottom:0}
-
-/* ── PLAN GRID ────────────────────────────── */
-.plan-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
-.plan-card{background:var(--ink3);border:1px solid var(--border2);border-radius:12px;padding:16px;transition:border-color var(--transition)}
-.plan-card:hover{border-color:rgba(201,168,76,0.3)}
-
-/* ── LOG ROWS ─────────────────────────────── */
-.log-row{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border);transition:background var(--transition)}
-.log-row:hover{background:rgba(255,255,255,0.02)}
-.log-row:last-child{border-bottom:none}
-.log-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px}
-
-/* ── QUEUE ────────────────────────────────── */
-.queue-row{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border)}
-.queue-row:last-child{border-bottom:none}
-.q-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.q-bar{flex:1;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;max-width:100px}
-.q-fill{height:100%;border-radius:2px}
-
-/* ── NICHE CHIPS ──────────────────────────── */
-.niche-grid{display:flex;flex-wrap:wrap;gap:8px;padding:16px 20px}
-.niche-chip{
-  display:inline-flex;align-items:center;gap:6px;
-  background:var(--ink3);border:1px solid var(--border2);
-  border-radius:8px;padding:7px 12px;font-size:12px;
-  transition:all var(--transition);
-}
-.niche-chip:hover{border-color:rgba(201,168,76,0.3);background:var(--gold-dim)}
-.niche-chip-del{background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0;line-height:1;transition:color var(--transition)}
-.niche-chip-del:hover{color:var(--rose)}
-
-/* ── LOADING ──────────────────────────────── */
-.loading{text-align:center;padding:40px;color:var(--text3);font-size:13px;font-family:DM Mono,monospace}
-.loading::before{content:'...';animation:dots 1.5s infinite}
-@keyframes dots{0%{content:'...'}33%{content:'....'}66%{content:'.....'}100%{content:'...'}}
-
-/* ── BAR CHART ────────────────────────────── */
-.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-.bar-label{font-size:12px;color:var(--text2);min-width:70px}
-.bar-track{flex:1;height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden}
-.bar-fill{height:100%;border-radius:3px;transition:width .6s cubic-bezier(0.4,0,0.2,1)}
-.bar-count{font-family:DM Mono,monospace;font-size:11px;color:var(--text3);min-width:22px;text-align:right}
-
-/* ── EDITOR TOOLBAR ──────────────────────────── */
-.bc-tb-btn{
-  background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);
-  border-radius:5px;color:var(--text2);font-size:12px;padding:3px 8px;
-  cursor:pointer;transition:all var(--transition);min-width:28px;
-  font-family:'Instrument Sans',sans-serif;
-}
-.bc-tb-btn:hover{background:rgba(255,255,255,0.1);color:var(--text);border-color:rgba(255,255,255,0.18)}
-#bc-editor:empty:before{content:attr(data-placeholder);color:var(--text3);pointer-events:none;white-space:pre-wrap}
-
-/* ── BROADCAST HISTORY ────────────────────── */
-.bc-item{padding:14px 20px;border-bottom:1px solid var(--border)}
-.bc-item:last-child{border-bottom:none}
-.bc-subj{font-weight:600;font-size:13px;margin-bottom:3px}
-.bc-meta{font-size:11.5px;color:var(--text3)}
-
-
-/* ── Professional polish ────────────────────────────────────── */
-
-/* Stat cards */
-.stat-card{
-  background:var(--ink2);border:1px solid var(--border);border-radius:14px;
-  padding:18px 20px;position:relative;overflow:hidden;
-  transition:border-color var(--transition),transform var(--transition);
-}
-.stat-card:hover{border-color:var(--border2);transform:translateY(-1px)}
-.stat-card::before{
-  content:'';position:absolute;top:0;left:0;right:0;height:2px;
-  background:linear-gradient(90deg,transparent,var(--gold),transparent);
-  opacity:0;transition:opacity var(--transition);
-}
-.stat-card:hover::before{opacity:1}
-.stat-label{font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);margin-bottom:8px}
-.stat-val{font-family:Syne,sans-serif;font-size:28px;font-weight:800;letter-spacing:-1px;color:var(--text)}
-.stat-sub{font-size:11px;color:var(--text3);margin-top:4px}
-
-/* Card improvements */
-.card{
-  background:var(--ink2);border:1px solid var(--border);
-  border-radius:14px;overflow:hidden;
-  transition:border-color var(--transition);
-}
-.card:hover{border-color:var(--border2)}
-.card-hdr{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:14px 18px;border-bottom:1px solid var(--border);
-  background:rgba(255,255,255,0.02);
-}
-.card-title{font-size:13px;font-weight:700;letter-spacing:-.2px}
-
-/* Sidebar improvements */
-.sb-logo{
-  padding:18px 20px 14px;
-  border-bottom:1px solid var(--border);
-  font-family:Syne,sans-serif;font-size:16px;font-weight:800;letter-spacing:-0.5px;
-}
-.sb-logo em{font-style:normal;color:var(--gold)}
-.sb-section{
-  font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
-  color:var(--text3);padding:14px 20px 6px;
-}
-.nb{
-  width:100%;display:flex;align-items:center;gap:10px;
-  padding:8px 20px;border:none;background:none;cursor:pointer;
-  color:var(--text2);font-size:13px;font-weight:500;text-align:left;
-  border-left:2px solid transparent;
-  transition:all var(--transition);
-}
-.nb:hover{background:rgba(255,255,255,0.04);color:var(--text)}
-.nb.active,.nb:focus-visible{
-  background:rgba(201,168,76,0.08);color:var(--gold);
-  border-left-color:var(--gold);
-}
-.nb-icon{width:16px;height:16px;flex-shrink:0;opacity:.7}
-
-/* Table improvements */
-th{
-  text-align:left;font-size:10.5px;font-weight:700;
-  letter-spacing:.07em;text-transform:uppercase;
-  color:var(--text3);padding:10px 14px;
-  background:rgba(255,255,255,0.02);
-  border-bottom:1px solid var(--border);white-space:nowrap;
-}
-td{
-  padding:12px 14px;font-size:13px;border-bottom:1px solid var(--border);
-  color:var(--text2);vertical-align:middle;
-}
-tr:last-child td{border-bottom:none}
-tr:hover td{background:rgba(255,255,255,0.02)}
-
-/* Button improvements */
-.btn{
-  display:inline-flex;align-items:center;gap:6px;
-  padding:8px 14px;border-radius:9px;font-size:13px;font-weight:600;
-  cursor:pointer;transition:all var(--transition);border:1px solid transparent;
-  font-family:inherit;white-space:nowrap;
-}
-.btn-gold{background:linear-gradient(135deg,var(--gold),#b8952a);color:#000;border-color:transparent}
-.btn-gold:hover{filter:brightness(1.1);transform:translateY(-1px)}
-.btn-teal{background:rgba(45,212,191,0.15);color:var(--teal);border-color:rgba(45,212,191,0.25)}
-.btn-teal:hover{background:rgba(45,212,191,0.22)}
-.btn-ghost{background:rgba(255,255,255,0.06);color:var(--text2);border-color:var(--border2)}
-.btn-ghost:hover{background:rgba(255,255,255,0.1);color:var(--text)}
-.btn-rose{background:rgba(248,113,113,0.12);color:var(--rose);border-color:rgba(248,113,113,0.2)}
-.btn-xs{padding:5px 9px;font-size:11px;border-radius:7px}
-.btn-sm{padding:7px 12px;font-size:12px;border-radius:8px}
-
-/* Alert improvements */
-.alert{
-  border-radius:10px;padding:12px 16px;margin-bottom:16px;
-  font-size:13px;display:none;align-items:center;gap:10px;
-  border:1px solid transparent;
-}
-.alert.on{display:flex}
-.alert.success{background:rgba(45,212,191,0.1);color:var(--teal);border-color:rgba(45,212,191,0.2)}
-.alert.error{background:rgba(248,113,113,0.1);color:var(--rose);border-color:rgba(248,113,113,0.2)}
-
-/* Page header */
-.ph{padding:24px 32px 16px}
-.ph-title{font-family:Syne,sans-serif;font-size:24px;font-weight:800;letter-spacing:-0.8px}
-.ph-sub{font-size:13px;color:var(--text3);margin-top:4px}
-
-/* Badge */
-.badge-plan{
-  display:inline-block;font-size:10px;font-weight:700;letter-spacing:.05em;
-  text-transform:uppercase;padding:2px 8px;border-radius:100px;
-}
-.badge-free{background:rgba(255,255,255,0.07);color:var(--text3)}
-.badge-starter{background:rgba(45,212,191,0.12);color:var(--teal)}
-.badge-pro{background:rgba(167,139,250,0.12);color:var(--violet)}
-.badge-studio{background:rgba(201,168,76,0.12);color:var(--gold)}
-
-/* Input focus ring */
-input:focus,select:focus,textarea:focus{
-  outline:none;border-color:var(--gold) !important;
-  box-shadow:0 0 0 3px rgba(201,168,76,0.1);
+interface LandingProps {
+  onLogin: () => void
+  onSignup: () => void
 }
 
-/* Loading skeleton */
-.skeleton{
-  background:linear-gradient(90deg,var(--ink3) 25%,var(--ink2) 50%,var(--ink3) 75%);
-  background-size:200% 100%;animation:shimmer 1.5s infinite;
-  border-radius:6px;
-}
-@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+const FEATURES = [
+  { icon: '⚡', title: 'AI Script Generation', desc: 'From niche to full voiceover script in seconds. Streamed live as it writes.' },
+  { icon: '🎬', title: 'Scene Editor', desc: 'Edit every scene — text, duration, and visuals — before a single frame renders.' },
+  { icon: '🎙️', title: 'Neural Voice Synthesis', desc: '24+ neural voices with adjustable pace and tone. Upload your own voice too.' },
+  { icon: '📸', title: 'Auto Visuals', desc: 'Pexels stock footage matched per scene automatically. Zero manual searching.' },
+  { icon: '✂️', title: 'CapCut Export', desc: 'Full MP4 or per-scene bundle with CapCut draft ready to import instantly.' },
+  { icon: '📊', title: 'Multi-Platform', desc: 'Optimised for TikTok, YouTube Shorts, Instagram Reels, and LinkedIn.' },
+]
 
-/* ── Mobile topbar ─────────────────────────────────────────── */
-.mobile-topbar{
-  display:none;align-items:center;gap:12px;
-  padding:12px 16px;background:var(--ink2);
-  border-bottom:1px solid var(--border);
-  position:sticky;top:0;z-index:50;
-}
-.mobile-topbar .logo-text{font-size:15px}
-.hamburger{
-  background:none;border:none;cursor:pointer;
-  color:var(--text2);padding:6px;border-radius:8px;
-  display:flex;align-items:center;justify-content:center;
-  transition:background var(--transition);
-}
-.hamburger:hover{background:var(--ink3)}
-.hamburger svg{width:20px;height:20px}
+const STEPS = [
+  { num: '01', label: 'Choose your niche', sub: 'Pick from curated content categories' },
+  { num: '02', label: 'AI writes your script', sub: 'Full voiceover, streamed live' },
+  { num: '03', label: 'Edit & customise', sub: 'Scenes, voice, visuals — all yours' },
+  { num: '04', label: 'Render & publish', sub: 'MP4 ready in under 60 seconds' },
+]
 
-/* Table scroll wrapper */
-.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px}
+const STATS = [
+  { value: '60s', label: 'Average render time' },
+  { value: '24+', label: 'Neural voice options' },
+  { value: '4', label: 'Platforms supported' },
+  { value: '100%', label: 'AI-powered workflow' },
+]
 
-/* Card actions responsive */
-.card-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+const TESTIMONIALS = [
+  { quote: 'I went from idea to published TikTok in under 3 minutes. SceneForge is the tool I didn\'t know I needed.', name: 'Adebayo O.', role: 'Content creator · Lagos', init: 'AO', color: '#A78BFA' },
+  { quote: 'The neural voice quality is unreal. My audience can\'t tell it\'s AI-narrated. Views went up 4x since I started using SceneForge.', name: 'Priya M.', role: 'YouTube creator · Mumbai', init: 'PM', color: '#2DD4BF' },
+  { quote: 'I produce 3 YouTube Shorts a day with this. What used to take me 2 hours now takes 8 minutes. Absolute game-changer.', name: 'Carlos R.', role: 'Fitness creator · São Paulo', init: 'CR', color: '#F59E0B' },
+  { quote: 'SceneForge replaced my entire video production stack. Script, voiceover, footage — all done before I finish my coffee.', name: 'Amina K.', role: 'Business educator · Nairobi', init: 'AK', color: '#34D399' },
+  { quote: 'Best investment I\'ve made for my brand. The CapCut export feature saves me another 30 minutes per video.', name: 'James T.', role: 'Finance creator · London', init: 'JT', color: '#60A5FA' },
+  { quote: 'As a non-native English speaker the neural voices sound better than my own recordings. My channel grew 2k subs in a month.', name: 'Yuki S.', role: 'Tech creator · Tokyo', init: 'YS', color: '#F472B6' },
+]
 
-/* ── Responsive breakpoints ─────────────────────────────────── */
-@media(max-width:900px){
-  .two-col{grid-template-columns:1fr}
-  .stat-row{grid-template-columns:repeat(2,1fr)}
-}
+const SAMPLE_PROJECTS = [
+  { title: '5 Morning Habits That Changed My Life', niche: 'Lifestyle', platform: 'TikTok', duration: '58s', scenes: 8, color: '#A78BFA' },
+  { title: 'How to Invest ₦50k in 2026', niche: 'Finance', platform: 'YouTube Shorts', duration: '55s', scenes: 7, color: '#2DD4BF' },
+  { title: 'Top 10 AI Tools You Need Right Now', niche: 'Tech', platform: 'Instagram Reels', duration: '44s', scenes: 10, color: '#F59E0B' },
+  { title: '3 Home Workouts No Equipment Needed', niche: 'Fitness', platform: 'TikTok', duration: '52s', scenes: 9, color: '#34D399' },
+  { title: 'The Psychology of Viral Content', niche: 'Marketing', platform: 'LinkedIn', duration: '60s', scenes: 8, color: '#60A5FA' },
+  { title: 'Why Africa is the Next Tech Hub', niche: 'Business', platform: 'YouTube Shorts', duration: '57s', scenes: 9, color: '#F472B6' },
+  { title: 'Healthy Meal Prep in 20 Minutes', niche: 'Food', platform: 'Instagram Reels', duration: '48s', scenes: 7, color: '#FB923C' },
+  { title: 'Crypto Explained for Beginners', niche: 'Finance', platform: 'TikTok', duration: '60s', scenes: 10, color: '#A78BFA' },
+]
 
-@media(max-width:768px){
-    #sb-close-btn{display:flex !important}
-  .sb{transform:translateX(-100%)}
-  .sb.open{transform:translateX(0)}
-  .sb-overlay.open{display:block}
-  .main{margin-left:0;padding:0}
-  .pg{padding:16px}
-  .mobile-topbar{display:flex}
-  .ph{padding:16px 16px 8px}
-  .ph-title{font-size:20px}
-  .stat-row{grid-template-columns:repeat(2,1fr);gap:8px}
-  .two-col{grid-template-columns:1fr;gap:12px}
-  .card-hdr{flex-wrap:wrap;gap:8px}
-  .btn{font-size:12px;padding:7px 12px}
-  .btn-sm{font-size:11px;padding:5px 9px}
-  .nb{padding:7px 14px}
-  .nb-label{font-size:12px}
-  .alert{margin:0 16px 12px}
-  .user-row{grid-template-columns:1fr}
-  /* Hide less important table columns on mobile */
-  .hide-mobile{display:none}
-}
+function ScrollRow({ children, speed = 40 }: { children: React.ReactNode; speed?: number }) {
+  const rowRef = useRef<HTMLDivElement>(null)
+  const [offset, setOffset] = useState(0)
+  const animRef = useRef<number>()
+  const lastTime = useRef<number>(0)
 
-@media(max-width:480px){
-  .stat-row{grid-template-columns:1fr 1fr}
-  .login-title{font-size:26px}
-  .login-card{padding:0 4px}
-  .modal-inner{margin:12px;padding:20px 16px}
-  .bc-item{padding:10px 12px}
-}
-</style>
-</head>
-<body>
+  useEffect(() => {
+    const row = rowRef.current
+    if (!row) return
+    const half = row.scrollWidth / 2
 
-<!-- ═══════════════════════════════════════════════
-     LOGIN
-══════════════════════════════════════════════════ -->
-<div id="login-screen">
-  <nav class="login-nav">
-    <a href="https://sceneraforge.com" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none;color:var(--text3);font-size:12px;transition:color var(--transition)" onmouseover="this.style.color='var(--text2)'" onmouseout="this.style.color='var(--text3)'">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10 3L5 8l5 5"/></svg>Back to app
-    </a>
-    <div class="logo-text">Scene<em>Forge</em></div>
-    <div class="nav-tag">Command Center</div>
-  </nav>
-  <div class="login-body">
-    <div class="login-card">
-      <div class="login-eyebrow">Restricted Access</div>
-      <h1 class="login-title">Admin<br>Sign in</h1>
-      <p class="login-sub">Authorised personnel only. All actions are logged and monitored.</p>
-      <div id="login-error">Invalid credentials or insufficient permissions.</div>
-      <div class="inp-wrap">
-        <label>Email address</label>
-        <div class="inp-field">
-          <input type="email" id="admin-email" placeholder="you@example.com" autocomplete="email">
-        </div>
-      </div>
-      <div class="inp-wrap">
-        <label>Password</label>
-        <div class="inp-field">
-          <input type="password" id="admin-pass" placeholder="••••••••••••" autocomplete="current-password">
-          <button class="show-btn" onclick="togglePass()">show</button>
-        </div>
-      </div>
-      <button class="login-btn" onclick="doLogin()">
-        Access dashboard
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
-      </button>
-      <div class="login-divider"><span>secured by SceneForge</span></div>
-    </div>
-  </div>
-</div>
+    const tick = (time: number) => {
+      const dt = lastTime.current ? (time - lastTime.current) / 1000 : 0
+      lastTime.current = time
+      setOffset(prev => {
+        const next = prev + speed * dt
+        return next >= half ? 0 : next
+      })
+      animRef.current = requestAnimationFrame(tick)
+    }
+    animRef.current = requestAnimationFrame(tick)
+    return () => { if (animRef.current) cancelAnimationFrame(animRef.current) }
+  }, [speed])
 
-<!-- ═══════════════════════════════════════════════
-     RESET PASSWORD
-══════════════════════════════════════════════════ -->
-<div id="reset-overlay">
-  <div class="reset-card">
-    <div class="reset-head">
-      <div style="font-family:DM Mono,monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-bottom:8px">Security Required</div>
-      <div style="font-family:Syne,sans-serif;font-size:20px;font-weight:800;letter-spacing:-.5px;margin-bottom:4px">Set your password</div>
-      <div style="font-size:12.5px;color:var(--text3)">Your account requires a new password before continuing.</div>
-    </div>
-    <div class="reset-body">
-      <div id="reset-error"></div>
-      <div class="field">
-        <label>New password</label>
-        <input type="password" id="reset-new" placeholder="Minimum 8 characters" oninput="updateStrength(this.value)">
-        <div class="strength-track"><div id="strength-bar" class="strength-fill" style="width:0%"></div></div>
-        <span id="strength-label" style="font-size:11px;color:var(--text3)"></span>
-      </div>
-      <div class="field">
-        <label>Confirm password</label>
-        <input type="password" id="reset-confirm" placeholder="Repeat password">
-      </div>
-      <button class="btn btn-gold" style="width:100%;justify-content:center;margin-top:4px" onclick="doResetPassword()">Set password &amp; continue</button>
-    </div>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════
-     ADMIN SHELL
-══════════════════════════════════════════════════ -->
-<div id="admin-shell">
-  <!-- SIDEBAR -->
-  <aside class="sb">
-    <div class="sb-brand">
-      <div class="sb-logo" style="display:flex;align-items:center;justify-content:space-between">Scene<em>Forge</em></div>
-      <div class="sb-tag">Command Center</div>
-    </div>
-
-    <div class="sb-section">Overview</div>
-    <button class="nb on" id="nb-dashboard" onclick="nav('dashboard',this)">
-      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
-      Dashboard
-    </button>
-    <button class="nb" id="nb-analytics" onclick="nav('analytics',this)">
-      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="2,12 5,7 8,9 11,5 14,8"/></svg>
-      Analytics
-    </button>
-
-    <div class="sb-section" id="sec-users">Users</div>
-    <button class="nb" id="nb-users" onclick="nav('users',this)">
-      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="5" r="2.5"/><path d="M1 14c0-3 2.2-5 5-5M11 8v6M14 11h-6"/></svg>
-      All users
-    </button>
-    <button class="nb" id="nb-topup" onclick="nav('topup',this)">
-      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v6M5 8h6"/></svg>
-      Token top-up
-    </button>
-    <button class="nb" id="nb-broadcast" onclick="nav('broadcast',this)">
-      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 6h12v7a1 1 0 01-1 1H3a1 1 0 01-1-1z"/><path d="M2 6l6-4 6 4"/></svg>
-      Broadcast
-    </button>
-
-    <div class="sb-section" id="sec-revenue">Revenue</div>
-    <button class="nb" id="nb-revenue" onclick="nav('revenue',this)">
-      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="2,13 5,8 8,10 11,5 14,7"/><path d="M2 13h12"/></svg>
-      Revenue chart
-    </button>
-    <button class="nb" id="nb-tx" onclick="nav('tx',this)">
-      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="12" height="9" rx="1.5"/><path d="M2 7h12"/></svg>
-      Transactions
-    </button>
-    <button class="nb" id="nb-pricing" onclick="nav('pricing',this)">
-      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v5.5M6 6.5h2.5a1 1 0 010 2H7a1 1 0 000 2h2.5"/></svg>
-      Pricing
-    </button>
-    <button class="nb" id="nb-niches" onclick="nav('niches',this)">
-      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2"/><path d="M8 2v2M8 12v2M2 8h2M12 8h2"/></svg>
-      Niches
-    </button>
-    <button class="nb" id="nb-coupons" onclick="nav('coupons',this)">
-      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="12" height="6" rx="1"/><path d="M6 5v6M10 5v6"/></svg>
-      Coupons
-    </button>
-
-    <div class="sb-section" id="sec-system">System</div>
-    <button class="nb" id="nb-queue" onclick="nav('queue',this)">
-      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
-      Render queue
-    </button>
-    <button class="nb" id="nb-logs" onclick="nav('logs',this)">
-      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4h10M3 8h7M3 12h5"/></svg>
-      Activity logs
-    </button>
-    <button class="nb" id="nb-feedback" onclick="nav('feedback',this)">
-      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H2a1 1 0 00-1 1v8a1 1 0 001 1h3l3 3 3-3h3a1 1 0 001-1V3a1 1 0 00-1-1z"/><path d="M5 7h6M5 5h4"/></svg>
-      User feedback
-    </button>
-    <div class="sb-section" id="sec-admins" style="display:none">Access</div>
-    <button class="nb" id="nb-admins" style="display:none" onclick="nav('admins',this)">
-      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 8a3 3 0 100-6 3 3 0 000 6z"/><path d="M2 14s1-4 6-4 6 4 6 4"/></svg>
-      Admin users
-    </button>
-
-    <div class="sb-footer">
-      <div class="user-pill">
-        <div class="user-av" id="sb-av">SA</div>
-        <div class="user-info">
-          <div class="user-name" id="sb-name">Admin</div>
-          <div class="user-role" id="sb-role"></div>
-        </div>
-      </div>
-      <button class="logout-btn" onclick="doLogout()">
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 3H3a1 1 0 00-1 1v8a1 1 0 001 1h3M10 11l4-3-4-3M14 8H6"/></svg>
-        Sign out
-      </button>
-    </div>
-  </aside>
-
-  <!-- MAIN CONTENT -->
-  <main class="main">
-  <!-- Mobile topbar -->
-  <div class="mobile-topbar" id="mobile-topbar">
-    <button class="hamburger" onclick="toggleSidebar()" aria-label="Open menu">
-      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-        <path d="M2 5h16M2 10h16M2 15h16"/>
-      </svg>
-    </button>
-    <div class="logo-text">Scene<em>Forge</em> <span style="font-size:10px;color:var(--text3);font-family:DM Mono,monospace">Admin</span></div>
-    <div id="mobile-role-badge" style="margin-left:auto;font-size:10px;color:var(--gold);background:rgba(201,168,76,0.1);border:1px solid rgba(201,168,76,0.2);border-radius:20px;padding:3px 10px"></div>
-  </div>
-
-    <!-- DASHBOARD -->
-    <div class="pg on" id="pg-dashboard">
-      <div class="ph">
-        <div class="ph-top">
-          <div>
-            <div class="ph-title">Dashboard</div>
-            <div class="ph-sub">Real-time platform overview</div>
-          </div>
-          <div class="ph-actions">
-            <button class="btn btn-ghost btn-sm" onclick="loadDash()">
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 8a6 6 0 0112 0M14 4v4h-4"/></svg>
-              Refresh
-            </button>
-          </div>
-        </div>
-      </div>
-      <div class="stat-row" id="stats-grid">
-        <div class="stat gold"><div class="stat-label">Total users</div><div class="stat-val">—</div><div class="stat-meta">Registered accounts</div><div class="stat-icon">👤</div></div>
-        <div class="stat teal"><div class="stat-label">Videos created</div><div class="stat-val">—</div><div class="stat-meta">All-time renders</div><div class="stat-icon">🎬</div></div>
-        <div class="stat rose"><div class="stat-label">Transactions</div><div class="stat-val">—</div><div class="stat-meta">Paid purchases</div><div class="stat-icon">💳</div></div>
-        <div class="stat violet"><div class="stat-label">Tokens in use</div><div class="stat-val">—</div><div class="stat-meta">Circulation balance</div><div class="stat-icon">🪙</div></div>
-      </div>
-      <div class="card">
-        <div class="card-hdr"><span class="card-title">Recent users</span></div>
-        <div id="recent-body"><div class="loading"></div></div>
+  return (
+    <div style={{ overflow: 'hidden', width: '100%' }}>
+      <div
+        ref={rowRef}
+        style={{
+          display: 'flex', gap: 16,
+          transform: `translateX(-${offset}px)`,
+          willChange: 'transform',
+          width: 'max-content',
+        }}
+      >
+        {children}
+        {children}
       </div>
     </div>
+  )
+}
 
-    <!-- ANALYTICS -->
-    <div class="pg" id="pg-analytics">
-      <div class="ph">
-        <div class="ph-top">
-          <div><div class="ph-title">Analytics</div><div class="ph-sub">Content trends and platform usage</div></div>
-          <div class="ph-actions">
-            <button class="btn btn-ghost btn-sm" onclick="exportAnalyticsExcel()">
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 2h7l3 3v9H3z"/><path d="M10 2v4h4"/><path d="M5 9l2 2 4-4"/></svg>
-              Export Excel
-            </button>
-          </div>
-        </div>
-      </div>
-      <div class="two-col" style="margin-bottom:18px">
-        <div class="card">
-          <div class="card-hdr"><span class="card-title">Top niches</span></div>
-          <div id="niches-analytics" style="padding:18px 20px"><div class="loading"></div></div>
-        </div>
-        <div class="card">
-          <div class="card-hdr"><span class="card-title">Plan distribution</span></div>
-          <div id="plans-analytics" style="padding:18px 20px"><div class="loading"></div></div>
-        </div>
-      </div>
-      <div class="stat-row" style="grid-template-columns:repeat(3,1fr)" id="metrics-row">
-        <div class="stat teal"><div class="stat-label">Avg scenes/video</div><div class="stat-val" id="m-avg">—</div></div>
-        <div class="stat violet"><div class="stat-label">Total scenes</div><div class="stat-val" id="m-scenes">—</div></div>
-        <div class="stat gold"><div class="stat-label">Total videos</div><div class="stat-val" id="m-videos">—</div></div>
-      </div>
-    </div>
+export default function Landing({ onLogin, onSignup }: LandingProps) {
+  return (
+    <div style={{ minHeight: '100vh', background: '#07070E', color: '#F0F0FF', overflowX: 'hidden', fontFamily: "DM Sans, system-ui, sans-serif" }}>
 
-    <!-- USERS -->
-    <div class="pg" id="pg-users">
-      <div class="ph">
-        <div class="ph-top">
-          <div><div class="ph-title">Users</div><div class="ph-sub">Manage all registered accounts</div></div>
-          <div class="ph-actions">
-            <button class="btn btn-ghost btn-sm" onclick="exportCSV()">Export CSV</button>
-            <button class="btn btn-ghost btn-sm" onclick="loadUsers()">Refresh</button>
-          </div>
+      {/* NAV */}
+      <nav aria-label="Main navigation" style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 clamp(16px, 4vw, 64px)', height: 60,
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        position: 'sticky', top: 0, zIndex: 100,
+        background: 'rgba(7,7,14,0.92)', backdropFilter: 'blur(16px)',
+      }}>
+        <div style={{ fontFamily: "Syne, system-ui, sans-serif", fontSize: 20, fontWeight: 800, letterSpacing: '-0.5px' }}>
+          Scene<span style={{ color: '#A78BFA' }}>Forge</span>
         </div>
-      </div>
-      <div class="search-wrap">
-        <input class="search-inp" type="text" id="user-search" placeholder="Search by name or email..." oninput="filterUsers()">
-      </div>
-      <div id="alert-users" class="alert"></div>
-      <div class="card">
-        <table><thead><tr>
-          <th style="width:30%">User</th><th style="width:14%">Plan</th>
-          <th style="width:13%">Tokens</th><th style="width:8%">Videos</th>
-          <th style="width:12%">Joined</th><th style="width:14%">Actions</th>
-        </tr></thead>
-        <tbody id="users-tbody"><tr><td colspan="6"><div class="loading"></div></td></tr></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- TOKEN TOP-UP -->
-    <div class="pg" id="pg-topup">
-      <div class="ph"><div class="ph-title">Token top-up</div><div class="ph-sub">Manually credit tokens to any user account</div></div>
-      <div id="alert-topup" class="alert"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
-        <div class="card">
-          <div class="card-hdr"><span class="card-title">Credit tokens</span></div>
-          <div style="padding:20px">
-            <div class="field"><label>User ID or email</label><input type="text" id="topup-user" placeholder="Enter email or user ID"></div>
-            <div class="field"><label>Tokens to add</label><input type="number" id="topup-amount" value="500" min="1"></div>
-            <div class="field"><label>Reason / note</label><input type="text" id="topup-reason" placeholder="e.g. Goodwill, refund, promo"></div>
-            <button class="btn btn-teal" style="width:100%;justify-content:center" onclick="doTopUp()">Credit tokens</button>
-          </div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <a href="/blog" style={{ ...ghostBtn, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>Blog</a>
+          <button onClick={onLogin} style={ghostBtn}>Log in</button>
+          <button onClick={onSignup} style={primaryBtn}>Start free →</button>
         </div>
-        <div class="card">
-          <div class="card-hdr"><span class="card-title">Quick presets</span></div>
-          <div style="padding:20px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
-            <button class="btn btn-ghost" onclick="setTopup(100)" style="flex-direction:column;height:70px;gap:3px">
-              <span style="font-family:Syne,sans-serif;font-size:20px;font-weight:800;color:var(--gold)">100</span>
-              <span style="font-size:11px;color:var(--text3)">tokens</span>
-            </button>
-            <button class="btn btn-ghost" onclick="setTopup(500)" style="flex-direction:column;height:70px;gap:3px">
-              <span style="font-family:Syne,sans-serif;font-size:20px;font-weight:800;color:var(--gold)">500</span>
-              <span style="font-size:11px;color:var(--text3)">tokens</span>
-            </button>
-            <button class="btn btn-ghost" onclick="setTopup(1000)" style="flex-direction:column;height:70px;gap:3px">
-              <span style="font-family:Syne,sans-serif;font-size:20px;font-weight:800;color:var(--gold)">1,000</span>
-              <span style="font-size:11px;color:var(--text3)">tokens</span>
-            </button>
-            <button class="btn btn-ghost" onclick="setTopup(3500)" style="flex-direction:column;height:70px;gap:3px">
-              <span style="font-family:Syne,sans-serif;font-size:20px;font-weight:800;color:var(--gold)">3,500</span>
-              <span style="font-size:11px;color:var(--text3)">tokens</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+      </nav>
 
-    <!-- BROADCAST -->
-    <div class="pg" id="pg-broadcast">
-      <div class="ph"><div class="ph-title">Email broadcast</div><div class="ph-sub">Compose and send targeted emails to your users</div></div>
-      <div id="alert-broadcast" class="alert"></div>
-      <div class="two-col">
+      <main>
 
-        <!-- LEFT: Compose -->
-        <div class="card">
-          <div class="card-hdr">
-            <span class="card-title">Compose</span>
-            <div class="card-actions">
-              <button class="btn btn-ghost btn-xs" onclick="bcLoadTemplate()" title="Load from history">&#128196; Template</button>
+        {/* HERO */}
+        <section aria-labelledby="hero-heading" style={{ position: 'relative', textAlign: 'center', padding: 'clamp(72px, 12vw, 120px) 20px clamp(60px, 10vw, 100px)', overflow: 'hidden' }}>
+          <div aria-hidden="true" style={{
+            position: 'absolute', inset: 0, zIndex: 0,
+            backgroundImage: `linear-gradient(rgba(167,139,250,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(167,139,250,0.04) 1px, transparent 1px)`,
+            backgroundSize: '48px 48px',
+          }} />
+          <div aria-hidden="true" style={{
+            position: 'absolute', top: -100, left: '50%', transform: 'translateX(-50%)',
+            width: 900, height: 600, borderRadius: '50%',
+            background: 'radial-gradient(ellipse, rgba(124,92,255,0.14) 0%, rgba(45,212,191,0.04) 50%, transparent 70%)',
+            pointerEvents: 'none', zIndex: 0,
+          }} />
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.25)',
+              borderRadius: 100, padding: '6px 16px', marginBottom: 28,
+            }}>
+              <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: '50%', background: '#A78BFA', display: 'inline-block' }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#C4B5FD', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                AI-Powered Video Studio
+              </span>
             </div>
+            <h1 id="hero-heading" style={{
+              fontFamily: "Syne, system-ui, sans-serif",
+              fontSize: 'clamp(40px, 7.5vw, 84px)',
+              fontWeight: 800, lineHeight: 1.0, letterSpacing: 'clamp(-1px, -0.04em, -3px)',
+              margin: '0 auto 28px', maxWidth: 920,
+            }}>
+              Go from idea to{' '}
+              <span style={{ background: 'linear-gradient(135deg, #A78BFA 0%, #2DD4BF 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                viral video
+              </span>{' '}
+              in 60 seconds
+            </h1>
+            <p style={{ fontSize: 'clamp(16px, 2vw, 20px)', color: 'rgba(255,255,255,0.72)', maxWidth: 560, margin: '0 auto 40px', lineHeight: 1.7 }}>
+              SceneForge writes your script, voices it with neural narration, sources footage, and renders — fully automated, completely customisable.
+            </p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 20 }}>
+              <button onClick={onSignup} style={{ ...primaryBtn, padding: '14px 36px', fontSize: 15, fontWeight: 700 }}>
+                Create your first video free
+              </button>
+              <button onClick={onLogin} style={{ ...ghostBtn, padding: '14px 28px', fontSize: 15 }}>
+                Sign in to your account
+              </button>
+            </div>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', margin: 0 }}>
+              No credit card required · Free plan · 3 videos/day
+            </p>
           </div>
-          <div style="padding:20px">
+        </section>
 
-            <!-- Target selector -->
-            <div class="field">
-              <label>Send to</label>
-              <div style="display:flex;gap:6px;flex-wrap:wrap">
-                <button id="bt-all"    class="btn btn-teal btn-sm"  onclick="setBcTarget('all')"    style="flex:1;min-width:80px">&#127760; All</button>
-                <button id="bt-plan"   class="btn btn-ghost btn-sm" onclick="setBcTarget('plan')"   style="flex:1;min-width:80px">&#128203; By plan</button>
-                <button id="bt-user"   class="btn btn-ghost btn-sm" onclick="setBcTarget('user')"   style="flex:1;min-width:80px">&#128100; One user</button>
-                <button id="bt-upload" class="btn btn-ghost btn-sm" onclick="setBcTarget('upload')" style="flex:1;min-width:80px">&#128229; Upload CSV</button>
+        {/* STATS BAR */}
+        <section aria-label="Platform statistics" style={{
+          borderTop: '1px solid rgba(255,255,255,0.06)', borderBottom: '1px solid rgba(255,255,255,0.06)',
+          background: 'rgba(255,255,255,0.02)',
+        }}>
+          <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 clamp(20px, 4vw, 48px)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))' }}>
+            {STATS.map((s, i) => (
+              <div key={i} style={{ textAlign: 'center', padding: '28px 16px', borderRight: 'none', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontFamily: "Syne, system-ui, sans-serif", fontSize: 30, fontWeight: 800, color: '#A78BFA', letterSpacing: '-1px', marginBottom: 4 }}>{s.value}</div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.60)' }}>{s.label}</div>
               </div>
-            </div>
+            ))}
+          </div>
+        </section>
 
-            <div id="bc-plan-row" class="field" style="display:none">
-              <label>Plan</label>
-              <select id="bc-plan" style="width:100%;background:var(--ink3);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-size:13px;padding:10px 13px;outline:none">
-                <option value="free">Free</option><option value="starter">Starter</option>
-                <option value="pro">Pro</option><option value="studio">Studio</option>
-              </select>
-            </div>
-
-            <div id="bc-user-row" class="field" style="display:none">
-              <label>User ID or email</label>
-              <input type="text" id="bc-user-id" placeholder="UUID or user@email.com">
-            </div>
-
-            <div id="bc-upload-row" class="field" style="display:none">
-              <label>Upload email list (CSV or TXT, one email per line)</label>
-              <div style="border:2px dashed rgba(255,255,255,0.12);border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:border-color var(--transition)"
-                onclick="document.getElementById('bc-csv-input').click()"
-                ondragover="event.preventDefault();this.style.borderColor='var(--gold)'"
-                ondragleave="this.style.borderColor='rgba(255,255,255,0.12)'"
-                ondrop="bcHandleDrop(event)">
-                <input type="file" id="bc-csv-input" accept=".csv,.txt" style="display:none" onchange="bcReadFile(this.files[0])">
-                <div style="font-size:22px;margin-bottom:6px">&#128229;</div>
-                <div style="font-size:12.5px;color:var(--text2);margin-bottom:3px">Drop CSV/TXT here or click to browse</div>
-                <div style="font-size:11px;color:var(--text3)">One email per line or comma-separated</div>
+        {/* SAMPLE PROJECTS — auto-scrolling */}
+        <section aria-labelledby="projects-heading" style={{ padding: 'clamp(60px, 8vw, 80px) 0', overflow: 'hidden' }}>
+          <div style={{ textAlign: 'center', marginBottom: 40, padding: '0 20px' }}>
+            <p style={sectionEyebrow}>Made with SceneForge</p>
+            <h2 id="projects-heading" style={sectionTitle}>Videos creators are making right now</h2>
+          </div>
+          <ScrollRow speed={45}>
+            {SAMPLE_PROJECTS.map((p, i) => (
+              <div key={i} style={{
+                flexShrink: 0, width: 220,
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 16, padding: '20px 18px',
+              }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10,
+                  background: p.color + '22', border: `1px solid ${p.color}44`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  marginBottom: 14, fontSize: 16,
+                }} aria-hidden="true">🎬</div>
+                <p style={{ fontSize: 13, fontWeight: 700, color: '#FFFFFF', marginBottom: 10, lineHeight: 1.4 }}>{p.title}</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  <span style={{ ...pill, background: p.color + '18', color: p.color, border: `1px solid ${p.color}33` }}>{p.niche}</span>
+                  <span style={{ ...pill, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.65)' }}>{p.platform}</span>
+                  <span style={{ ...pill, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.65)' }}>{p.duration}</span>
+                  <span style={{ ...pill, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.65)' }}>{p.scenes} scenes</span>
+                </div>
               </div>
-              <div id="bc-upload-status" style="margin-top:8px;font-size:12px;color:var(--teal);display:none"></div>
-              <textarea id="bc-email-list" rows="3" placeholder="Or paste emails directly: user@a.com, user@b.com" style="margin-top:8px;width:100%;background:var(--ink3);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-size:12px;padding:9px 12px;outline:none;resize:vertical"></textarea>
-            </div>
+            ))}
+          </ScrollRow>
+        </section>
 
-            <!-- Subject -->
-            <div class="field">
-              <label>Subject &mdash; use {{name}} to personalise</label>
-              <input type="text" id="bc-subject" placeholder="e.g. Big news from SceneForge!">
-            </div>
+        {/* HOW IT WORKS */}
+        <section aria-labelledby="steps-heading" style={{ padding: 'clamp(40px, 6vw, 72px) clamp(20px, 4vw, 48px)', maxWidth: 1000, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: 48 }}>
+            <p style={sectionEyebrow}>How it works</p>
+            <h2 id="steps-heading" style={sectionTitle}>Four steps. One perfect video.</h2>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+            {STEPS.map((step, i) => (
+              <div key={i} style={{
+                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 16, padding: '28px 22px', position: 'relative',
+              }}>
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  width: 36, height: 36, borderRadius: 10,
+                  background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.2)', marginBottom: 16,
+                }}>
+                  <span style={{ fontFamily: "Syne, system-ui, sans-serif", fontSize: 12, fontWeight: 800, color: '#A78BFA' }}>{step.num}</span>
+                </div>
+                <p style={{ fontSize: 14, fontWeight: 700, color: '#FFFFFF', marginBottom: 6, lineHeight: 1.3 }}>{step.label}</p>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.60)', lineHeight: 1.5, margin: 0 }}>{step.sub}</p>
+                {i < STEPS.length - 1 && (
+                  <div aria-hidden="true" style={{ position: 'absolute', right: -8, top: '40px', color: 'rgba(167,139,250,0.4)', fontSize: 18, zIndex: 2 }}>→</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
 
-            <!-- Mini editor toolbar -->
-            <div class="field">
-              <label>Message body</label>
-              <div style="border:1px solid var(--border2);border-radius:10px;overflow:hidden;background:var(--ink3)">
-                <!-- Toolbar -->
-                <div style="display:flex;align-items:center;gap:4px;padding:8px 10px;border-bottom:1px solid var(--border);flex-wrap:wrap;background:var(--ink2)">
-                  <button class="bc-tb-btn" title="Bold" onclick="bcFormat('bold')"><b>B</b></button>
-                  <button class="bc-tb-btn" title="Italic" onclick="bcFormat('italic')"><i>I</i></button>
-                  <button class="bc-tb-btn" title="Underline" onclick="bcFormat('underline')"><u>U</u></button>
-                  <div style="width:1px;height:18px;background:var(--border2);margin:0 2px"></div>
-                  <button class="bc-tb-btn" title="Bullet list" onclick="bcFormat('insertUnorderedList')">&#8226;&#8212;</button>
-                  <button class="bc-tb-btn" title="Numbered list" onclick="bcFormat('insertOrderedList')">1&#8212;</button>
-                  <div style="width:1px;height:18px;background:var(--border2);margin:0 2px"></div>
-                  <select onchange="bcFormat('fontSize',this.value);this.selectedIndex=0" title="Font size"
-                    style="background:var(--ink3);border:1px solid var(--border2);border-radius:5px;color:var(--text2);font-size:11px;padding:3px 5px;outline:none;cursor:pointer">
-                    <option value="">Size</option>
-                    <option value="1">Small</option>
-                    <option value="3">Normal</option>
-                    <option value="5">Large</option>
-                    <option value="7">Huge</option>
-                  </select>
-                  <select onchange="bcFormat('fontName',this.value);this.selectedIndex=0" title="Font"
-                    style="background:var(--ink3);border:1px solid var(--border2);border-radius:5px;color:var(--text2);font-size:11px;padding:3px 5px;outline:none;cursor:pointer">
-                    <option value="">Font</option>
-                    <option value="Arial">Arial</option>
-                    <option value="Georgia">Georgia</option>
-                    <option value="Courier New">Courier</option>
-                    <option value="Verdana">Verdana</option>
-                  </select>
-                  <div style="width:1px;height:18px;background:var(--border2);margin:0 2px"></div>
-                  <button class="bc-tb-btn" title="Insert link" onclick="bcInsertLink()">&#128279;</button>
-                  <button class="bc-tb-btn" title="Insert personalisation tag" onclick="bcInsertTag()" style="font-size:10px;padding:3px 7px">{{name}}</button>
-                  <div style="margin-left:auto;display:flex;gap:4px">
-                    <button class="bc-tb-btn" title="Undo" onclick="bcFormat('undo')">&#8630;</button>
-                    <button class="bc-tb-btn" title="Redo" onclick="bcFormat('redo')">&#8631;</button>
+        {/* FEATURES */}
+        <section aria-labelledby="features-heading" style={{ padding: 'clamp(40px, 6vw, 72px) clamp(20px, 4vw, 48px)', maxWidth: 1000, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: 48 }}>
+            <p style={sectionEyebrow}>Features</p>
+            <h2 id="features-heading" style={sectionTitle}>Everything you need to create</h2>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+            {FEATURES.map((f, i) => (
+              <div key={i} style={{
+                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 16, padding: '26px 24px',
+              }}>
+                <div aria-hidden="true" style={{ fontSize: 24, marginBottom: 14, lineHeight: 1 }}>{f.icon}</div>
+                <p style={{ fontSize: 14, fontWeight: 700, color: '#FFFFFF', marginBottom: 8 }}>{f.title}</p>
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.68)', lineHeight: 1.65, margin: 0 }}>{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* TESTIMONIALS — auto-scrolling */}
+        <section aria-labelledby="testimonials-heading" style={{ padding: 'clamp(60px, 8vw, 80px) 0', overflow: 'hidden' }}>
+          <div style={{ textAlign: 'center', marginBottom: 40, padding: '0 20px' }}>
+            <p style={sectionEyebrow}>Creator stories</p>
+            <h2 id="testimonials-heading" style={sectionTitle}>Loved by creators worldwide</h2>
+          </div>
+          <ScrollRow speed={30}>
+            {TESTIMONIALS.map((t, i) => (
+              <div key={i} style={{
+                flexShrink: 0, width: 320,
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 20, padding: '24px 24px',
+              }}>
+                {/* Stars */}
+                <div aria-label="5 stars" style={{ marginBottom: 14 }}>
+                  {'★★★★★'.split('').map((s, j) => (
+                    <span key={j} style={{ color: '#F59E0B', fontSize: 14 }}>{s}</span>
+                  ))}
+                </div>
+                <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.80)', lineHeight: 1.65, marginBottom: 20, fontStyle: 'italic' }}>
+                  "{t.quote}"
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{
+                    width: 38, height: 38, borderRadius: '50%',
+                    background: t.color + '33', border: `1px solid ${t.color}55`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 12, fontWeight: 700, color: t.color, flexShrink: 0,
+                  }} aria-hidden="true">{t.init}</div>
+                  <div>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.90)', margin: 0 }}>{t.name}</p>
+                    <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', margin: 0 }}>{t.role}</p>
                   </div>
                 </div>
-                <!-- Editable area -->
-                <div id="bc-editor"
-                  contenteditable="true"
-                  style="min-height:160px;padding:14px;font-size:13.5px;color:var(--text);outline:none;line-height:1.7;font-family:'Instrument Sans',sans-serif"
-                  data-placeholder="Hi {{name}},&#10;&#10;We have exciting news...&#10;&#10;— SceneForge Team"
-                  oninput="bcEditorInput()"
-                ></div>
               </div>
-              <div style="font-size:10.5px;color:var(--text3);margin-top:5px">
-                Use <code style="background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:3px">{{name}}</code> or
-                <code style="background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:3px">{{email}}</code> for personalisation
-              </div>
+            ))}
+          </ScrollRow>
+        </section>
+
+        {/* CTA */}
+        <section aria-labelledby="cta-heading" style={{
+          padding: 'clamp(72px, 10vw, 110px) clamp(20px, 4vw, 48px)',
+          textAlign: 'center', position: 'relative',
+        }}>
+          <div aria-hidden="true" style={{
+            position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)',
+            width: 700, height: 350,
+            background: 'radial-gradient(ellipse at center bottom, rgba(124,92,255,0.12) 0%, transparent 70%)',
+            pointerEvents: 'none',
+          }} />
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <p style={sectionEyebrow}>Get started today</p>
+            <h2 id="cta-heading" style={{
+              fontFamily: "Syne, system-ui, sans-serif",
+              fontSize: 'clamp(32px, 5vw, 54px)',
+              fontWeight: 800, letterSpacing: '-1.5px',
+              margin: '0 auto 16px', maxWidth: 640, color: '#FFFFFF', lineHeight: 1.1,
+            }}>
+              Your next viral video is one click away
+            </h2>
+            <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.72)', maxWidth: 440, margin: '0 auto 36px' }}>
+              Join creators using SceneForge to produce more content in less time — powered by neural narration and AI visuals.
+            </p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button onClick={onSignup} style={{ ...primaryBtn, padding: '15px 40px', fontSize: 15, fontWeight: 700 }}>
+                Create free account →
+              </button>
+              <button onClick={onLogin} style={{ ...ghostBtn, padding: '15px 28px', fontSize: 15 }}>
+                Log in
+              </button>
             </div>
-
-            <!-- Preview -->
-            <div id="bc-preview-wrap" style="display:none;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:16px;margin-bottom:12px">
-              <div style="font-size:10px;color:var(--teal);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em;font-weight:600">&#128065; Preview ({{name}} = "Creator")</div>
-              <div id="bc-preview-body" style="font-size:13px;color:rgba(255,255,255,0.75);line-height:1.7"></div>
-            </div>
-
-            <div style="display:flex;gap:8px;margin-bottom:12px">
-              <button class="btn btn-ghost btn-sm" onclick="toggleBcPreview()" style="flex:1">&#128065; Preview</button>
-              <button class="btn btn-ghost btn-sm" onclick="bcClear()" style="flex:1">&#10006; Clear</button>
-            </div>
-
-            <button class="btn btn-gold" style="width:100%;justify-content:center;font-size:14px" onclick="doBroadcast()">
-              Send broadcast &rarr;
-            </button>
-            <p style="font-size:11px;color:var(--text3);text-align:center;margin-top:10px">Suspended accounts are always skipped</p>
           </div>
-        </div>
+        </section>
 
-        <!-- RIGHT: History -->
-        <div class="card" style="display:flex;flex-direction:column">
-          <div class="card-hdr">
-            <span class="card-title">Sent broadcasts</span>
-            <button class="btn btn-ghost btn-sm" onclick="loadBroadcasts()">Refresh</button>
-          </div>
-          <div class="tbl-wrap"><div id="broadcast-history" style="flex:1;overflow-y:auto"></div>
-        </div>
-      </div>
+      </main>
 
-      <!-- Broadcast detail modal -->
-      <div id="bc-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(10,10,15,0.85);backdrop-filter:blur(8px);z-index:600;align-items:center;justify-content:center">
-        <div style="background:var(--ink2);border:1px solid var(--border2);border-radius:20px;width:100%;max-width:560px;overflow:hidden;animation:fadeUp .2s ease">
-          <div style="background:linear-gradient(135deg,rgba(201,168,76,0.12),rgba(45,212,191,0.06));padding:22px 28px;border-bottom:1px solid var(--border);position:relative">
-            <div style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent)"></div>
-            <button onclick="closeBcDetail()" style="position:absolute;top:14px;right:16px;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);color:var(--text3);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center">&times;</button>
-            <div id="bc-detail-badge" style="margin-bottom:10px"></div>
-            <div id="bc-detail-subject" style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--text);margin-bottom:4px"></div>
-            <div id="bc-detail-meta" style="font-size:12px;color:var(--text3)"></div>
-          </div>
-          <div style="padding:24px 28px;max-height:400px;overflow-y:auto">
-            <div style="font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;font-weight:600">Message body</div>
-            <div id="bc-detail-body" style="font-size:13.5px;color:var(--text2);line-height:1.75;white-space:pre-wrap"></div>
-          </div>
-          <div style="padding:16px 28px;border-top:1px solid var(--border);display:flex;gap:10px">
-            <button class="btn btn-teal btn-sm" onclick="bcReuseTemplate()" style="flex:1">&#9166; Reuse as template</button>
-            <button class="btn btn-ghost btn-sm" onclick="closeBcDetail()">Close</button>
-          </div>
-        </div>
-      </div>
+      {/* FOOTER */}
+      <footer aria-label="Site footer" style={{
+        borderTop: '1px solid rgba(255,255,255,0.07)',
+        padding: 'clamp(20px, 3vw, 28px) clamp(20px, 4vw, 64px)',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12,
+      }}>
+        <span aria-label="SceneForge" style={{ fontFamily: "Syne, system-ui, sans-serif", fontSize: 15, fontWeight: 800, color: 'rgba(255,255,255,0.80)' }}>
+          Scene<span style={{ color: '#A78BFA' }}>Forge</span>
+        </span>
+        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
+          © {new Date().getFullYear()} SceneForge. All rights reserved.
+        </span>
+      </footer>
     </div>
-
-    <!-- REVENUE -->
-    <div class="pg" id="pg-revenue">
-      <div class="ph">
-        <div class="ph-top">
-          <div><div class="ph-title">Revenue</div><div class="ph-sub">NGN earned over the last 30 days</div></div>
-          <div class="ph-actions">
-            <button class="btn btn-ghost btn-sm" onclick="exportRevenueExcel()">
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 2h7l3 3v9H3z"/><path d="M10 2v4h4"/><path d="M5 9l2 2 4-4"/></svg>
-              Export Excel
-            </button>
-            <button class="btn btn-ghost btn-sm" onclick="loadRevenue()">Refresh</button>
-          </div>
-        </div>
-      </div>
-      <div class="stat-row" style="grid-template-columns:repeat(4,1fr)" id="rev-stats">
-        <div class="stat gold"><div class="stat-label">Total revenue (NGN)</div><div class="stat-val" id="rev-ngn">—</div><div class="stat-meta" id="rev-usd-sub" style="color:var(--teal);font-size:12px;margin-top:4px"></div></div>
-        <div class="stat teal"><div class="stat-label">Total revenue (USD)</div><div class="stat-val" id="rev-usd">—</div><div class="stat-meta" id="rev-rate-sub" style="font-size:11px"></div></div>
-        <div class="stat rose"><div class="stat-label">Transactions</div><div class="stat-val" id="rev-count">—</div></div>
-        <div class="stat violet"><div class="stat-label">Avg transaction</div><div class="stat-val" id="rev-avg">—</div></div>
-      </div>
-      <div class="card">
-        <div class="card-hdr"><span class="card-title">Daily revenue (NGN)</span></div>
-        <div style="padding:20px;height:260px"><canvas id="revenue-chart"></canvas></div>
-      </div>
-    </div>
-
-    <!-- TRANSACTIONS -->
-    <div class="pg" id="pg-tx">
-      <div class="ph">
-        <div class="ph-top">
-          <div><div class="ph-title">Transactions</div><div class="ph-sub">All completed Flutterwave payments</div></div>
-          <div class="ph-actions">
-            <button class="btn btn-ghost btn-sm" onclick="exportTxExcel()">
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 2h7l3 3v9H3z"/><path d="M10 2v4h4"/><path d="M5 9l2 2 4-4"/></svg>
-              Export Excel
-            </button>
-            <button class="btn btn-ghost btn-sm" onclick="loadTx()">Refresh</button>
-          </div>
-        </div>
-      </div>
-      <div class="card">
-        <table><thead><tr>
-          <th style="width:26%">Transaction ID</th><th style="width:16%">Plan</th>
-          <th style="width:14%">Amount</th><th style="width:12%">Tokens</th>
-          <th style="width:20%">User</th><th style="width:12%">Time</th>
-        </tr></thead>
-        <tbody id="tx-tbody"><tr><td colspan="6"><div class="loading"></div></td></tr></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- PRICING -->
-    <div class="pg" id="pg-pricing">
-      <div class="ph"><div class="ph-title">Pricing</div><div class="ph-sub">Edit plans — changes are live immediately in the app</div></div>
-      <div id="alert-pricing" class="alert"></div>
-      <div id="plan-grid" class="plan-grid"><div class="loading"></div></div>
-      <div class="card">
-        <div class="card-hdr"><span class="card-title">Add new plan</span></div>
-        <div style="padding:20px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:12px;align-items:end">
-          <div class="field" style="margin:0"><label>Key</label><input type="text" id="new-key" placeholder="enterprise"></div>
-          <div class="field" style="margin:0"><label>Label</label><input type="text" id="new-label" placeholder="Enterprise"></div>
-          <div class="field" style="margin:0"><label>Amount (NGN)</label><input type="number" id="new-amount" placeholder="10000"></div>
-          <div class="field" style="margin:0"><label>Tokens</label><input type="number" id="new-tokens" placeholder="8000"></div>
-          <button class="btn btn-gold" onclick="addPlan()">+ Add</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- NICHES -->
-    <div class="pg" id="pg-niches">
-      <div class="ph"><div class="ph-title">Niches</div><div class="ph-sub">Manage content niches — changes reflect immediately in the app</div></div>
-      <div id="alert-niches" class="alert"></div>
-      <div class="two-col">
-        <div class="card">
-          <div class="card-hdr"><span class="card-title">Add niche</span></div>
-          <div style="padding:20px">
-            <div class="field"><label>Label</label><input type="text" id="nn-label" placeholder="e.g. Parenting"></div>
-            <div class="field"><label>Key</label><input type="text" id="nn-key" placeholder="e.g. Parenting"></div>
-            <div class="field"><label>Quick-add suggestions (one per line)</label><textarea id="nn-sugg" rows="5" placeholder="Best parenting tips&#10;How to raise confident kids&#10;Screen time advice"></textarea></div>
-            <button class="btn btn-gold" style="width:100%;justify-content:center" onclick="addNiche()">Add niche</button>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-hdr"><span class="card-title">Active niches</span><button class="btn btn-ghost btn-sm" onclick="loadNiches()">Refresh</button></div>
-          <div id="niches-list"><div class="loading"></div></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- COUPONS -->
-    <div class="pg" id="pg-coupons">
-      <div class="ph"><div class="ph-title">Coupons</div><div class="ph-sub">Promo codes that grant bonus tokens on signup</div></div>
-      <div id="alert-coupons" class="alert"></div>
-      <div class="two-col">
-        <div class="card">
-          <div class="card-hdr"><span class="card-title">Create coupon</span></div>
-          <div style="padding:20px">
-            <div class="field"><label>Code</label><input type="text" id="cp-code" placeholder="e.g. LAUNCH50" style="text-transform:uppercase"></div>
-            <div class="field"><label>Bonus tokens</label><input type="number" id="cp-tokens" value="200" min="1"></div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-              <div class="field" style="margin:0"><label>Max uses (0=unlimited)</label><input type="number" id="cp-uses" value="0" min="0"></div>
-              <div class="field" style="margin:0"><label>Expires days (0=never)</label><input type="number" id="cp-days" value="0" min="0"></div>
-            </div>
-            <button class="btn btn-gold" style="width:100%;justify-content:center;margin-top:14px" onclick="createCoupon()">Create coupon</button>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-hdr"><span class="card-title">Active coupons</span><button class="btn btn-ghost btn-sm" onclick="loadCoupons()">Refresh</button></div>
-          <table><thead><tr>
-            <th style="width:30%">Code</th><th style="width:20%">Tokens</th>
-            <th style="width:22%">Uses</th><th style="width:16%">Status</th><th style="width:12%"></th>
-          </tr></thead>
-          <tbody id="coupons-tbody"><tr><td colspan="5"><div class="loading"></div></td></tr></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- QUEUE -->
-    <div class="pg" id="pg-queue">
-      <div class="ph">
-        <div class="ph-top">
-          <div><div class="ph-title">Render queue</div><div class="ph-sub">Active and recent video render jobs</div></div>
-          <button class="btn btn-ghost btn-sm" onclick="loadQueue()">Refresh</button>
-        </div>
-      </div>
-      <div style="display:flex;gap:16px;margin-bottom:16px;font-size:12px;color:var(--text3)">
-        <span style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:var(--violet);display:inline-block"></span>Processing</span>
-        <span style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:var(--gold);display:inline-block"></span>Queued</span>
-        <span style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:var(--teal);display:inline-block"></span>Complete</span>
-        <span style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:var(--rose);display:inline-block"></span>Failed</span>
-      </div>
-      <div class="card" id="queue-card"><div class="loading"></div></div>
-    </div>
-
-    <!-- FEEDBACK -->
-    <div class="pg" id="pg-feedback">
-      <div class="ph">
-        <div class="ph-top">
-          <div>
-            <div class="ph-title">User feedback</div>
-            <div class="ph-sub">Ratings and comments submitted by users</div>
-          </div>
-          <div class="ph-actions">
-            <button class="btn btn-ghost btn-sm" onclick="exportFeedbackExcel()">&#8595; Excel</button>
-            <button class="btn btn-ghost btn-sm" onclick="exportFeedbackPdf()">&#8595; PDF</button>
-            <button class="btn btn-ghost btn-sm" onclick="loadFeedback()">Refresh</button>
-          </div>
-        </div>
-      </div>
-      <div class="stat-row" style="grid-template-columns:repeat(4,1fr)" id="fb-stats">
-        <div class="stat gold"><div class="stat-label">Total responses</div><div class="stat-val" id="fb-total">—</div></div>
-        <div class="stat teal"><div class="stat-label">Avg rating</div><div class="stat-val" id="fb-avg">—</div></div>
-        <div class="stat violet"><div class="stat-label">5-star ratings</div><div class="stat-val" id="fb-five">—</div></div>
-        <div class="stat rose"><div class="stat-label">Improvement requests</div><div class="stat-val" id="fb-improve">—</div></div>
-      </div>
-      <!-- Rating distribution -->
-      <div class="two-col" style="margin-bottom:18px">
-        <div class="card">
-          <div class="card-hdr"><span class="card-title">Rating distribution</span></div>
-          <div id="fb-distribution" style="padding:18px 20px"><div class="loading"></div></div>
-        </div>
-        <div class="card">
-          <div class="card-hdr"><span class="card-title">Top tags mentioned</span></div>
-          <div id="fb-tags" style="padding:18px 20px"><div class="loading"></div></div>
-        </div>
-      </div>
-      <!-- Individual responses -->
-      <div class="card">
-        <div class="card-hdr">
-          <span class="card-title">All responses</span>
-          <div class="card-actions">
-            <select id="fb-filter" onchange="renderFeedback()" style="background:var(--ink3);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:12px;padding:5px 10px;outline:none">
-              <option value="all">All ratings</option>
-              <option value="5">5 stars only</option>
-              <option value="4">4 stars+</option>
-              <option value="3">3 stars only</option>
-              <option value="1">1-2 stars</option>
-            </select>
-          </div>
-        </div>
-        <div id="fb-list"><div class="loading"></div></div>
-      </div>
-    </div>
-
-    <!-- LOGS -->
-    <div class="pg" id="pg-logs">
-      <div class="ph"><div class="ph-title">Activity logs</div><div class="ph-sub">Recent admin actions — last 50 entries</div></div>
-      <div class="card" id="logs-card"><div class="loading"></div></div>
-    </div>
-
-    <!-- ADMINS -->
-    <div class="pg" id="pg-admins">
-      <div class="ph"><div class="ph-title">Admin users</div><div class="ph-sub">Manage dashboard access and permissions</div></div>
-      <div id="alert-admins" class="alert"></div>
-      <div class="two-col">
-        <div class="card">
-          <div class="card-hdr"><span class="card-title">Add admin user</span></div>
-          <div style="padding:20px">
-            <div class="field"><label>Full name</label><input type="text" id="na-name" placeholder="e.g. John Doe"></div>
-            <div class="field"><label>Email</label><input type="email" id="na-email" placeholder="john@example.com"></div>
-            <div class="field"><label>Temporary password</label><input type="password" id="na-pass" placeholder="They'll reset on first login"></div>
-            <div class="field"><label>Role</label>
-              <select id="na-role">
-                <option value="admin">Admin — full dashboard access</option>
-                <option value="analytics">Analytics — read-only stats & revenue</option>
-                <option value="support">Support — users & token top-up only</option>
-              </select>
-            </div>
-            <button class="btn btn-gold" style="width:100%;justify-content:center" onclick="createAdminUser()">Create admin user</button>
-          </div>
-        </div>
-        <div>
-          <div class="card" style="margin-bottom:14px">
-            <div class="card-hdr"><span class="card-title">Team</span><button class="btn btn-ghost btn-sm" onclick="loadAdmins()">Refresh</button></div>
-            <table><thead><tr>
-              <th style="width:32%">Name</th><th style="width:30%">Email</th>
-              <th style="width:20%">Role</th><th style="width:18%">Actions</th>
-            </tr></thead>
-            <tbody id="admins-tbody"><tr><td colspan="4"><div class="loading"></div></td></tr></tbody>
-            </table>
-          </div>
-          <div class="card">
-            <div class="card-hdr"><span class="card-title">Role permissions</span></div>
-            <div id="roles-list" style="padding:16px 20px"><div class="loading"></div></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-  </main>
-</div>
-
-<!-- USER MODAL -->
-<div class="modal-overlay" id="user-modal">
-  <div class="modal">
-    <div class="modal-title" id="modal-title">Manage user</div>
-    <div class="modal-sub" id="modal-sub"></div>
-    <div class="modal-metas" id="modal-metas"></div>
-    <div id="modal-body"></div>
-    <div id="modal-alert" class="alert" style="margin-top:12px"></div>
-    <div style="display:flex;justify-content:flex-end;margin-top:16px">
-      <button class="btn btn-ghost btn-sm" onclick="closeModal()">Close</button>
-    </div>
-  </div>
-</div>
-
-<script>
-var API='https://sceneforge-production-8d19.up.railway.app/api/admin';
-var USER_CACHE={};
-var AAPI='https://sceneforge-production-8d19.up.railway.app/api/admin-auth';
-var NAPI='https://sceneforge-production-8d19.up.railway.app/api/niches';
-var KEY='',ROLE='',ALL_USERS=[],MODAL_USER=null,revChart=null;
-var CACHED_RATE=0,REV_CHART_DATA=[],REV_TOTAL=0,REV_TX=0,REV_RATE=1600;
-var TX_DATA=[],ANA_DATA={};
-
-function apiFetch(path,opts){
-  opts=opts||{};
-  return fetch(API+path,Object.assign({headers:{'Content-Type':'application/json','Authorization':'Bearer '+KEY,'x-admin-key':KEY}},opts))
-    .then(function(r){return r.ok?r.json():r.json().then(function(e){throw e;});});
+  )
 }
 
-function togglePass(){
-  var i=document.getElementById('admin-pass'),b=document.querySelector('.show-btn');
-  i.type=i.type==='password'?'text':'password';b.textContent=i.type==='password'?'show':'hide';
+const primaryBtn: React.CSSProperties = {
+  background: 'linear-gradient(135deg, #7C5CFF 0%, #6344E8 100%)',
+  color: '#fff', border: 'none', borderRadius: 12,
+  padding: '11px 22px', minHeight: 44, fontSize: 14, fontWeight: 600,
+  cursor: 'pointer', fontFamily: "DM Sans, system-ui, sans-serif",
+  transition: 'opacity 0.15s, transform 0.15s',
+  boxShadow: '0 0 0 1px rgba(124,92,255,0.4)',
 }
 
-async function doLogin(){
-  var email=document.getElementById('admin-email').value.trim();
-  var pass=document.getElementById('admin-pass').value;
-  var err=document.getElementById('login-error');
-  err.classList.remove('on');
-  if(!email||!pass)return;
-  try{
-    var r=await fetch(AAPI+'/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,password:pass})});
-    if(!r.ok){err.classList.add('on');return;}
-    var d=await r.json();
-    KEY=d.access_token;ROLE=d.admin.role;
-    var parts=(d.admin.full_name||'Admin').trim().split(' ');
-    document.getElementById('sb-av').textContent=(parts.length>=2?parts[0][0]+parts[parts.length-1][0]:parts[0].slice(0,2)).toUpperCase();
-    document.getElementById('sb-name').textContent=d.admin.full_name;
-    var rc={superadmin:'var(--rose)',admin:'var(--violet)',analytics:'var(--teal)',support:'var(--gold)'};
-    document.getElementById('sb-role').innerHTML='<span style="color:'+( rc[ROLE]||'var(--text3)')+';font-size:10.5px;text-transform:capitalize">'+ROLE+'</span>';
-    document.getElementById('login-screen').style.display='none';
-    document.getElementById('admin-shell').classList.add('on');
-    if(d.admin.must_reset_password){document.getElementById('reset-overlay').classList.add('on');}
-    if(ROLE==='superadmin'){document.getElementById('sec-admins').style.display='block';document.getElementById('nb-admins').style.display='flex';}
-    applyRoleRestrictions();
-    loadDash();
-  }catch(e){err.classList.add('on');}
-}
-document.getElementById('admin-email').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
-document.getElementById('admin-pass').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
-
-function applyRoleRestrictions(){
-  var access={analytics:['nb-dashboard','nb-analytics','nb-revenue','nb-tx','nb-feedback'],support:['nb-dashboard','nb-users','nb-topup','nb-queue','nb-logs','nb-feedback']};
-  var allowed=access[ROLE];
-  if(!allowed)return;
-  var all=['nb-dashboard','nb-analytics','nb-users','nb-topup','nb-broadcast','nb-revenue','nb-tx','nb-pricing','nb-niches','nb-coupons','nb-queue','nb-logs','nb-feedback'];
-  all.forEach(function(id){var el=document.getElementById(id);if(el)el.style.display=allowed.indexOf(id)>=0?'flex':'none';});
-  var secs={'sec-users':['nb-users','nb-topup','nb-broadcast'],'sec-revenue':['nb-revenue','nb-tx','nb-pricing','nb-niches','nb-coupons'],'sec-system':['nb-queue','nb-logs','nb-feedback']};
-  Object.keys(secs).forEach(function(s){var el=document.getElementById(s);if(el)el.style.display=secs[s].some(function(id){return allowed.indexOf(id)>=0;})?'block':'none';});
+const ghostBtn: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.05)',
+  color: 'rgba(255,255,255,0.85)',
+  border: '1px solid rgba(255,255,255,0.18)',
+  borderRadius: 12, padding: '11px 20px', minHeight: 44,
+  fontSize: 14, fontWeight: 500, cursor: 'pointer',
+  fontFamily: "DM Sans, system-ui, sans-serif", transition: 'border-color 0.15s',
 }
 
-function doLogout(){
-  if(!confirm('Sign out of the dashboard?'))return;
-  KEY='';ROLE='';
-  document.getElementById('admin-email').value='';document.getElementById('admin-pass').value='';
-  document.getElementById('admin-shell').classList.remove('on');
-  document.getElementById('reset-overlay').classList.remove('on');
-  document.getElementById('login-screen').style.display='';
-  document.getElementById('sec-admins').style.display='none';
-  document.getElementById('nb-admins').style.display='none';
+const sectionEyebrow: React.CSSProperties = {
+  fontSize: 11, fontWeight: 700, color: '#A78BFA',
+  textTransform: 'uppercase', letterSpacing: '0.12em', margin: '0 0 12px',
 }
 
-function nav(id,btn){
-  document.querySelectorAll('.pg').forEach(function(p){p.classList.remove('on');});
-  document.querySelectorAll('.nb').forEach(function(b){b.classList.remove('on');});
-  var pg=document.getElementById('pg-'+id);
-  if(pg)pg.classList.add('on');
-  btn.classList.add('on');
-  var loaders={dashboard:loadDash,analytics:loadAnalytics,users:loadUsers,broadcast:loadBroadcasts,revenue:loadRevenue,tx:loadTx,pricing:loadPricing,niches:loadNiches,coupons:loadCoupons,queue:loadQueue,logs:loadLogs,admins:loadAdmins,feedback:loadFeedback};
-  if(loaders[id])loaders[id]();
+const sectionTitle: React.CSSProperties = {
+  fontFamily: "Syne, system-ui, sans-serif",
+  fontSize: 'clamp(26px, 4vw, 36px)',
+  fontWeight: 800, letterSpacing: '-1px',
+  color: '#FFFFFF', margin: '0 auto', lineHeight: 1.15,
 }
 
-function fmt(n){return Number(n||0).toLocaleString();}
-function ago(ts){if(!ts)return'—';var s=Math.floor((new Date()-new Date(ts))/1000);if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
-function planTag(p){var cls={free:'tag-free',starter:'tag-starter',pro:'tag-pro',studio:'tag-studio'}[p]||'tag-free';return '<span class="tag '+cls+'">'+(p||'free')+'</span>';}
-function showAlert(page,msg,type){var el=document.getElementById('alert-'+page);if(!el)return;el.className='alert alert-'+(type==='success'?'ok':'err')+' on';el.textContent=msg;setTimeout(function(){el.classList.remove('on');},6000);}
-
-async function loadDash(){
-  try{
-    var s=await apiFetch('/stats');
-    var cards=document.getElementById('stats-grid').querySelectorAll('.stat');
-    cards[0].querySelector('.stat-val').textContent=fmt(s.total_users);
-    cards[1].querySelector('.stat-val').textContent=fmt(s.total_videos_created);
-    cards[2].querySelector('.stat-val').textContent=fmt(s.total_transactions);
-    cards[3].querySelector('.stat-val').textContent=fmt(s.total_tokens_in_circulation);
-    var u=await apiFetch('/users');ALL_USERS=u.users||[];
-    var rows=ALL_USERS.slice(0,8).map(function(u){
-      USER_CACHE[u.id]=u;
-      var row='<tr>';
-      row+='<td><div style="font-weight:600;color:var(--text);font-size:13px">'+(u.full_name||'-')+'</div>';
-      row+='<div style="font-size:11px;color:var(--text3)">'+u.email+'</div></td>';
-      row+='<td>'+planTag(u.plan)+'</td>';
-      row+='<td style="font-family:monospace;color:'+(u.tokens_remaining<100?'var(--rose)':'var(--text2)')+'">'+fmt(u.tokens_remaining)+'</td>';
-      row+='<td>'+(u.videos_created||0)+'</td>';
-      row+='<td style="color:var(--text3)">'+ago(u.created_at)+'</td>';
-      row+='<td><button class="btn btn-ghost btn-xs" id="mb-'+u.id+'">Manage</button></td>';
-      row+='</tr>';
-      setTimeout(function(){var b=document.getElementById('mb-'+u.id);if(b)b.onclick=function(){openModal(u.id);};},0);
-      return row;
-    }).join('');
-    document.getElementById('recent-body').innerHTML='<table><thead><tr><th style="width:30%">User</th><th style="width:12%">Plan</th><th style="width:13%">Tokens</th><th style="width:8%">Videos</th><th style="width:12%">Joined</th><th style="width:14%">Actions</th></tr></thead><tbody>'+rows+'</tbody></table>';
-  }catch(e){console.error(e);}
+const pill: React.CSSProperties = {
+  fontSize: 11, fontWeight: 600, padding: '3px 9px',
+  borderRadius: 100, display: 'inline-block',
 }
-
-async function loadAnalytics(){
-  try{
-    var s=await apiFetch('/stats');ANA_DATA=s;
-    document.getElementById('m-avg').textContent=s.avg_scenes_per_video||0;
-    document.getElementById('m-scenes').textContent=fmt(s.total_scenes_generated||0);
-    document.getElementById('m-videos').textContent=fmt(s.total_videos_created||0);
-    var niches=s.top_niches||{},maxN=Math.max.apply(null,Object.values(niches).concat([1]));
-    document.getElementById('niches-analytics').innerHTML=Object.keys(niches).length?Object.entries(niches).sort(function(a,b){return b[1]-a[1];}).map(function(e){return '<div class="bar-row"><span class="bar-label">'+e[0]+'</span><div class="bar-track"><div class="bar-fill" style="width:'+Math.round(e[1]/maxN*100)+'%;background:var(--gold)"></div></div><span class="bar-count">'+e[1]+'</span></div>';}).join(''):'<div style="color:var(--text3);font-size:13px">No niche data yet</div>';
-    var plans=s.users_by_plan||{},total=Math.max(Object.values(plans).reduce(function(a,b){return a+b;},0),1);
-    var pc={free:'rgba(255,255,255,0.3)',starter:'var(--violet)',pro:'var(--gold)',studio:'var(--teal)'};
-    document.getElementById('plans-analytics').innerHTML=Object.entries(plans).map(function(e){return '<div class="bar-row"><span class="bar-label" style="text-transform:capitalize">'+e[0]+'</span><div class="bar-track"><div class="bar-fill" style="width:'+Math.round(e[1]/total*100)+'%;background:'+(pc[e[0]]||'var(--violet)')+'"></div></div><span class="bar-count">'+e[1]+'</span></div>';}).join('');
-  }catch(e){console.error(e);}
-}
-
-async function loadUsers(){
-  document.getElementById('users-tbody').innerHTML='<tr><td colspan="6"><div class="loading"></div></td></tr>';
-  try{var d=await apiFetch('/users');ALL_USERS=d.users||[];renderUsers(ALL_USERS);}
-  catch(e){document.getElementById('users-tbody').innerHTML='<tr><td colspan="6" style="color:var(--rose);text-align:center;padding:20px">Failed to load users</td></tr>';}
-}
-function renderUsers(users){
-  if(!users.length){document.getElementById('users-tbody').innerHTML='<tr><td colspan="6" class="loading">No users found</td></tr>';return;}
-  document.getElementById('users-tbody').innerHTML=users.map(function(u){
-    USER_CACHE[u.id]=u;
-    var row='<tr>';
-    row+='<td><div style="font-weight:600;color:var(--text)">'+(u.full_name||'-')+'</div>';
-    row+='<div style="font-size:11px;color:var(--text3)">'+u.email+'</div></td>';
-    row+='<td>'+planTag(u.plan)+(u.suspended?' <span class="tag tag-red">Sus</span>':'')+'</td>';
-    row+='<td style="font-family:monospace;color:'+(u.tokens_remaining<100?'var(--rose)':'var(--text2)')+'">'+fmt(u.tokens_remaining)+'</td>';
-    row+='<td style="color:var(--text2)">'+(u.videos_created||0)+'</td>';
-    row+='<td style="color:var(--text3)">'+ago(u.created_at)+'</td>';
-    row+='<td><button class="btn btn-ghost btn-xs" id="mb-'+u.id+'">Manage</button></td>';
-    row+='</tr>';
-    return row;
-  }).join('');
-  // Attach click handlers after DOM update
-  users.forEach(function(u){
-    var b=document.getElementById('mb-'+u.id);
-    if(b) b.onclick=function(){openModal(u.id);};
-  });
-}
-function filterUsers(){var q=document.getElementById('user-search').value.toLowerCase();renderUsers(ALL_USERS.filter(function(u){return (u.email||'').toLowerCase().includes(q)||(u.full_name||'').toLowerCase().includes(q);}));}
-async function exportCSV(){var r=await fetch(API+'/users/export/csv',{headers:{'Authorization':'Bearer '+KEY,'x-admin-key':KEY}});var b=await r.blob();var url=URL.createObjectURL(b);var a=document.createElement('a');a.href=url;a.download='sceneforge_users.csv';a.click();URL.revokeObjectURL(url);}
-
-function openModal(uid){
-  var user = USER_CACHE[uid];
-  if (!user) return;
-  MODAL_USER=user;
-  document.getElementById('modal-title').textContent=user.full_name||user.email;
-  document.getElementById('modal-sub').textContent=user.email;
-  document.getElementById('modal-metas').innerHTML='<div class="modal-meta"><div class="modal-meta-val" style="color:'+(user.tokens_remaining<100?'var(--rose)':'var(--teal)')+'">'+fmt(user.tokens_remaining)+'</div><div class="modal-meta-lbl">Tokens remaining</div></div><div class="modal-meta"><div class="modal-meta-val" style="color:var(--gold)">'+(user.videos_created||0)+'</div><div class="modal-meta-lbl">Videos created</div></div>';
-  document.getElementById('modal-body').innerHTML='<div class="modal-row"><input type="number" id="mt" value="'+user.tokens_remaining+'" placeholder="Token amount"><button class="btn btn-teal btn-sm" onclick="mAdd()">Add tokens</button><button class="btn btn-ghost btn-sm" onclick="mSet()">Set exact</button></div><div class="modal-row"><select id="mp"><option value="free"'+(user.plan==='free'?' selected':'')+'>Free</option><option value="starter"'+(user.plan==='starter'?' selected':'')+'>Starter</option><option value="pro"'+(user.plan==='pro'?' selected':'')+'>Pro</option><option value="studio"'+(user.plan==='studio'?' selected':'')+'>Studio</option></select><button class="btn btn-ghost btn-sm" onclick="mPlan()">Set plan</button></div><div class="modal-row"><button class="btn btn-danger btn-sm" style="flex:1" onclick="mSuspend()">'+(user.suspended?'Unsuspend':'Suspend')+' account</button><button class="btn btn-xs" style="background:rgba(248,113,113,0.12);color:var(--rose);border:1px solid rgba(248,113,113,0.2)" onclick="mDelete()">Delete</button></div>';
-  document.getElementById('modal-alert').className='alert';
-  document.getElementById('user-modal').classList.add('on');
-}
-function closeModal(){document.getElementById('user-modal').classList.remove('on');}
-function mAlert(msg,t){var e=document.getElementById('modal-alert');e.className='alert alert-'+(t||'ok')+' on';e.textContent=msg;}
-async function mAdd(){var a=parseInt(document.getElementById('mt').value);if(!a)return;try{var r=await apiFetch('/users/top-up',{method:'POST',body:JSON.stringify({user_id:MODAL_USER.id,tokens:a,reason:'Admin top-up'})});mAlert('Added '+fmt(a)+' tokens. Balance: '+fmt(r.tokens_remaining));loadUsers();}catch(e){mAlert(e.detail||'Error','err');}}
-async function mSet(){var a=parseInt(document.getElementById('mt').value);if(isNaN(a))return;try{await apiFetch('/users/set-tokens',{method:'POST',body:JSON.stringify({user_id:MODAL_USER.id,tokens:a,reason:'Admin set'})});mAlert('Balance set to '+fmt(a));loadUsers();}catch(e){mAlert(e.detail||'Error','err');}}
-async function mPlan(){var p=document.getElementById('mp').value;try{await apiFetch('/users/set-plan',{method:'POST',body:JSON.stringify({user_id:MODAL_USER.id,plan:p})});mAlert('Plan updated to '+p);loadUsers();}catch(e){mAlert(e.detail||'Error','err');}}
-async function mSuspend(){if(!confirm((MODAL_USER.suspended?'Unsuspend':'Suspend')+' '+MODAL_USER.email+'?'))return;try{await apiFetch('/users/suspend',{method:'POST',body:JSON.stringify({user_id:MODAL_USER.id,suspended:!MODAL_USER.suspended,reason:'Admin action'})});mAlert('Done');MODAL_USER.suspended=!MODAL_USER.suspended;loadUsers();}catch(e){mAlert(e.detail||'Error','err');}}
-async function mDelete(){if(!confirm('DELETE '+MODAL_USER.email+'?')||!confirm('This cannot be undone.'))return;try{await apiFetch('/users/'+MODAL_USER.id,{method:'DELETE'});closeModal();loadUsers();}catch(e){mAlert(e.detail||'Error','err');}}
-
-async function doTopUp(){
-  var ref=document.getElementById('topup-user').value.trim(),amt=parseInt(document.getElementById('topup-amount').value),reason=document.getElementById('topup-reason').value.trim()||'Admin top-up';
-  if(!ref||!amt)return;
-  try{
-    var uid=ref;
-    if(ref.indexOf('@')>=0){var d=await apiFetch('/users');var f=(d.users||[]).find(function(u){return (u.email||'').toLowerCase()===ref.toLowerCase();});if(!f){showAlert('topup','User not found','error');return;}uid=f.id;}
-    var r=await apiFetch('/users/top-up',{method:'POST',body:JSON.stringify({user_id:uid,tokens:amt,reason:reason})});
-    showAlert('topup','Credited '+fmt(amt)+' tokens to '+r.user+'. Balance: '+fmt(r.tokens_remaining),'success');
-    document.getElementById('topup-user').value='';document.getElementById('topup-reason').value='';
-  }catch(e){showAlert('topup',e.detail||'Failed','error');}
-}
-function setTopup(n){document.getElementById('topup-amount').value=n;}
-
-var BC_TARGET='all';
-var BC_UPLOADED_EMAILS=[];
-var BC_HISTORY=[];
-var BC_DETAIL=null;
-
-function setBcTarget(t){
-  BC_TARGET=t;
-  ['all','plan','user','upload'].forEach(function(x){
-    var btn=document.getElementById('bt-'+x);
-    if(btn)btn.className='btn btn-sm '+(x===t?'btn-teal':'btn-ghost');
-  });
-  document.getElementById('bc-plan-row').style.display=t==='plan'?'block':'none';
-  document.getElementById('bc-user-row').style.display=t==='user'?'block':'none';
-  document.getElementById('bc-upload-row').style.display=t==='upload'?'block':'none';
-}
-
-// ── Editor helpers ────────────────────────────────────────────────────────────
-function bcFormat(cmd,val){
-  document.getElementById('bc-editor').focus();
-  document.execCommand(cmd,false,val||null);
-}
-function bcEditorInput(){
-  // keep placeholder logic handled by CSS :empty
-}
-function bcInsertLink(){
-  var url=prompt('Enter URL:','https://');
-  if(!url)return;
-  var text=prompt('Link text (leave blank to use URL):','')||url;
-  document.getElementById('bc-editor').focus();
-  document.execCommand('insertHTML',false,'<a href="'+url+'" style="color:#A78BFA">'+text+'</a>');
-}
-function bcInsertTag(){
-  document.getElementById('bc-editor').focus();
-  document.execCommand('insertText',false,'{{name}}');
-}
-function bcGetContent(){
-  return document.getElementById('bc-editor').innerHTML;
-}
-function bcGetText(){
-  return document.getElementById('bc-editor').innerText||'';
-}
-function bcClear(){
-  document.getElementById('bc-editor').innerHTML='';
-  document.getElementById('bc-subject').value='';
-  document.getElementById('bc-preview-wrap').style.display='none';
-  BC_UPLOADED_EMAILS=[];
-  document.getElementById('bc-upload-status').style.display='none';
-  document.getElementById('bc-email-list').value='';
-}
-
-// ── CSV upload ────────────────────────────────────────────────────────────────
-function bcReadFile(file){
-  if(!file)return;
-  var reader=new FileReader();
-  reader.onload=function(e){
-    bcParseEmails(e.target.result);
-  };
-  reader.readAsText(file);
-}
-function bcHandleDrop(e){
-  e.preventDefault();
-  e.currentTarget.style.borderColor='rgba(255,255,255,0.12)';
-  var file=e.dataTransfer.files[0];
-  if(file)bcReadFile(file);
-}
-function bcParseEmails(text){
-  var emails=text.split(/[\n,;\r]+/).map(function(e){
-    return e.trim().replace(/^["']|["']$/g,'').toLowerCase();
-  }).filter(function(e){
-    return e.indexOf('@')>0 && e.indexOf('.')>1;
-  });
-  var unique=[...new Set(emails)];
-  BC_UPLOADED_EMAILS=unique;
-  var el=document.getElementById('bc-upload-status');
-  el.style.display='block';
-  el.textContent='✓ '+unique.length+' valid email'+(unique.length===1?'':'s')+' loaded';
-  document.getElementById('bc-email-list').value=unique.join('\n');
-}
-
-// ── Preview ───────────────────────────────────────────────────────────────────
-function toggleBcPreview(){
-  var w=document.getElementById('bc-preview-wrap');
-  if(w.style.display==='none'||!w.style.display){
-    w.style.display='block';
-    var html=bcGetContent().replace(/{{name}}/g,'Creator').replace(/{{email}}/g,'creator@example.com');
-    document.getElementById('bc-preview-body').innerHTML=html;
-  }else{w.style.display='none';}
-}
-
-// ── Send ──────────────────────────────────────────────────────────────────────
-async function doBroadcast(){
-  var subj=document.getElementById('bc-subject').value.trim();
-  var html=bcGetContent();
-  var text=bcGetText().trim();
-  if(!subj||!text){showAlert('broadcast','Fill subject and message','error');return;}
-
-  var body={subject:subj,message:text,html:html,target:BC_TARGET};
-
-  if(BC_TARGET==='plan'){
-    var plan=document.getElementById('bc-plan').value;
-    if(!plan){showAlert('broadcast','Select a plan','error');return;}
-    body.plan=plan;
-  } else if(BC_TARGET==='user'){
-    var userId=document.getElementById('bc-user-id').value.trim();
-    if(!userId){showAlert('broadcast','Enter a user ID or email','error');return;}
-    body.user_id=userId;
-  } else if(BC_TARGET==='upload'){
-    // Parse from textarea in case user typed directly
-    var rawList=document.getElementById('bc-email-list').value;
-    if(rawList.trim())bcParseEmails(rawList);
-    if(!BC_UPLOADED_EMAILS.length){showAlert('broadcast','Upload or paste email addresses first','error');return;}
-    body.email_list=BC_UPLOADED_EMAILS;
-    body.target='upload';
-  }
-
-  var label=BC_TARGET==='all'?'ALL users'
-    :BC_TARGET==='plan'?'all '+body.plan.toUpperCase()+' users'
-    :BC_TARGET==='user'?'user '+body.user_id.slice(0,12)+'...'
-    :BC_UPLOADED_EMAILS.length+' uploaded emails';
-
-  if(!confirm('Send "'+subj+'" to '+label+'?\n\nThis cannot be undone.'))return;
-
-  try{
-    var r=await apiFetch('/broadcast',{method:'POST',body:JSON.stringify(body)});
-    showAlert('broadcast','✅ Sent: '+r.sent+' | Failed: '+r.failed+' | Skipped: '+r.skipped,'success');
-    bcClear();
-    loadBroadcasts();
-  }catch(e){showAlert('broadcast',e.detail||'Broadcast failed','error');}
-}
-
-// ── History ───────────────────────────────────────────────────────────────────
-function bcTargetLabel(b){
-  if(b.target==='plan')return '📋 Plan: '+b.plan;
-  if(b.target==='user')return '👤 User';
-  if(b.target==='upload')return '📩 '+b.recipients+' uploaded emails';
-  return '🌐 All users';
-}
-
-async function loadBroadcasts(){
-  try{
-    var d=await apiFetch('/broadcasts'),list=d.broadcasts||[];
-    BC_HISTORY=list;
-    document.getElementById('broadcast-history').innerHTML=list.length
-      ?list.map(function(b,idx){
-        return '<div class="bc-item" style="cursor:pointer" onclick="openBcDetail('+idx+')">'
-          +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">'
-          +'<div class="bc-subj">'+b.subject+'</div>'
-          +'<span style="font-size:10px;color:var(--text3);white-space:nowrap">'+ago(b.ts)+'</span>'
-          +'</div>'
-          +'<div class="bc-meta">'+bcTargetLabel(b)
-          +' &middot; <span style="color:var(--teal)">'+b.sent+' sent</span>'
-          +(b.failed>0?' &middot; <span style="color:var(--rose)">'+b.failed+' failed</span>':'')
-          +'</div>'
-          +'<div style="margin-top:6px;display:flex;gap:6px">'
-          +'<span style="font-size:10px;color:var(--text3);background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:5px;padding:2px 8px">View &rarr;</span>'
-          +'<span style="font-size:10px;color:var(--teal);background:rgba(45,212,191,0.07);border:1px solid rgba(45,212,191,0.15);border-radius:5px;padding:2px 8px">Reuse</span>'
-          +'</div>'
-          +'</div>';
-      }).join('')
-      :'<div class="loading">No broadcasts yet</div>';
-  }catch(e){document.getElementById('broadcast-history').innerHTML='<div class="loading">Failed</div>';}
-}
-
-function openBcDetail(idx){
-  var b=BC_HISTORY[idx];if(!b)return;
-  BC_DETAIL=b;
-  // Badge
-  var tl=bcTargetLabel(b);
-  document.getElementById('bc-detail-badge').innerHTML='<span style="display:inline-flex;align-items:center;gap:6px;background:rgba(201,168,76,0.1);border:1px solid rgba(201,168,76,0.2);border-radius:100px;padding:4px 12px;font-size:11px;color:var(--gold)">'+tl+'</span>';
-  document.getElementById('bc-detail-subject').textContent=b.subject;
-  document.getElementById('bc-detail-meta').innerHTML=
-    '<span style="color:var(--teal)">'+b.sent+' sent</span>'
-    +(b.failed>0?' &middot; <span style="color:var(--rose)">'+b.failed+' failed</span>':'')
-    +' &middot; '+ago(b.ts);
-  // Body - use html if available, else plain text
-  var bodyEl=document.getElementById('bc-detail-body');
-  if(b.html){bodyEl.innerHTML=b.html;bodyEl.style.whiteSpace='normal';}
-  else{bodyEl.textContent=b.message||b.body||'(no body stored)';bodyEl.style.whiteSpace='pre-wrap';}
-  var modal=document.getElementById('bc-detail-modal');
-  modal.style.display='flex';
-}
-function toggleSidebar(){
-  var sb=document.getElementById('sidebar');
-  var ov=document.getElementById('sb-overlay');
-  sb.classList.toggle('open');
-  ov.classList.toggle('open');
-  document.body.style.overflow=sb.classList.contains('open')?'hidden':'';
-}
-
-function closeSidebarOnMobile(){
-  if(window.innerWidth<=768) toggleSidebar();
-}
-
-// Update mobile role badge when logged in
-function updateMobileRole(){
-  var badge=document.getElementById('mobile-role-badge');
-  if(badge&&ROLE) badge.textContent=ROLE.toUpperCase();
-}
-
-function closeBcDetail(){document.getElementById('bc-detail-modal').style.display='none';}
-function bcReuseTemplate(){
-  if(!BC_DETAIL)return;
-  document.getElementById('bc-subject').value=BC_DETAIL.subject||'';
-  var editor=document.getElementById('bc-editor');
-  if(BC_DETAIL.html)editor.innerHTML=BC_DETAIL.html;
-  else editor.innerText=BC_DETAIL.message||BC_DETAIL.body||'';
-  closeBcDetail();
-  showAlert('broadcast','Template loaded — edit and send when ready','success');
-}
-function bcLoadTemplate(){
-  if(!BC_HISTORY.length){showAlert('broadcast','No broadcast history yet','error');return;}
-  openBcDetail(0); // open most recent
-}
-
-async function loadRevenue(){
-  try{
-    var d=await apiFetch('/revenue/chart'),chart=d.chart||[],total=d.total_revenue||0,txCount=d.total_transactions||0;
-    // Fetch live exchange rate
-    var rate=CACHED_RATE||1600;
-    try{
-      if(!CACHED_RATE){
-        var er=await fetch('https://open.er-api.com/v6/latest/USD');
-        var erd=await er.json();
-        rate=erd.rates&&erd.rates.NGN?erd.rates.NGN:1600;
-        CACHED_RATE=rate;
-      }
-    }catch(e){rate=CACHED_RATE||1600;}
-    var totalUsd=(total/rate);
-    var avgNgn=txCount>0?Math.round(total/txCount):0;
-    function _set(id,val){var el=document.getElementById(id);if(el)el.textContent=val;}
-    _set('rev-ngn','₦'+fmt(Math.round(total)));
-    _set('rev-usd','$'+totalUsd.toFixed(2));
-    _set('rev-usd-sub','≈ $'+totalUsd.toFixed(2)+' USD');
-    _set('rev-rate-sub','Rate: ₦'+Math.round(rate)+'/$1');
-    _set('rev-count',fmt(txCount));
-    _set('rev-avg','₦'+fmt(avgNgn));
-    REV_CHART_DATA=chart; REV_TOTAL=total; REV_TX=txCount; REV_RATE=rate;
-    var ctx=document.getElementById('revenue-chart').getContext('2d');
-    if(revChart)revChart.destroy();
-    revChart=new Chart(ctx,{type:'bar',data:{labels:chart.map(function(c){return c.date.slice(5);}),datasets:[{data:chart.map(function(c){return c.amount;}),backgroundColor:'rgba(201,168,76,0.25)',borderColor:'rgba(201,168,76,0.7)',borderWidth:1,borderRadius:4,hoverBackgroundColor:'rgba(201,168,76,0.4)'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'rgba(240,240,248,0.35)',font:{size:10,family:'DM Mono'}}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'rgba(240,240,248,0.35)',font:{size:10,family:'DM Mono'}},beginAtZero:true}}}});
-  }catch(e){console.error(e);}
-}
-
-async function loadTx(){
-  try{var d=await apiFetch('/transactions'),txns=d.transactions||[];TX_DATA=txns;document.getElementById('tx-tbody').innerHTML=txns.length?txns.map(function(t){return '<tr><td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text3)">'+(t.transaction_id||'—')+'</td><td>'+(t.plan?'<span class="tag tag-green">'+t.plan+'</span>':'—')+'</td><td style="font-family:DM Mono,monospace;color:var(--teal)">'+(t.amount?'N'+fmt(t.amount):'—')+'</td><td style="font-family:DM Mono,monospace">'+(t.tokens?fmt(t.tokens):'—')+'</td><td style="color:var(--text3)">'+(t.email||'—')+'</td><td style="color:var(--text3)">'+ago(t.ts)+'</td></tr>';}).join(''):'<tr><td colspan="6" class="loading">No transactions yet</td></tr>';}
-  catch(e){document.getElementById('tx-tbody').innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--rose);padding:20px">Failed to load</td></tr>';}
-}
-
-async function loadPricing(){
-  try{
-    var d=await apiFetch('/pricing'),plans=d.plans||{};
-    var colors={starter:'var(--violet)',pro:'var(--gold)',studio:'var(--teal)'};
-    document.getElementById('plan-grid').innerHTML=Object.keys(plans).map(function(k){
-      var p=plans[k];
-      return '<div class="plan-card"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px"><div style="font-family:Syne,sans-serif;font-size:15px;font-weight:800;color:'+(colors[k]||'var(--gold)')+'">'+p.label+'</div><button class="btn btn-danger btn-xs" onclick="deletePlan(\''+k+'\')">Remove</button></div><div class="field" style="margin-bottom:8px"><label>Label</label><input type="text" id="lbl-'+k+'" value="'+p.label+'"></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px"><div class="field" style="margin:0"><label>Price (NGN)</label><input type="number" id="amt-'+k+'" value="'+p.amount+'"></div><div class="field" style="margin:0"><label>Tokens</label><input type="number" id="tok-'+k+'" value="'+p.tokens+'"></div></div><div style="font-size:11px;color:var(--text3);margin-bottom:12px">'+Math.floor(p.tokens/100)+' videos &middot; key: <code style="font-family:DM Mono,monospace;background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px">'+k+'</code></div><button class="btn btn-teal btn-sm" style="width:100%;justify-content:center" onclick="savePlan(\''+k+'\')">Save changes</button></div>';
-    }).join('');
-  }catch(e){document.getElementById('plan-grid').innerHTML='<div class="loading">Failed to load</div>';}
-}
-async function savePlan(k){var label=document.getElementById('lbl-'+k).value.trim(),amount=parseInt(document.getElementById('amt-'+k).value),tokens=parseInt(document.getElementById('tok-'+k).value);if(!label||!amount||!tokens)return;try{await apiFetch('/pricing/'+k,{method:'PUT',body:JSON.stringify({plan_key:k,label:label,amount:amount,tokens:tokens,currency:'NGN'})});showAlert('pricing',label+' updated successfully','success');loadPricing();}catch(e){showAlert('pricing',e.detail||'Failed','error');}}
-async function deletePlan(k){if(!confirm('Delete plan "'+k+'"?'))return;try{await apiFetch('/pricing/'+k,{method:'DELETE'});showAlert('pricing','Plan removed','success');loadPricing();}catch(e){showAlert('pricing',e.detail||'Failed','error');}}
-async function addPlan(){var k=document.getElementById('new-key').value.trim().toLowerCase(),label=document.getElementById('new-label').value.trim(),amount=parseInt(document.getElementById('new-amount').value),tokens=parseInt(document.getElementById('new-tokens').value);if(!k||!label||!amount||!tokens)return;try{await apiFetch('/pricing',{method:'POST',body:JSON.stringify({plan_key:k,label:label,amount:amount,tokens:tokens,currency:'NGN'})});showAlert('pricing','Plan added','success');['new-key','new-label','new-amount','new-tokens'].forEach(function(id){document.getElementById(id).value='';});loadPricing();}catch(e){showAlert('pricing',e.detail||'Failed','error');}}
-
-async function loadNiches(){
-  try{
-    var r=await fetch(NAPI),d=await r.json(),niches=d.niches||[];
-    document.getElementById('niches-list').innerHTML=niches.length?'<div class="niche-grid">'+niches.map(function(n){
-      var suggs=(n.suggestions||[]).slice(0,2).join(', ');
-      return '<div class="niche-chip"><div><div style="font-weight:600;font-size:12px">'+n.label+'</div>'+(suggs?'<div style="font-size:10.5px;color:var(--text3);margin-top:1px">'+suggs+'...</div>':'')+'</div><button class="niche-chip-del" onclick="deleteNiche(\''+n.key+'\')" title="Remove">&#215;</button></div>';
-    }).join('')+'</div>':'<div class="loading">No niches yet</div>';
-  }catch(e){document.getElementById('niches-list').innerHTML='<div class="loading">Failed to load</div>';}
-}
-async function addNiche(){
-  var label=document.getElementById('nn-label').value.trim(),key=document.getElementById('nn-key').value.trim().replace(/\s+/g,'');
-  var suggs=document.getElementById('nn-sugg').value.trim().split('\n').map(function(s){return s.trim();}).filter(Boolean);
-  if(!label||!key){showAlert('niches','Label and key are required','error');return;}
-  try{await fetch(NAPI+'/admin',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+KEY,'x-admin-key':KEY},body:JSON.stringify({key:key,label:label,suggestions:suggs})}).then(function(r){return r.ok?r.json():r.json().then(function(e){throw e;});});showAlert('niches',label+' niche added','success');document.getElementById('nn-label').value='';document.getElementById('nn-key').value='';document.getElementById('nn-sugg').value='';loadNiches();}
-  catch(e){showAlert('niches',e.detail||'Failed','error');}
-}
-async function deleteNiche(key){if(!confirm('Remove niche "'+key+'"?'))return;try{await fetch(NAPI+'/admin/'+key,{method:'DELETE',headers:{'Authorization':'Bearer '+KEY,'x-admin-key':KEY}}).then(function(r){return r.ok?r.json():r.json().then(function(e){throw e;});});showAlert('niches','Removed','success');loadNiches();}catch(e){showAlert('niches',e.detail||'Failed','error');}}
-
-async function loadCoupons(){
-  try{var d=await apiFetch('/coupons'),coupons=d.coupons||[];document.getElementById('coupons-tbody').innerHTML=coupons.length?coupons.map(function(c){return '<tr><td style="font-family:DM Mono,monospace;font-weight:500;color:var(--gold)">'+c.code+'</td><td style="font-family:DM Mono,monospace">+'+fmt(c.tokens)+'</td><td style="font-family:DM Mono,monospace">'+c.uses+(c.max_uses>0?' / '+c.max_uses:' / &#8734;')+'</td><td>'+(c.active?'<span class="tag tag-green">Active</span>':'<span class="tag tag-free">Off</span>')+'</td><td><button class="btn btn-danger btn-xs" onclick="deleteCoupon(\''+c.code+'\')">Del</button></td></tr>';}).join(''):'<tr><td colspan="5" class="loading">No coupons yet</td></tr>';}
-  catch(e){document.getElementById('coupons-tbody').innerHTML='<tr><td colspan="5" class="loading">Failed</td></tr>';}
-}
-async function createCoupon(){var code=document.getElementById('cp-code').value.trim().toUpperCase(),tokens=parseInt(document.getElementById('cp-tokens').value),max_uses=parseInt(document.getElementById('cp-uses').value)||0,expires_days=parseInt(document.getElementById('cp-days').value)||0;if(!code||!tokens){showAlert('coupons','Fill code and tokens','error');return;}try{await apiFetch('/coupons',{method:'POST',body:JSON.stringify({code:code,tokens:tokens,max_uses:max_uses,expires_days:expires_days})});showAlert('coupons','Coupon '+code+' created','success');document.getElementById('cp-code').value='';loadCoupons();}catch(e){showAlert('coupons',e.detail||'Failed','error');}}
-async function deleteCoupon(code){if(!confirm('Delete coupon '+code+'?'))return;try{await apiFetch('/coupons/'+code,{method:'DELETE'});showAlert('coupons','Deleted','success');loadCoupons();}catch(e){showAlert('coupons',e.detail||'Failed','error');}}
-
-async function loadQueue(){
-  var card=document.getElementById('queue-card');
-  try{
-    var d=await apiFetch('/queue'),jobs=d.jobs||[];
-    var colors={processing:'var(--violet)',queued:'var(--gold)',complete:'var(--teal)',failed:'var(--rose)'};
-    card.innerHTML=jobs.length?'<div>'+jobs.map(function(j){return '<div class="queue-row"><div class="q-dot" style="background:'+(colors[j.status]||'#888')+'"></div><div style="font-family:DM Mono,monospace;font-size:11px;color:var(--text3);min-width:110px">'+j.job_id.slice(0,8)+'...</div><span class="tag" style="background:'+(colors[j.status]||'#888')+'22;color:'+(colors[j.status]||'#888')+';min-width:80px;justify-content:center">'+j.status+'</span><div style="flex:1;font-size:12px;color:var(--text2)">'+(j.stage||'')+'</div><div class="q-bar"><div class="q-fill" style="width:'+(j.pct||0)+'%;background:'+(colors[j.status]||'#888')+'"></div></div><span style="font-family:DM Mono,monospace;font-size:11px;color:var(--text3);min-width:32px;text-align:right">'+(j.pct||0)+'%</span></div>';}).join('')+'</div>':'<div class="loading">No active render jobs</div>';
-  }catch(e){card.innerHTML='<div class="loading">Failed to load</div>';}
-}
-
-async function loadLogs(){
-  try{
-    var d=await apiFetch('/logs'),logs=d.logs||[];
-    var ic={top_up:{i:'↑',bg:'rgba(45,212,191,0.12)',c:'var(--teal)'},set_tokens:{i:'✏',bg:'rgba(167,139,250,0.12)',c:'var(--violet)'},set_plan:{i:'◈',bg:'rgba(167,139,250,0.12)',c:'var(--violet)'},pricing_update:{i:'₦',bg:'rgba(201,168,76,0.12)',c:'var(--gold)'},suspend:{i:'⊘',bg:'rgba(248,113,113,0.12)',c:'var(--rose)'},broadcast:{i:'✉',bg:'rgba(96,165,250,0.12)',c:'#60a5fa'},coupon_created:{i:'◆',bg:'rgba(45,212,191,0.12)',c:'var(--teal)'},delete_user:{i:'✗',bg:'rgba(248,113,113,0.12)',c:'var(--rose)'}};
-    document.getElementById('logs-card').innerHTML=logs.length?logs.map(function(l){var s=ic[l.action]||{i:'•',bg:'rgba(255,255,255,0.06)',c:'var(--text3)'};return '<div class="log-row"><div class="log-dot" style="background:'+s.bg+';color:'+s.c+'">'+s.i+'</div><div style="flex:1"><div style="font-weight:600;color:var(--text);font-size:12.5px">'+(l.action||'').replace(/_/g,' ')+'</div><div style="font-size:11.5px;color:var(--text3)">'+(l.reason||'')+' '+(l.tokens?'&middot; '+fmt(l.tokens)+' tokens':'')+' '+(l.user_id?'&middot; '+l.user_id.slice(0,8)+'...':'')+'</div></div><div style="font-family:DM Mono,monospace;font-size:11px;color:var(--text3)">'+ago(l.ts)+'</div></div>';}).join(''):'<div class="loading">No admin actions logged yet</div>';
-  }catch(e){document.getElementById('logs-card').innerHTML='<div class="loading">Failed to load</div>';}
-}
-
-async function loadAdmins(){
-  try{
-    var r=await fetch(AAPI+'/users',{headers:{'Authorization':'Bearer '+KEY}}),d=await r.json(),admins=d.admins||[];
-    var rc={superadmin:'var(--rose)',admin:'var(--violet)',analytics:'var(--teal)',support:'var(--gold)'};
-    document.getElementById('admins-tbody').innerHTML=admins.length?admins.map(function(a){return '<tr><td style="font-weight:600;color:var(--text)">'+a.full_name+'</td><td style="color:var(--text3);font-size:11.5px">'+a.email+'</td><td><span style="color:'+(rc[a.role]||'var(--text3)')+';font-size:11.5px;font-weight:600;text-transform:capitalize">'+a.role+'</span></td><td><button class="btn btn-danger btn-xs" onclick="toggleAdmin(\''+a.id+'\','+a.active+')">'+(a.active?'Disable':'Enable')+'</button></td></tr>';}).join(''):'<tr><td colspan="4" class="loading">No admin users yet</td></tr>';
-    var rr=await fetch(AAPI+'/roles',{headers:{'Authorization':'Bearer '+KEY}}),rd=await rr.json();
-    document.getElementById('roles-list').innerHTML=(rd.roles||[]).map(function(r){return '<div style="padding:10px 14px;background:var(--ink3);border:1px solid var(--border);border-radius:10px;margin-bottom:8px"><div style="font-family:Syne,sans-serif;font-size:13px;font-weight:700;color:'+(rc[r.role]||'var(--gold)')+';text-transform:capitalize;margin-bottom:3px">'+r.label+'</div><div style="font-size:12px;color:var(--text3)">'+r.description+'</div></div>';}).join('');
-  }catch(e){console.error(e);}
-}
-async function createAdminUser(){
-  var name=document.getElementById('na-name').value.trim(),email=document.getElementById('na-email').value.trim(),pass=document.getElementById('na-pass').value,role=document.getElementById('na-role').value;
-  if(!name||!email||!pass){showAlert('admins','Fill all fields','error');return;}
-  try{var r=await fetch(AAPI+'/users',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+KEY},body:JSON.stringify({full_name:name,email:email,password:pass,role:role})});var d=await r.json();if(!r.ok)throw d;showAlert('admins','Admin user '+email+' created as '+role,'success');document.getElementById('na-name').value='';document.getElementById('na-email').value='';document.getElementById('na-pass').value='';loadAdmins();}
-  catch(e){showAlert('admins',e.detail||'Failed','error');}
-}
-async function toggleAdmin(id,active){try{await fetch(AAPI+'/users/'+id,{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+KEY},body:JSON.stringify({active:!active})});showAlert('admins','Admin '+(active?'deactivated':'activated'),'success');loadAdmins();}catch(e){showAlert('admins','Failed','error');}}
-
-async function doResetPassword(){
-  var np=document.getElementById('reset-new').value,cp=document.getElementById('reset-confirm').value,err=document.getElementById('reset-error');
-  err.classList.remove('on');
-  if(!np||!cp){err.textContent='Please fill both fields';err.classList.add('on');return;}
-  if(np!==cp){err.textContent='Passwords do not match';err.classList.add('on');return;}
-  if(np.length<8){err.textContent='Minimum 8 characters';err.classList.add('on');return;}
-  try{var r=await fetch(AAPI+'/reset-password',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+KEY},body:JSON.stringify({new_password:np,confirm_password:cp})});var d=await r.json();if(!r.ok){err.textContent=d.detail||'Reset failed';err.classList.add('on');return;}document.getElementById('reset-overlay').classList.remove('on');}
-  catch(e){err.textContent='Network error';err.classList.add('on');}
-}
-function updateStrength(v){
-  var bar=document.getElementById('strength-bar'),lbl=document.getElementById('strength-label');
-  if(!v){bar.style.width='0%';lbl.textContent='';return;}
-  var s=0;if(v.length>=8)s++;if(/[A-Z]/.test(v))s++;if(/[0-9]/.test(v))s++;if(/[^A-Za-z0-9]/.test(v))s++;
-  var bg=['','#f87171','#f59e0b','#2dd4bf','#4ade80'][s],lbs=['','Weak','Fair','Good','Strong'][s];
-  bar.style.width=(s*25)+'%';bar.style.background=bg;lbl.textContent=lbs;lbl.style.color=bg;
-}
-
-// ── Excel export helpers ──────────────────────────────────────────────────────
-async function _xlsxDownload(wb, filename){
-  var buf=await wb.xlsx.writeBuffer();
-  var blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-  var url=URL.createObjectURL(blob);
-  var a=document.createElement('a');a.href=url;a.download=filename;a.click();
-  URL.revokeObjectURL(url);
-}
-
-function _xlsxHeader(ws, cols){
-  var row=ws.addRow(cols.map(function(c){return c.header;}));
-  row.eachCell(function(cell){
-    cell.font={bold:true,color:{argb:'FFFFFFFF'},size:11};
-    cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF111118'}};
-    cell.border={bottom:{style:'thin',color:{argb:'FF444455'}}};
-    cell.alignment={vertical:'middle'};
-  });
-  cols.forEach(function(c,i){ws.getColumn(i+1).width=c.width||16;});
-}
-
-async function exportRevenueExcel(){
-  if(!REV_CHART_DATA.length){await loadRevenue();}
-  var wb=new ExcelJS.Workbook();
-  wb.creator='SceneForge Admin';wb.created=new Date();
-
-  // Sheet 1 — Daily revenue
-  var ws1=wb.addWorksheet('Daily Revenue');
-  _xlsxHeader(ws1,[
-    {header:'Date',width:14},{header:'Revenue (NGN)',width:18},
-    {header:'Revenue (USD)',width:18}
-  ]);
-  var rate=REV_RATE||1600;
-  REV_CHART_DATA.forEach(function(r){
-    ws1.addRow([r.date, r.amount, parseFloat((r.amount/rate).toFixed(2))]);
-  });
-  // Totals row
-  var tot=ws1.addRow(['TOTAL', REV_TOTAL, parseFloat((REV_TOTAL/rate).toFixed(2))]);
-  tot.eachCell(function(c){c.font={bold:true};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1A1A24'}};});
-
-  // Sheet 2 — Summary
-  var ws2=wb.addWorksheet('Summary');
-  _xlsxHeader(ws2,[{header:'Metric',width:28},{header:'Value',width:20}]);
-  var today=new Date().toISOString().slice(0,10);
-  [
-    ['Report date', today],
-    ['Total revenue (NGN)', '₦'+fmt(Math.round(REV_TOTAL))],
-    ['Total revenue (USD)', '$'+(REV_TOTAL/rate).toFixed(2)],
-    ['Total transactions', REV_TX],
-    ['Avg per transaction (NGN)', REV_TX>0?'₦'+fmt(Math.round(REV_TOTAL/REV_TX)):'—'],
-    ['Exchange rate used', '₦'+Math.round(rate)+'/$1'],
-  ].forEach(function(r){ws2.addRow(r);});
-
-  await _xlsxDownload(wb,'sceneforge_revenue_'+today+'.xlsx');
-}
-
-async function exportTxExcel(){
-  if(!TX_DATA.length){await loadTx();await new Promise(function(r){setTimeout(r,500);});}
-  var wb=new ExcelJS.Workbook();
-  wb.creator='SceneForge Admin';wb.created=new Date();
-  var ws=wb.addWorksheet('Transactions');
-  _xlsxHeader(ws,[
-    {header:'Transaction ID',width:32},{header:'Plan',width:12},
-    {header:'Amount (NGN)',width:16},{header:'Amount (USD)',width:16},
-    {header:'Tokens',width:12},{header:'User email',width:28},
-    {header:'User ID',width:36},{header:'Date',width:20}
-  ]);
-  var rate=CACHED_RATE||1600;
-  TX_DATA.forEach(function(t){
-    ws.addRow([
-      t.transaction_id||'',
-      t.plan||'',
-      t.amount||0,
-      parseFloat(((t.amount||0)/rate).toFixed(2)),
-      t.tokens||0,
-      t.email||'',
-      t.user_id||'',
-      t.ts?new Date(t.ts).toLocaleString():'',
-    ]);
-  });
-  // Summary row
-  var totalNgn=TX_DATA.reduce(function(s,t){return s+(t.amount||0);},0);
-  var sumRow=ws.addRow(['TOTAL','',totalNgn,parseFloat((totalNgn/rate).toFixed(2)),
-    TX_DATA.reduce(function(s,t){return s+(t.tokens||0);},0),'','','']);
-  sumRow.eachCell(function(c){c.font={bold:true};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1A1A24'}};});
-
-  var today=new Date().toISOString().slice(0,10);
-  await _xlsxDownload(wb,'sceneforge_transactions_'+today+'.xlsx');
-}
-
-var FB_DATA=[];
-
-async function loadFeedback(){
-  try{
-    var d=await apiFetch('/feedback');
-    var items=d.feedback||[];
-    FB_DATA=items;
-
-    // Summary stats
-    var total=items.length;
-    var avg=d.avg_rating||0;
-    var five=items.filter(function(i){return i.rating===5;}).length;
-    var improve=items.filter(function(i){return (i.tags||[]).includes('Needs improvement');}).length;
-    function _s(id,v){var el=document.getElementById(id);if(el)el.textContent=v;}
-    _s('fb-total',total);
-    _s('fb-avg',avg.toFixed(1)+' / 5');
-    _s('fb-five',five);
-    _s('fb-improve',improve);
-
-    // Rating distribution
-    var dist={1:0,2:0,3:0,4:0,5:0};
-    items.forEach(function(i){dist[i.rating]=(dist[i.rating]||0)+1;});
-    var maxD=Math.max.apply(null,Object.values(dist).concat([1]));
-    var EMOJIS={1:'😞',2:'😕',3:'😐',4:'😊',5:'🤩'};
-    document.getElementById('fb-distribution').innerHTML=[5,4,3,2,1].map(function(r){
-      var count=dist[r]||0;
-      var pct=Math.round(count/Math.max(total,1)*100);
-      return '<div class="bar-row"><span style="font-size:16px;min-width:24px">'+EMOJIS[r]+'</span>'
-        +'<div class="bar-track"><div class="bar-fill" style="width:'+Math.round(count/maxD*100)+'%;background:'
-        +(['','#f87171','#fb923c','#fbbf24','#34d399','#2dd4bf'][r])+'"></div></div>'
-        +'<span class="bar-count">'+count+' ('+pct+'%)</span></div>';
-    }).join('');
-
-    // Tag frequency
-    var tagMap={};
-    items.forEach(function(i){(i.tags||[]).forEach(function(t){tagMap[t]=(tagMap[t]||0)+1;});});
-    var sortedTags=Object.entries(tagMap).sort(function(a,b){return b[1]-a[1];}).slice(0,8);
-    var maxT=sortedTags.length?sortedTags[0][1]:1;
-    document.getElementById('fb-tags').innerHTML=sortedTags.length
-      ?sortedTags.map(function(e){
-        return '<div class="bar-row"><span class="bar-label" style="min-width:110px;font-size:11px">'+e[0]+'</span>'
-          +'<div class="bar-track"><div class="bar-fill" style="width:'+Math.round(e[1]/maxT*100)+'%;background:var(--violet)"></div></div>'
-          +'<span class="bar-count">'+e[1]+'</span></div>';
-      }).join('')
-      :'<div style="color:var(--text3);font-size:13px">No tags yet</div>';
-
-    renderFeedback();
-  }catch(e){console.error(e);}
-}
-
-function renderFeedback(){
-  var filter=document.getElementById('fb-filter').value;
-  var items=FB_DATA.filter(function(i){
-    if(filter==='all')return true;
-    if(filter==='5')return i.rating===5;
-    if(filter==='4')return i.rating>=4;
-    if(filter==='3')return i.rating===3;
-    if(filter==='1')return i.rating<=2;
-    return true;
-  });
-  var STARS={1:'★☆☆☆☆',2:'★★☆☆☆',3:'★★★☆☆',4:'★★★★☆',5:'★★★★★'};
-  var COLS={1:'#f87171',2:'#fb923c',3:'#fbbf24',4:'#34d399',5:'#2dd4bf'};
-  var EMOJIS={1:'😞',2:'😕',3:'😐',4:'😊',5:'🤩'};
-  document.getElementById('fb-list').innerHTML=items.length
-    ?items.map(function(i){
-      var tags=(i.tags||[]).map(function(t){
-        return '<span style="font-size:10px;padding:2px 8px;border-radius:100px;background:rgba(167,139,250,0.12);color:#C4B5FD;border:1px solid rgba(167,139,250,0.2)">'+t+'</span>';
-      }).join(' ');
-      return '<div style="padding:16px 20px;border-bottom:1px solid var(--border)">'
-        +'<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">'
-        +'<div style="display:flex;align-items:center;gap:10px">'
-        +'<span style="font-size:22px">'+EMOJIS[i.rating]+'</span>'
-        +'<div><div style="font-family:DM Mono,monospace;font-size:13px;font-weight:700;color:'+(COLS[i.rating]||'#fff')+'">'+STARS[i.rating]+' &nbsp;'+i.rating+'/5</div>'
-        +'<div style="font-size:10.5px;color:var(--text3);margin-top:1px">'+(i.trigger==='video_complete'?'After render':'Time on screen')+' &middot; '+ago(i.ts)+'</div></div>'
-        +'</div>'
-        +(function(){var u=USER_CACHE[i.user_id]||{};var name=u.full_name||i.user_name||'';var email=u.email||i.email||'';if(name||email){return '<span style="font-size:10px;color:var(--text3)">'+name+(email?' &middot; '+email:'')+'</span>';}return '';})()
-        +'</div>'
-        +(tags?'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">'+tags+'</div>':'')
-        +(i.comment?'<div style="font-size:13px;color:var(--text2);background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:10px 12px;line-height:1.6">'+i.comment+'</div>':'')
-        +'</div>';
-    }).join('')
-    :'<div class="loading">No responses match this filter</div>';
-}
-
-async function exportFeedbackExcel(){
-  if(!FB_DATA.length){await loadFeedback();await new Promise(function(r){setTimeout(r,500);});}
-  var wb=new ExcelJS.Workbook();wb.creator='SceneForge Admin';wb.created=new Date();
-  var today=new Date().toISOString().slice(0,10);
-
-  var ws=wb.addWorksheet('Feedback');
-  _xlsxHeader(ws,[
-    {header:'Rating',width:10},{header:'Stars',width:14},{header:'Trigger',width:18},
-    {header:'Tags',width:36},{header:'Comment',width:48},
-    {header:'User name',width:22},{header:'Email',width:28},{header:'Date',width:20}
-  ]);
-  var STARS={1:'★☆☆☆☆',2:'★★☆☆☆',3:'★★★☆☆',4:'★★★★☆',5:'★★★★★'};
-  FB_DATA.forEach(function(i){
-    var u=USER_CACHE[i.user_id]||{};
-    ws.addRow([i.rating,STARS[i.rating]||'',i.trigger||'',(i.tags||[]).join(', '),i.comment||'',
-      u.full_name||i.user_name||'—',u.email||i.email||'—',
-      i.ts?new Date(i.ts).toLocaleString():'']);
-  });
-
-  var ws2=wb.addWorksheet('Summary');
-  _xlsxHeader(ws2,[{header:'Metric',width:28},{header:'Value',width:20}]);
-  var dist={1:0,2:0,3:0,4:0,5:0};
-  FB_DATA.forEach(function(i){dist[i.rating]=(dist[i.rating]||0)+1;});
-  var avg=FB_DATA.length?FB_DATA.reduce(function(s,i){return s+i.rating;},0)/FB_DATA.length:0;
-  [
-    ['Report date',today],['Total responses',FB_DATA.length],['Average rating',avg.toFixed(2)],
-    ['5-star responses',dist[5]||0],['4-star responses',dist[4]||0],['3-star responses',dist[3]||0],
-    ['2-star responses',dist[2]||0],['1-star responses',dist[1]||0],
-  ].forEach(function(r){ws2.addRow(r);});
-
-  await _xlsxDownload(wb,'sceneforge_feedback_'+today+'.xlsx');
-}
-
-async function exportFeedbackPdf(){
-  if(!FB_DATA.length){await loadFeedback();await new Promise(function(r){setTimeout(r,500);});}
-  var today=new Date().toISOString().slice(0,10);
-  var avg=FB_DATA.length?FB_DATA.reduce(function(s,i){return s+i.rating;},0)/FB_DATA.length:0;
-  var dist={1:0,2:0,3:0,4:0,5:0};
-  FB_DATA.forEach(function(i){dist[i.rating]=(dist[i.rating]||0)+1;});
-  var STARS={1:'★☆☆☆☆',2:'★★☆☆☆',3:'★★★☆☆',4:'★★★★☆',5:'★★★★★'};
-
-  var html='<!DOCTYPE html><html><head><meta charset="utf-8">'
-    +'<style>body{font-family:Arial,sans-serif;color:#111;padding:32px;max-width:800px;margin:0 auto}'
-    +'h1{font-size:24px;margin:0 0 4px}p.sub{color:#666;font-size:13px;margin:0 0 28px}'
-    +'h2{font-size:16px;margin:24px 0 10px;border-bottom:1px solid #eee;padding-bottom:6px}'
-    +'.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}'
-    +'.stat{background:#f8f8f8;border-radius:8px;padding:14px;text-align:center}'
-    +'.stat-val{font-size:28px;font-weight:800;color:#7C5CFF}'
-    +'.stat-lbl{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.05em}'
-    +'.item{border:1px solid #eee;border-radius:8px;padding:14px;margin-bottom:10px}'
-    +'.rating{font-size:14px;font-weight:700;color:#7C5CFF;margin-bottom:4px}'
-    +'.meta{font-size:11px;color:#999;margin-bottom:8px}'
-    +'.tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}'
-    +'.tag{background:#f0edff;color:#7C5CFF;border-radius:100px;padding:2px 10px;font-size:11px}'
-    +'.comment{background:#f9f9f9;border-radius:6px;padding:10px;font-size:13px;color:#444;line-height:1.6}'
-    +'@media print{body{padding:16px}.item{break-inside:avoid}}'
-    +'</style></head><body>'
-    +'<h1>SceneForge User Feedback</h1>'
-    +'<p class="sub">Report generated '+today+' &nbsp;&middot;&nbsp; '+FB_DATA.length+' responses</p>'
-    +'<div class="stat-grid">'
-    +'<div class="stat"><div class="stat-val">'+FB_DATA.length+'</div><div class="stat-lbl">Responses</div></div>'
-    +'<div class="stat"><div class="stat-val">'+avg.toFixed(1)+'</div><div class="stat-lbl">Avg rating</div></div>'
-    +'<div class="stat"><div class="stat-val">'+(dist[5]||0)+'</div><div class="stat-lbl">5-star</div></div>'
-    +'<div class="stat"><div class="stat-val">'+(dist[1]+dist[2]||0)+'</div><div class="stat-lbl">Low ratings</div></div>'
-    +'</div>'
-    +'<h2>All responses</h2>';
-
-  FB_DATA.forEach(function(i){
-    html+='<div class="item">'
-      +'<div class="rating">'+STARS[i.rating]+' &nbsp;'+i.rating+'/5</div>'
-      +'<div class="meta">'+(i.trigger==='video_complete'?'After video render':'Time on screen')+' &middot; '+new Date(i.ts).toLocaleDateString()+'</div>';
-    if(i.tags&&i.tags.length)html+='<div class="tags">'+i.tags.map(function(t){return '<span class="tag">'+t+'</span>';}).join('')+'</div>';
-    if(i.comment)html+='<div class="comment">'+i.comment+'</div>';
-    html+='</div>';
-  });
-
-  html+='</body></html>';
-  var w=window.open('','_blank');
-  w.document.write(html);
-  w.document.close();
-  w.onload=function(){w.print();};
-}
-
-async function exportAnalyticsExcel(){
-  if(!ANA_DATA.total_users){await loadAnalytics();await new Promise(function(r){setTimeout(r,500);});}
-  var wb=new ExcelJS.Workbook();
-  wb.creator='SceneForge Admin';wb.created=new Date();
-  var today=new Date().toISOString().slice(0,10);
-
-  // Sheet 1 — Platform summary
-  var ws1=wb.addWorksheet('Platform Summary');
-  _xlsxHeader(ws1,[{header:'Metric',width:30},{header:'Value',width:20}]);
-  [
-    ['Report date', today],
-    ['Total users', ANA_DATA.total_users||0],
-    ['Total videos created', ANA_DATA.total_videos_created||0],
-    ['Total scenes generated', ANA_DATA.total_scenes_generated||0],
-    ['Avg scenes per video', ANA_DATA.avg_scenes_per_video||0],
-    ['Total transactions', ANA_DATA.total_transactions||0],
-    ['Tokens in circulation', ANA_DATA.total_tokens_in_circulation||0],
-  ].forEach(function(r){ws1.addRow(r);});
-
-  // Sheet 2 — Users by plan
-  var ws2=wb.addWorksheet('Users by Plan');
-  _xlsxHeader(ws2,[{header:'Plan',width:16},{header:'Users',width:12},{header:'% of total',width:14}]);
-  var plans=ANA_DATA.users_by_plan||{};
-  var totalUsers=ANA_DATA.total_users||1;
-  Object.entries(plans).forEach(function(e){
-    ws2.addRow([e[0], e[1], parseFloat((e[1]/totalUsers*100).toFixed(1))+'%']);
-  });
-
-  // Sheet 3 — Top niches
-  var ws3=wb.addWorksheet('Top Niches');
-  _xlsxHeader(ws3,[{header:'Niche',width:24},{header:'Videos',width:14}]);
-  var niches=ANA_DATA.top_niches||{};
-  Object.entries(niches).sort(function(a,b){return b[1]-a[1];}).forEach(function(e){
-    ws3.addRow([e[0], e[1]]);
-  });
-
-  await _xlsxDownload(wb,'sceneforge_analytics_'+today+'.xlsx');
-}
-</script>
-</body>
-</html>
