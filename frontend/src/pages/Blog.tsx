@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import BlogThumbnail from '../components/BlogThumbnail'
 
 interface Post {
   slug: string
@@ -56,6 +57,36 @@ const POSTS_META: Omit<Post, 'content'>[] = [
     category: 'strategy',
     tags: ['monetisation', 'content creator', 'income', 'digital products'],
     readTime: 9,
+  },
+  {
+    slug: 'how-to-make-money-as-content-creator-with-ai',
+    title: 'How to Make Money as a Content Creator Using AI Video Tools in 2026',
+    description: 'A complete guide to monetising your content creator journey using AI video tools — from your first video to your first $1,000 month. No camera required.',
+    date: '2026-01-05',
+    category: 'strategy',
+    tags: ['monetisation', 'ai video', 'content creator', 'make money online', 'tiktok'],
+    readTime: 10,
+    author: 'sceneforge-team',
+  },
+  {
+    slug: 'ai-video-creation-future-2026',
+    title: 'The Future of AI Video Creation in 2026: What Every Creator Needs to Know',
+    description: 'AI video generation has changed everything for content creators in 2026. Here is what is working right now, what is coming next, and how to stay ahead.',
+    date: '2026-01-08',
+    category: 'tutorials',
+    tags: ['ai video', 'content creation', '2026', 'future', 'technology'],
+    readTime: 8,
+    author: 'daniel-osei',
+  },
+  {
+    slug: 'tiktok-content-strategy-guide-2026',
+    title: 'The Complete TikTok Content Strategy Guide for 2026',
+    description: 'Everything you need to build a TikTok audience in 2026 — algorithm changes, content formats, posting strategy, and how AI accelerates growth.',
+    date: '2026-01-15',
+    category: 'strategy',
+    tags: ['tiktok', 'content strategy', 'social media', '2026', 'algorithm'],
+    readTime: 9,
+    author: 'amara-diallo',
   },
 ]
 
@@ -164,7 +195,8 @@ export default function Blog() {
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(167,139,250,0.35)'; (e.currentTarget as HTMLElement).style.background = 'rgba(167,139,250,0.06)' }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = i === 0 && category === 'all' && !search ? 'rgba(167,139,250,0.2)' : 'rgba(255,255,255,0.07)'; (e.currentTarget as HTMLElement).style.background = i === 0 && category === 'all' && !search ? 'rgba(167,139,250,0.05)' : 'rgba(255,255,255,0.02)' }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <BlogThumbnail slug={post.slug} title={post.title} category={post.category} size={i === 0 && category === 'all' && !search ? 'hero' : 'card'} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, marginTop: 14 }}>
                   <CategoryBadge cat={post.category} />
                   <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>{formatDate(post.date)}</span>
                   <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginLeft: 'auto' }}>{post.readTime} min read</span>
