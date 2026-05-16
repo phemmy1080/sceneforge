@@ -20,6 +20,7 @@ from app.services import auth as auth_service
 from app.services.plans import get_limits, check_scene_limit
 from app.dependencies import get_redis
 from app.middleware.rate_limit import limiter
+from app.services.security import validate_upload, sanitize_filename
 
 router   = APIRouter()
 logger   = logging.getLogger(__name__)
