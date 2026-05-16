@@ -62,7 +62,7 @@ With AI video generation, daily posting is achievable in 30-45 minutes per day. 
 - Your topic coverage grows, which means more entry points for new viewers to discover you
 - Compounding accelerates: more videos means more chances for one to break through
 
-SceneForge was built for the daily posting workflow. From topic to finished TikTok in under 5 minutes. [See how it works at sceneraforge.com](https://sceneraforge.com).
+SceneForge was built for the daily posting workflow. From topic to finished TikTok in under 5 minutes. [See how it works at scenraforge.com](https://scenraforge.com).
 
 ## The Niches With the Strongest Growth Signals in 2026
 
@@ -80,4 +80,4 @@ Pick your niche based on what you can speak about with genuine authority. Authen
 
 ---
 
-*Start your TikTok growth journey with AI-powered video creation. [Create your first video free at sceneraforge.com](https://sceneraforge.com).*
+*Start your TikTok growth journey with AI-powered video creation. [Create your first video free at scenraforge.com](https://scenraforge.com).*
