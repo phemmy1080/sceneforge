@@ -22,8 +22,6 @@ from app.api.admin_auth_api import router as admin_auth_router
 from app.api.niches import router as niches_router
 from app.api.projects import router as projects_router
 from app.api.voice_router import router as voice_sample_router
-from app.api import feedback
-from app.api import chat
 
 settings = get_settings()
 
@@ -76,9 +74,14 @@ app = FastAPI(
 )
 
 # CORS
+# Read allowed origins from settings — never use * in production
+_allowed_origins = [o.strip() for o in getattr(settings, "frontend_origin", "").split(",") if o.strip()]
+if not _allowed_origins:
+    _allowed_origins = ["http://localhost:5173"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -125,10 +128,6 @@ app.include_router(admin_auth_router,   prefix="/api/admin-auth", tags=["AdminAu
 app.include_router(niches_router,       prefix="/api/niches",     tags=["Niches"])
 app.include_router(projects_router,     prefix="/api/projects",   tags=["Projects"])
 app.include_router(voice_sample_router, prefix="/api/voice",      tags=["Voice"])
-app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
-
-
-app.include_router(feedback.router, prefix="/api/feedback", tags=["feedback"])
 
 if os.path.exists(settings.renders_dir):
     app.mount("/renders", StaticFiles(directory=settings.renders_dir), name="renders")
