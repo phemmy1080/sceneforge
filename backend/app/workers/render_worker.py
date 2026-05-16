@@ -15,6 +15,7 @@ from app.services.voice import synthesize_all_scenes, split_audio_by_scenes
 from app.services.visuals import get_visual_for_scene
 from app.services.storage import upload_job_files, r2_enabled
 from app.services.capcut import build_capcut_draft, write_manifest
+from app.services.cost_tracker import build_cost_record, store_cost_record
 
 settings = get_settings()
 logger   = logging.getLogger(__name__)
@@ -99,6 +100,7 @@ async def render_video(ctx, job_id: str, payload: dict):
 
         # ── Stage 3: FFmpeg render ────────────────────────────────────────────
         await _set_progress(redis, job_id, "Rendering video...", 55)
+        _render_start = __import__('time').time()
 
         async def ffmpeg_progress(stage: str, pct: int):
             await _set_progress(redis, job_id, stage, pct)
@@ -113,6 +115,7 @@ async def render_video(ctx, job_id: str, payload: dict):
             on_progress=ffmpeg_progress,
             platform=req.platform,
         )
+        _render_seconds = __import__('time').time() - _render_start
 
         # ── Stage 3b: Watermark (free plan only) ────────────────────────────────
         await _set_progress(redis, job_id, "Finalising video...", 85)
@@ -256,6 +259,56 @@ async def render_video(ctx, job_id: str, payload: dict):
         }
         await redis.set(f"job:{job_id}:progress", json.dumps(final_result), ex=86400)
         logger.info("Render complete — job %s | %s", job_id, video_url)
+
+        # ── Cost tracking ─────────────────────────────────────────────────────
+        try:
+            _user_plan = "free"
+            _plan_price_ngn = 0.0
+            _exchange_rate = 1600.0
+            if user_id:
+                _raw_user = await redis.get(f"user:{user_id}")
+                if _raw_user:
+                    _ud = json.loads(_raw_user)
+                    _user_plan = _ud.get("plan", "free")
+
+            # Get plan price from Redis pricing
+            try:
+                from app.services.pricing import get_plans
+                plans = await get_plans(redis)
+                _plan_data = plans.get(_user_plan, {})
+                _plan_price_ngn = float(_plan_data.get("amount", 0))
+                # Get cached exchange rate
+                _rate_raw = await redis.get("sceneforge:exchange:usd_ngn")
+                if _rate_raw:
+                    _exchange_rate = float(_rate_raw)
+            except Exception:
+                pass
+
+            # Count total chars across all scenes for voice cost
+            _total_chars = sum(len(s.text) for s in req.scenes)
+            _dalle_images = len([v for v in visual_files if hasattr(v, 'source') and v.source == 'dalle'])
+            _voice_provider = "elevenlabs" if settings.elevenlabs_api_key and getattr(req, 'voice_name', '').startswith('el_') else "gtts"
+
+            _cost_rec = build_cost_record(
+                job_id=job_id,
+                user_id=user_id or "",
+                plan=_user_plan,
+                scenes=len(req.scenes),
+                visual_source=getattr(req, 'visual_source', 'pexels_video') or 'pexels_video',
+                voice_provider=_voice_provider,
+                total_chars=_total_chars,
+                ai_provider="groq" if settings.groq_api_key else "openai",
+                ai_input_tokens=800,   # avg tokens per render (script+ideas gen)
+                ai_output_tokens=400,
+                render_seconds=getattr(locals(), '_render_seconds', 30.0),
+                dalle_images=_dalle_images,
+                plan_price_ngn=_plan_price_ngn,
+                exchange_rate=_exchange_rate,
+            )
+            await store_cost_record(redis, _cost_rec)
+        except Exception as _cost_err:
+            logger.warning("Cost tracking failed (non-fatal): %s", _cost_err)
+
         return final_result
 
     except Exception as e:
