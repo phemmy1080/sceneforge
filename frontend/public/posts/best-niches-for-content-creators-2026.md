@@ -103,4 +103,4 @@ Finance, Business, and AI hit all three for most creators. Start there if you're
 
 ## Create Content in Any Niche Faster
 
-SceneForge supports all seven niches with dedicated AI models, niche-specific visual matching, and topic suggestions tuned to what's performing in each category. [Start creating for free](https://sceneraforge.com).
+SceneForge supports all seven niches with dedicated AI models, niche-specific visual matching, and topic suggestions tuned to what's performing in each category. [Start creating for free](https://scenraforge.com).
