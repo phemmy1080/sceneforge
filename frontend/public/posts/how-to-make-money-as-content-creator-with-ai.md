@@ -113,6 +113,6 @@ Every large creator account started at zero. The difference between the creators
 
 AI gives you the system. The strategy in this guide gives you the direction. The rest is consistency.
 
-[Create your first AI video free at sceneraforge.com →](https://sceneraforge.com)
+[Create your first AI video free at scenraforge.com →](https://scenraforge.com)
 
 No camera. No editing experience. No credit card required.
