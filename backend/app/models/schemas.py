@@ -76,13 +76,14 @@ class GenerateScenesRequest(BaseModel):
 
 class Scene(BaseModel):
     id: int
-    text: str
-    visual: str
-    duration: int = Field(default=5, ge=1)  # no upper cap — long scripts need longer scenes
+    text: str = Field(..., min_length=1, max_length=1000,
+                      description="Scene narration text — max 1000 chars")
+    visual: str = Field(default="", max_length=500)
+    duration: int = Field(default=5, ge=1, le=60)   # max 60s per scene
     type: SceneType = SceneType.main
-    visual_keyword: str
-    emotion: Optional[str] = None        # mood/energy of the scene
-    b_roll_note: Optional[str] = None    # overlay / cutaway suggestion
+    visual_keyword: str = Field(default="", max_length=200)
+    emotion: Optional[str] = Field(default=None, max_length=100)
+    b_roll_note: Optional[str] = Field(default=None, max_length=300)
 
 
 class GenerateScenesResponse(BaseModel):
@@ -93,8 +94,9 @@ class GenerateScenesResponse(BaseModel):
 # ─── Render ───────────────────────────────────────────────────────────────────
 
 class RenderRequest(BaseModel):
-    scenes: list[Scene]
-    voice_name: str = Field(default="Marcus")
+    scenes: list[Scene] = Field(..., min_length=1, max_length=20,
+                                description="1–20 scenes per render")
+    voice_name: str = Field(default="Marcus", max_length=50)
     voice_speed: float = Field(default=1.0, ge=0.5, le=2.0)
     visual_source: VisualSource = VisualSource.mixed
     subtitle_style: Literal["viral", "minimal", "karaoke", "none"] = "viral"
