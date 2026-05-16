@@ -315,6 +315,22 @@ tr:hover td{background:rgba(255,255,255,0.018)}
 .bc-tb-btn:hover{background:rgba(255,255,255,0.1);color:var(--text)}
 #bc-editor:empty:before{content:attr(data-placeholder);color:var(--text3);pointer-events:none;white-space:pre-wrap}
 #subj-suggestions{display:none;flex-direction:column;gap:6px}
+
+/* ── Emoji / symbol picker ───────────────────────── */
+.ep-tab{
+  padding:4px 10px;border-radius:7px;border:1px solid var(--border2);
+  background:var(--ink3);color:var(--text3);font-size:11px;cursor:pointer;
+  font-family:inherit;transition:all var(--transition);white-space:nowrap;
+}
+.ep-tab.on{background:rgba(201,168,76,0.12);border-color:rgba(201,168,76,0.3);color:var(--gold)}
+.ep-tab:hover{color:var(--text2)}
+.ep-btn{
+  padding:0;width:30px;height:30px;border:1px solid transparent;background:var(--ink3);
+  border-radius:7px;font-size:16px;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;transition:all var(--transition);line-height:1;
+}
+.ep-btn:hover{background:var(--ink4);border-color:var(--border2);transform:scale(1.15)}
+.ep-panel{animation:fadeUp .15s ease}
 </style>
 </head>
 <body>
@@ -716,6 +732,95 @@ tr:hover td{background:rgba(255,255,255,0.018)}
                   <div style="width:1px;height:16px;background:var(--border2);margin:0 2px"></div>
                   <button class="bc-tb-btn" onclick="bcInsertLink()">🔗</button>
                   <button class="bc-tb-btn" onclick="bcInsertTag()" style="font-size:10px">{{name}}</button>
+                  <div style="width:1px;height:16px;background:var(--border2);margin:0 2px"></div>
+                  <div style="position:relative">
+                    <button class="bc-tb-btn" onclick="toggleEmojiPicker(event)" title="Add attention icons, emojis and symbols" style="font-size:12px;padding:3px 8px;display:flex;align-items:center;gap:4px">✦ Icons</button>
+                    <div id="emoji-picker" style="display:none;position:absolute;top:calc(100% + 6px);left:0;background:var(--ink2);border:1px solid var(--border2);border-radius:12px;padding:12px;z-index:999;width:300px;box-shadow:0 8px 32px rgba(0,0,0,0.5)">
+                      <div style="display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap">
+                        <button class="ep-tab on" onclick="switchEpTab('attention',this)">👁 Attention</button>
+                        <button class="ep-tab" onclick="switchEpTab('visual',this)">🎨 Visual</button>
+                        <button class="ep-tab" onclick="switchEpTab('decorative',this)">✨ Decor</button>
+                        <button class="ep-tab" onclick="switchEpTab('emphasis',this)">⚡ Emphasis</button>
+                      </div>
+                      <div id="ep-attention" class="ep-panel" style="display:grid;grid-template-columns:repeat(8,1fr);gap:4px">
+                        <button class="ep-btn" onclick="insertSymbol('🚨')" title="Alert">🚨</button>
+                        <button class="ep-btn" onclick="insertSymbol('⚠️')" title="Warning">⚠️</button>
+                        <button class="ep-btn" onclick="insertSymbol('📢')" title="Announce">📢</button>
+                        <button class="ep-btn" onclick="insertSymbol('🔔')" title="Bell">🔔</button>
+                        <button class="ep-btn" onclick="insertSymbol('👀')" title="Eyes">👀</button>
+                        <button class="ep-btn" onclick="insertSymbol('👇')" title="Point down">👇</button>
+                        <button class="ep-btn" onclick="insertSymbol('👆')" title="Point up">👆</button>
+                        <button class="ep-btn" onclick="insertSymbol('➡️')" title="Right">➡️</button>
+                        <button class="ep-btn" onclick="insertSymbol('‼️')" title="Important">‼️</button>
+                        <button class="ep-btn" onclick="insertSymbol('❗')" title="Exclaim">❗</button>
+                        <button class="ep-btn" onclick="insertSymbol('🔴')" title="Red dot">🔴</button>
+                        <button class="ep-btn" onclick="insertSymbol('🟡')" title="Yellow dot">🟡</button>
+                        <button class="ep-btn" onclick="insertSymbol('🟢')" title="Green dot">🟢</button>
+                        <button class="ep-btn" onclick="insertSymbol('📌')" title="Pin">📌</button>
+                        <button class="ep-btn" onclick="insertSymbol('🎯')" title="Target">🎯</button>
+                        <button class="ep-btn" onclick="insertSymbol('🔑')" title="Key">🔑</button>
+                      </div>
+                      <div id="ep-visual" class="ep-panel" style="display:none;grid-template-columns:repeat(8,1fr);gap:4px">
+                        <button class="ep-btn" onclick="insertSymbol('✅')" title="Check">✅</button>
+                        <button class="ep-btn" onclick="insertSymbol('❌')" title="Cross">❌</button>
+                        <button class="ep-btn" onclick="insertSymbol('🎬')" title="Video">🎬</button>
+                        <button class="ep-btn" onclick="insertSymbol('🎥')" title="Camera">🎥</button>
+                        <button class="ep-btn" onclick="insertSymbol('🚀')" title="Launch">🚀</button>
+                        <button class="ep-btn" onclick="insertSymbol('💡')" title="Idea">💡</button>
+                        <button class="ep-btn" onclick="insertSymbol('🏆')" title="Trophy">🏆</button>
+                        <button class="ep-btn" onclick="insertSymbol('💰')" title="Money">💰</button>
+                        <button class="ep-btn" onclick="insertSymbol('🎁')" title="Gift">🎁</button>
+                        <button class="ep-btn" onclick="insertSymbol('📈')" title="Growth">📈</button>
+                        <button class="ep-btn" onclick="insertSymbol('⏰')" title="Time">⏰</button>
+                        <button class="ep-btn" onclick="insertSymbol('🔥')" title="Hot">🔥</button>
+                        <button class="ep-btn" onclick="insertSymbol('💎')" title="Premium">💎</button>
+                        <button class="ep-btn" onclick="insertSymbol('🌟')" title="Star">🌟</button>
+                        <button class="ep-btn" onclick="insertSymbol('💪')" title="Strong">💪</button>
+                        <button class="ep-btn" onclick="insertSymbol('🎉')" title="Celebrate">🎉</button>
+                      </div>
+                      <div id="ep-decorative" class="ep-panel" style="display:none;grid-template-columns:repeat(8,1fr);gap:4px">
+                        <button class="ep-btn" onclick="insertSymbol('✨')" title="Sparkles">✨</button>
+                        <button class="ep-btn" onclick="insertSymbol('⭐')" title="Star">⭐</button>
+                        <button class="ep-btn" onclick="insertSymbol('🌈')" title="Rainbow">🌈</button>
+                        <button class="ep-btn" onclick="insertSymbol('💫')" title="Dizzy">💫</button>
+                        <button class="ep-btn" onclick="insertSymbol('🌸')" title="Blossom">🌸</button>
+                        <button class="ep-btn" onclick="insertSymbol('🦋')" title="Butterfly">🦋</button>
+                        <button class="ep-btn" onclick="insertSymbol('💜')" title="Heart">💜</button>
+                        <button class="ep-btn" onclick="insertSymbol('🧡')" title="Heart">🧡</button>
+                        <button class="ep-btn" onclick="insertSymbol('•')" title="Bullet">•</button>
+                        <button class="ep-btn" onclick="insertSymbol('◆')" title="Diamond">◆</button>
+                        <button class="ep-btn" onclick="insertSymbol('▸')" title="Arrow">▸</button>
+                        <button class="ep-btn" onclick="insertSymbol('»')" title="Angle">»</button>
+                        <button class="ep-btn" onclick="insertSymbol('✦')" title="4-point star">✦</button>
+                        <button class="ep-btn" onclick="insertSymbol('★')" title="Star">★</button>
+                        <button class="ep-btn" onclick="insertSymbol('☑️')" title="Check box">☑️</button>
+                        <button class="ep-btn" onclick="insertSymbol('🎀')" title="Ribbon">🎀</button>
+                      </div>
+                      <div id="ep-emphasis" class="ep-panel" style="display:none;grid-template-columns:repeat(8,1fr);gap:4px">
+                        <button class="ep-btn" onclick="insertSymbol('⚡')" title="Lightning">⚡</button>
+                        <button class="ep-btn" onclick="insertSymbol('💥')" title="Boom">💥</button>
+                        <button class="ep-btn" onclick="insertSymbol('‼️')" title="Double !">‼️</button>
+                        <button class="ep-btn" onclick="insertSymbol('⁉️')" title="!?">⁉️</button>
+                        <button class="ep-btn" onclick="insertSymbol('🆕')" title="New">🆕</button>
+                        <button class="ep-btn" onclick="insertSymbol('🆓')" title="Free">🆓</button>
+                        <button class="ep-btn" onclick="insertSymbol('🔝')" title="Top">🔝</button>
+                        <button class="ep-btn" onclick="insertSymbol('💯')" title="100%">💯</button>
+                        <button class="ep-btn" onclick="insertSymbol('🏅')" title="Medal">🏅</button>
+                        <button class="ep-btn" onclick="insertSymbol('📣')" title="Megaphone">📣</button>
+                        <button class="ep-btn" onclick="insertSymbol('🔮')" title="Crystal">🔮</button>
+                        <button class="ep-btn" onclick="insertSymbol('🧲')" title="Magnet">🧲</button>
+                        <button class="ep-btn" onclick="insertSymbol('🎪')" title="Event">🎪</button>
+                        <button class="ep-btn" onclick="insertSymbol('🏋️')" title="Lift">🏋️</button>
+                        <button class="ep-btn" onclick="insertSymbol('🎙️')" title="Mic">🎙️</button>
+                        <button class="ep-btn" onclick="insertSymbol('📡')" title="Broadcast">📡</button>
+                      </div>
+                      <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
+                        <input id="ep-search" type="text" placeholder="Search symbols..." oninput="searchSymbols(this.value)"
+                          style="width:100%;background:var(--ink3);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:12px;padding:6px 10px;outline:none">
+                        <div id="ep-search-results" style="display:none;margin-top:6px;display:grid;grid-template-columns:repeat(8,1fr);gap:4px;max-height:64px;overflow-y:auto"></div>
+                      </div>
+                    </div>
+                  </div>
                   <div style="margin-left:auto;display:flex;gap:4px">
                     <button class="bc-tb-btn" onclick="bcFormat('undo')">↺</button>
                     <button class="bc-tb-btn" onclick="bcFormat('redo')">↻</button>
@@ -2127,6 +2232,87 @@ async function exportAnalyticsExcel(){
   await _xlsxDownload(wb,'sceneforge_analytics_'+today+'.xlsx');
 }
 
+
+// ── Emoji / symbol picker ─────────────────────────────────────────────────
+
+var EP_SYMBOLS = [
+  {name:'alert',sym:'🚨'},{name:'warning',sym:'⚠️'},{name:'announce announce',sym:'📢'},
+  {name:'bell notification',sym:'🔔'},{name:'eyes look',sym:'👀'},{name:'point down',sym:'👇'},
+  {name:'point up',sym:'👆'},{name:'right arrow',sym:'➡️'},{name:'important',sym:'‼️'},
+  {name:'exclaim',sym:'❗'},{name:'red dot',sym:'🔴'},{name:'yellow dot',sym:'🟡'},
+  {name:'green dot',sym:'🟢'},{name:'pin',sym:'📌'},{name:'target bullseye',sym:'🎯'},
+  {name:'key point',sym:'🔑'},{name:'check tick',sym:'✅'},{name:'cross x no',sym:'❌'},
+  {name:'video film',sym:'🎬'},{name:'camera',sym:'🎥'},{name:'rocket launch',sym:'🚀'},
+  {name:'idea lightbulb',sym:'💡'},{name:'trophy win',sym:'🏆'},{name:'money cash',sym:'💰'},
+  {name:'gift present',sym:'🎁'},{name:'growth chart',sym:'📈'},{name:'clock time',sym:'⏰'},
+  {name:'fire hot',sym:'🔥'},{name:'diamond premium',sym:'💎'},{name:'star shine',sym:'🌟'},
+  {name:'strong muscle',sym:'💪'},{name:'celebrate party',sym:'🎉'},{name:'sparkles shine',sym:'✨'},
+  {name:'star gold',sym:'⭐'},{name:'rainbow colour',sym:'🌈'},{name:'flash lightning',sym:'💫'},
+  {name:'blossom flower',sym:'🌸'},{name:'butterfly',sym:'🦋'},{name:'heart purple',sym:'💜'},
+  {name:'heart orange',sym:'🧡'},{name:'bullet point',sym:'•'},{name:'diamond shape',sym:'◆'},
+  {name:'arrow right',sym:'▸'},{name:'angle double',sym:'»'},{name:'four point star',sym:'✦'},
+  {name:'black star',sym:'★'},{name:'checkbox tick',sym:'☑️'},{name:'ribbon bow',sym:'🎀'},
+  {name:'lightning bolt',sym:'⚡'},{name:'explosion boom',sym:'💥'},{name:'double exclaim',sym:'‼️'},
+  {name:'exclaim question',sym:'⁉️'},{name:'new',sym:'🆕'},{name:'free',sym:'🆓'},
+  {name:'top',sym:'🔝'},{name:'hundred percent',sym:'💯'},{name:'medal award',sym:'🏅'},
+  {name:'megaphone loud',sym:'📣'},{name:'broadcast megaphone',sym:'📡'},
+];
+
+function toggleEmojiPicker(e){
+  e.stopPropagation();
+  var p=document.getElementById('emoji-picker');
+  p.style.display=p.style.display==='none'?'block':'none';
+  if(p.style.display==='block'){
+    // Save cursor position before picker opens
+    var sel=window.getSelection();
+    if(sel&&sel.rangeCount>0) window._epRange=sel.getRangeAt(0).cloneRange();
+    document.getElementById('ep-search').value='';
+    document.getElementById('ep-search-results').style.display='none';
+  }
+}
+
+document.addEventListener('click',function(e){
+  var p=document.getElementById('emoji-picker');
+  if(p&&!p.contains(e.target)&&!e.target.closest('.bc-tb-btn')){
+    p.style.display='none';
+  }
+});
+
+function switchEpTab(id,btn){
+  document.querySelectorAll('.ep-tab').forEach(function(b){b.classList.remove('on');});
+  document.querySelectorAll('.ep-panel').forEach(function(p){p.style.display='none';});
+  btn.classList.add('on');
+  var panel=document.getElementById('ep-'+id);
+  if(panel){panel.style.display='grid';}
+  document.getElementById('ep-search-results').style.display='none';
+  document.getElementById('ep-search').value='';
+}
+
+function insertSymbol(sym){
+  var editor=document.getElementById('bc-editor');
+  editor.focus();
+  // Restore saved cursor position if available
+  if(window._epRange){
+    var sel=window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(window._epRange);
+  }
+  document.execCommand('insertText',false,sym);
+  // Update saved range to after inserted symbol
+  var sel=window.getSelection();
+  if(sel&&sel.rangeCount>0) window._epRange=sel.getRangeAt(0).cloneRange();
+}
+
+function searchSymbols(q){
+  var results=document.getElementById('ep-search-results');
+  if(!q.trim()){results.style.display='none';return;}
+  var matches=EP_SYMBOLS.filter(function(s){return s.name.includes(q.toLowerCase());}).slice(0,16);
+  if(!matches.length){results.style.display='none';return;}
+  results.style.display='grid';
+  results.innerHTML=matches.map(function(s){
+    return '<button class="ep-btn" data-sym="'+encodeURIComponent(s.sym)+'" onclick="insertSymbol(decodeURIComponent(this.dataset.sym))" title="'+s.name+'">'+s.sym+'</button>';
+  }).join('');
+}
 </script>
 </body>
 </html>
