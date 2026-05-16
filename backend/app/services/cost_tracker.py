@@ -2,7 +2,8 @@
 cost_tracker.py — Per-render cost accounting for SceneForge.
 
 Cost model (all in USD):
-  Voice synthesis   — gTTS is free; ElevenLabs $0.30/1k chars
+  Voice synthesis   — Microsoft Edge TTS (edge-tts) is free for all plans
+                      ElevenLabs $0.30/1k chars — Studio plan only, when ELEVENLABS_API_KEY set
   Visuals           — Pexels free; DALL-E 3 $0.04/image (1024×1024)
   AI generation     — Groq free tier; OpenAI gpt-4o-mini ~$0.00015/1k input + $0.0006/1k output
   FFmpeg/compute    — Railway CPU cost: ~$0.000015/second of processing
@@ -25,8 +26,8 @@ logger = logging.getLogger(__name__)
 # ─── Cost constants (USD) ─────────────────────────────────────────────────────
 
 # Voice
-GTTS_COST_PER_CHAR      = 0.0          # free
-ELEVENLABS_COST_PER_CHAR = 0.30 / 1000  # $0.30 per 1k chars
+EDGE_TTS_COST_PER_CHAR   = 0.0          # Microsoft Edge TTS — free (uses browser/edge runtime)
+ELEVENLABS_COST_PER_CHAR = 0.30 / 1000  # $0.30 per 1k chars (pro voices only)
 
 # Visuals
 PEXELS_COST_PER_IMAGE   = 0.0           # free
@@ -73,10 +74,13 @@ def build_cost_record(
     """Compute itemised cost breakdown for one render job."""
 
     # Voice cost
+    # Microsoft Edge TTS (edge-tts library) is free — no API key, no usage charges
+    # ElevenLabs is paid and only used if explicitly configured
     if voice_provider == "elevenlabs":
         voice_cost = total_chars * ELEVENLABS_COST_PER_CHAR
     else:
-        voice_cost = GTTS_COST_PER_CHAR
+        # edge-tts, gtts, or any other free provider
+        voice_cost = EDGE_TTS_COST_PER_CHAR
 
     # Visual cost
     if visual_source == "dalle" or dalle_images > 0:
