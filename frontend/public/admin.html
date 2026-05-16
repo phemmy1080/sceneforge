@@ -331,6 +331,15 @@ tr:hover td{background:rgba(255,255,255,0.018)}
 }
 .ep-btn:hover{background:var(--ink4);border-color:var(--border2);transform:scale(1.15)}
 .ep-panel{animation:fadeUp .15s ease}
+
+/* ── User modal tabs ─────────────────────────────── */
+.modal-tab{
+  flex:1;padding:6px 10px;border-radius:7px;border:none;background:none;
+  color:var(--text3);font-size:12px;font-weight:500;cursor:pointer;
+  transition:all var(--transition);font-family:inherit;
+}
+.modal-tab.on{background:var(--ink2);color:var(--text);border:1px solid var(--border2)}
+.modal-tab:hover{color:var(--text2)}
 </style>
 </head>
 <body>
@@ -1324,11 +1333,11 @@ tr:hover td{background:rgba(255,255,255,0.018)}
           <div class="card-hdr"><span class="card-title">Cost assumptions</span></div>
           <div style="padding:14px 18px;display:flex;flex-direction:column;gap:8px">
             <div style="display:flex;justify-content:space-between;font-size:12.5px">
-              <span style="color:var(--text2)">Voice (gTTS)</span>
-              <span style="color:var(--teal);font-family:DM Mono,monospace">$0.00 / render</span>
+              <span style="color:var(--text2)">Voice (Edge TTS / Microsoft)</span>
+              <span style="color:var(--teal);font-family:DM Mono,monospace">Free — always</span>
             </div>
             <div style="display:flex;justify-content:space-between;font-size:12.5px">
-              <span style="color:var(--text2)">Voice (ElevenLabs)</span>
+              <span style="color:var(--text2)">Voice (ElevenLabs — Studio plan only)</span>
               <span style="color:var(--gold);font-family:DM Mono,monospace">$0.30 / 1k chars</span>
             </div>
             <div style="display:flex;justify-content:space-between;font-size:12.5px">
@@ -1434,15 +1443,79 @@ tr:hover td{background:rgba(255,255,255,0.018)}
 
 <!-- USER MODAL -->
 <div class="modal-overlay" id="user-modal">
-  <div class="modal">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px">
-      <div class="modal-title" id="modal-title">Manage user</div>
+  <div class="modal" style="max-width:560px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
+      <div>
+        <div class="modal-title" id="modal-title">Manage user</div>
+        <div class="modal-sub" id="modal-sub" style="margin-bottom:0"></div>
+      </div>
       <button onclick="closeModal()" style="background:rgba(255,255,255,0.07);border:1px solid var(--border2);border-radius:50%;width:28px;height:28px;cursor:pointer;color:var(--text3);font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0">&times;</button>
     </div>
-    <div class="modal-sub" id="modal-sub"></div>
-    <div class="modal-metas" id="modal-metas"></div>
-    <div id="modal-body"></div>
-    <div id="modal-alert" class="alert" style="margin-top:12px"></div>
+
+    <!-- Modal tabs -->
+    <div style="display:flex;gap:2px;background:var(--ink3);border-radius:8px;padding:3px;margin-bottom:14px">
+      <button class="modal-tab on" id="mtab-manage" onclick="switchModalTab('manage',this)">Manage</button>
+      <button class="modal-tab" id="mtab-costs"  onclick="switchModalTab('costs',this)">
+        Render costs
+        <span id="modal-cost-badge" style="display:none;background:rgba(45,212,191,0.15);color:var(--teal);font-size:10px;padding:1px 6px;border-radius:100px;margin-left:4px"></span>
+      </button>
+    </div>
+
+    <!-- Manage tab -->
+    <div id="mpanel-manage">
+      <div class="modal-metas" id="modal-metas"></div>
+      <div id="modal-body"></div>
+      <div id="modal-alert" class="alert" style="margin-top:12px"></div>
+    </div>
+
+    <!-- Render costs tab -->
+    <div id="mpanel-costs" style="display:none">
+      <!-- Summary row -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px" id="modal-cost-summary">
+        <div style="background:var(--ink3);border-radius:10px;padding:12px;text-align:center">
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Total renders</div>
+          <div id="mcs-renders" style="font-family:Syne,sans-serif;font-size:22px;font-weight:800;color:var(--text)">—</div>
+        </div>
+        <div style="background:var(--ink3);border-radius:10px;padding:12px;text-align:center">
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Total cost</div>
+          <div id="mcs-cost" style="font-family:Syne,sans-serif;font-size:22px;font-weight:800;color:var(--rose)">—</div>
+        </div>
+        <div style="background:var(--ink3);border-radius:10px;padding:12px;text-align:center">
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Avg margin</div>
+          <div id="mcs-margin" style="font-family:Syne,sans-serif;font-size:22px;font-weight:800">—</div>
+        </div>
+      </div>
+
+      <!-- Cost breakdown mini bars -->
+      <div id="mcs-breakdown" style="background:var(--ink3);border-radius:10px;padding:12px;margin-bottom:14px;display:none">
+        <div style="font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Cost breakdown (total)</div>
+        <div id="mcs-bars"></div>
+      </div>
+
+      <!-- Per-render table -->
+      <div style="font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Individual renders</div>
+      <div style="overflow-x:auto;border-radius:8px;border:1px solid var(--border);max-height:280px;overflow-y:auto">
+        <table style="min-width:440px">
+          <thead>
+            <tr>
+              <th style="padding:8px 12px">Time</th>
+              <th style="padding:8px 12px">Plan</th>
+              <th style="padding:8px 12px">Scenes</th>
+              <th style="padding:8px 12px">Voice</th>
+              <th style="padding:8px 12px">Cost</th>
+              <th style="padding:8px 12px">Margin</th>
+            </tr>
+          </thead>
+          <tbody id="modal-cost-tbody">
+            <tr><td colspan="6" class="loading"></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="modal-cost-empty" style="display:none;text-align:center;padding:32px;color:var(--text3);font-size:13px">
+        No render cost data yet for this user.<br>
+        <span style="font-size:11px;margin-top:4px;display:block">Costs are recorded after each render completes.</span>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1599,6 +1672,17 @@ function openModal(uid){
   var user = USER_CACHE[uid];
   if (!user) return;
   MODAL_USER=user;
+  // Reset to manage tab
+  document.querySelectorAll('.modal-tab').forEach(function(b){ b.classList.remove('on'); });
+  var mt = document.getElementById('mtab-manage');
+  if(mt) mt.classList.add('on');
+  var pm = document.getElementById('mpanel-manage');
+  if(pm) pm.style.display='block';
+  var pc = document.getElementById('mpanel-costs');
+  if(pc) pc.style.display='none';
+  // Reset cost badge
+  var badge = document.getElementById('modal-cost-badge');
+  if(badge) badge.style.display='none';
   document.getElementById('modal-title').textContent=user.full_name||user.email;
   document.getElementById('modal-sub').textContent=user.email;
   document.getElementById('modal-metas').innerHTML='<div class="modal-meta"><div class="modal-meta-val" style="color:'+(user.tokens_remaining<100?'var(--rose)':'var(--teal)')+'">'+fmt(user.tokens_remaining)+'</div><div class="modal-meta-lbl">Tokens remaining</div></div><div class="modal-meta"><div class="modal-meta-val" style="color:var(--gold)">'+(user.videos_created||0)+'</div><div class="modal-meta-lbl">Videos created</div></div>';
@@ -2691,6 +2775,108 @@ async function loadAudit() {
   } catch(e) {
     if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--rose);padding:20px">Failed to load audit log</td></tr>';
     console.error('loadAudit error:', e);
+  }
+}
+
+// ── User modal tab switching ──────────────────────────────────────────────────
+
+function switchModalTab(id, btn) {
+  document.querySelectorAll('.modal-tab').forEach(function(b){ b.classList.remove('on'); });
+  ['manage','costs'].forEach(function(t){
+    var p = document.getElementById('mpanel-'+t);
+    if(p) p.style.display = t === id ? 'block' : 'none';
+  });
+  btn.classList.add('on');
+  if(id === 'costs' && MODAL_USER) loadUserRenderCosts(MODAL_USER.id);
+}
+
+// ── Per-user render costs ─────────────────────────────────────────────────────
+
+async function loadUserRenderCosts(uid) {
+  var tbody  = document.getElementById('modal-cost-tbody');
+  var empty  = document.getElementById('modal-cost-empty');
+  var bdown  = document.getElementById('mcs-breakdown');
+  if(!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="6"><div class="loading"></div></td></tr>';
+  if(empty) empty.style.display = 'none';
+
+  try {
+    var d = await apiFetch('/costs/user/' + uid);
+    var renders = d.renders || [];
+    var summary = d.summary || {};
+
+    // Badge on tab
+    var badge = document.getElementById('modal-cost-badge');
+    if(badge) {
+      badge.textContent = d.total_renders || 0;
+      badge.style.display = d.total_renders > 0 ? 'inline' : 'none';
+    }
+
+    // Summary stats
+    function _s(id, v) { var el=document.getElementById(id); if(el) el.textContent=v; }
+    _s('mcs-renders', fmt(d.total_renders || 0));
+    _s('mcs-cost',    '$' + (summary.total_cost_usd || 0).toFixed(4));
+
+    var mp = summary.avg_margin_pct || 0;
+    var mEl = document.getElementById('mcs-margin');
+    if(mEl) {
+      mEl.textContent = mp.toFixed(1) + '%';
+      mEl.style.color = mp >= 50 ? 'var(--teal)' : mp >= 20 ? 'var(--gold)' : 'var(--rose)';
+    }
+
+    // Breakdown bars
+    var bd = summary.breakdown || {};
+    var bdTotal = Object.values(bd).reduce(function(a,b){ return a+b; }, 0);
+    if(bdTotal > 0 && bdown) {
+      bdown.style.display = 'block';
+      var bars = document.getElementById('mcs-bars');
+      var bdItems = [
+        {label:'Voice',   val:bd.voice   ||0, color:'var(--violet)'},
+        {label:'Visuals', val:bd.visual  ||0, color:'var(--teal)'},
+        {label:'AI gen',  val:bd.ai      ||0, color:'var(--gold)'},
+        {label:'Compute', val:bd.compute ||0, color:'#60a5fa'},
+        {label:'Storage', val:bd.storage ||0, color:'var(--text3)'},
+      ];
+      bars.innerHTML = bdItems.map(function(item) {
+        var pct = bdTotal > 0 ? Math.round(item.val / bdTotal * 100) : 0;
+        return '<div class="bar-row" style="margin-bottom:6px">'
+          + '<span class="bar-label" style="min-width:60px;font-size:11px">' + item.label + '</span>'
+          + '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;background:' + item.color + '"></div></div>'
+          + '<span class="bar-count" style="min-width:60px;text-align:right;font-size:11px">$' + item.val.toFixed(5) + '</span>'
+          + '</div>';
+      }).join('');
+    }
+
+    // Per-render table
+    if(!renders.length) {
+      tbody.innerHTML = '';
+      if(empty) empty.style.display = 'block';
+      return;
+    }
+
+    tbody.innerHTML = renders.map(function(r) {
+      var mp2 = r.margin_pct || 0;
+      var mc  = mp2 >= 50 ? 'var(--teal)' : mp2 >= 20 ? 'var(--gold)' : 'var(--rose)';
+      var voiceLabel = r.voice_provider === 'elevenlabs'
+        ? '<span style="color:var(--violet);font-size:10.5px">ElevenLabs</span>'
+        : '<span style="color:var(--teal);font-size:10.5px">Edge TTS</span>';
+      var visualLabel = r.visual_source === 'dalle'
+        ? '<span style="color:var(--gold);font-size:10.5px">DALL·E</span>'
+        : '<span style="color:var(--text3);font-size:10.5px">Pexels</span>';
+      return '<tr>'
+        + '<td style="font-size:11px;color:var(--text3);white-space:nowrap">' + ago(r.ts) + '</td>'
+        + '<td>' + planTag(r.plan || 'free') + '</td>'
+        + '<td style="text-align:center;color:var(--text2)">' + (r.scenes || '—') + '</td>'
+        + '<td>' + voiceLabel + '<br>' + visualLabel + '</td>'
+        + '<td style="font-family:DM Mono,monospace;font-size:12px;color:var(--rose)">$' + (r.total_cost_usd || 0).toFixed(5) + '</td>'
+        + '<td style="font-family:DM Mono,monospace;font-size:12px;color:' + mc + '">' + mp2.toFixed(1) + '%</td>'
+        + '</tr>';
+    }).join('');
+
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--rose);padding:20px;font-size:13px">Failed to load render costs</td></tr>';
+    console.error('loadUserRenderCosts error:', e);
   }
 }
 </script>
