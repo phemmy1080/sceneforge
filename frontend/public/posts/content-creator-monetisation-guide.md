@@ -100,4 +100,4 @@ Every monetisation stream requires consistent content. The more you publish, the
 
 AI video creation tools have made daily publishing realistic for solo creators. SceneForge handles the production — you focus on the strategy.
 
-[Create your first AI video for free at sceneraforge.com](https://sceneraforge.com)
+[Create your first AI video for free at scenraforge.com](https://scenraforge.com)
