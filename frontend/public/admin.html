@@ -456,6 +456,14 @@ tr:hover td{background:rgba(255,255,255,0.018)}
     </button>
 
     <div class="sb-section" id="sec-system">System</div>
+    <button class="nb" id="nb-costs" onclick="nav('costs',this)">
+      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 4v2M8 10v2M5 6.5h4a1 1 0 010 2H6a1 1 0 000 2h4"/></svg>
+      Cost & margin
+    </button>
+    <button class="nb" id="nb-audit" onclick="nav('audit',this)">
+      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3h10v10H3z"/><path d="M6 6h4M6 9h3"/></svg>
+      Audit trail
+    </button>
     <button class="nb" id="nb-queue" onclick="nav('queue',this)">
       <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
       Render queue
@@ -1271,6 +1279,156 @@ tr:hover td{background:rgba(255,255,255,0.018)}
     </div>
 
   
+    <!-- COSTS -->
+    <div class="pg" id="pg-costs">
+      <div class="ph">
+        <div class="ph-top">
+          <div><div class="ph-title">Cost &amp; margin</div><div class="ph-sub">Render economics — revenue vs cost per plan</div></div>
+          <div class="ph-actions">
+            <button class="btn btn-ghost btn-sm" onclick="loadCosts()">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 8a6 6 0 0112 0M14 4v4h-4"/></svg>
+              Refresh
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Plan margin cards -->
+      <div id="cost-plan-grid" class="stat-row" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-bottom:24px">
+        <div class="loading"></div>
+      </div>
+
+      <!-- Cost breakdown table -->
+      <div class="card" style="margin-bottom:18px">
+        <div class="card-hdr">
+          <span class="card-title">Cost breakdown per render</span>
+          <span style="font-size:11px;color:var(--text3)">Avg across all renders on each plan</span>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th>Plan</th><th>Revenue/render</th><th>Voice</th>
+              <th>Visuals</th><th>AI gen</th><th>Compute</th>
+              <th>Storage</th><th>Total cost</th><th>Margin</th><th>Margin %</th>
+            </tr></thead>
+            <tbody id="cost-breakdown-tbody">
+              <tr><td colspan="10"><div class="loading"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Assumptions card -->
+      <div class="two-col">
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Cost assumptions</span></div>
+          <div style="padding:14px 18px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:space-between;font-size:12.5px">
+              <span style="color:var(--text2)">Voice (gTTS)</span>
+              <span style="color:var(--teal);font-family:DM Mono,monospace">$0.00 / render</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px">
+              <span style="color:var(--text2)">Voice (ElevenLabs)</span>
+              <span style="color:var(--gold);font-family:DM Mono,monospace">$0.30 / 1k chars</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px">
+              <span style="color:var(--text2)">Visuals (Pexels)</span>
+              <span style="color:var(--teal);font-family:DM Mono,monospace">$0.00 / render</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px">
+              <span style="color:var(--text2)">Visuals (DALL-E 3)</span>
+              <span style="color:var(--gold);font-family:DM Mono,monospace">$0.04 / image</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px">
+              <span style="color:var(--text2)">AI generation (Groq)</span>
+              <span style="color:var(--teal);font-family:DM Mono,monospace">Free tier</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px">
+              <span style="color:var(--text2)">AI generation (OpenAI)</span>
+              <span style="color:var(--gold);font-family:DM Mono,monospace">$0.00015 / 1k tok</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px">
+              <span style="color:var(--text2)">Compute (Railway)</span>
+              <span style="color:var(--text2);font-family:DM Mono,monospace">$0.000008 / sec</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px">
+              <span style="color:var(--text2)">Storage (R2)</span>
+              <span style="color:var(--text2);font-family:DM Mono,monospace">$0.000025 / render</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Recent render costs</span></div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr>
+                <th>Job</th><th>Plan</th><th>Cost</th><th>Margin</th><th>Time</th>
+              </tr></thead>
+              <tbody id="cost-recent-tbody">
+                <tr><td colspan="5"><div class="loading"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AUDIT TRAIL -->
+    <div class="pg" id="pg-audit">
+      <div class="ph">
+        <div class="ph-top">
+          <div><div class="ph-title">Audit trail</div><div class="ph-sub">Every admin action — who, what, when</div></div>
+          <div class="ph-actions">
+            <button class="btn btn-ghost btn-sm" onclick="loadAudit()">Refresh</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+        <select id="audit-filter-action" onchange="loadAudit()"
+          style="background:var(--ink2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:12.5px;padding:8px 12px;outline:none;min-width:160px">
+          <option value="">All actions</option>
+        </select>
+        <select id="audit-filter-admin" onchange="loadAudit()"
+          style="background:var(--ink2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:12.5px;padding:8px 12px;outline:none;min-width:180px">
+          <option value="">All admins</option>
+        </select>
+        <input type="text" id="audit-search" placeholder="Search..." oninput="filterAuditLocal()"
+          class="search-inp" style="max-width:220px;margin:0">
+      </div>
+
+      <!-- Stats row -->
+      <div class="stat-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px" id="audit-stats">
+        <div class="stat gold"><div class="stat-label">Total events</div><div class="stat-val" id="audit-total">—</div></div>
+        <div class="stat rose"><div class="stat-label">Deletions</div><div class="stat-val" id="audit-deletes">—</div></div>
+        <div class="stat violet"><div class="stat-label">Broadcasts sent</div><div class="stat-val" id="audit-broadcasts">—</div></div>
+        <div class="stat teal"><div class="stat-label">Token adjustments</div><div class="stat-val" id="audit-tokens">—</div></div>
+      </div>
+
+      <!-- Audit log table -->
+      <div class="card">
+        <div class="card-hdr">
+          <span class="card-title">Event log</span>
+          <span id="audit-count" style="font-size:11px;color:var(--text3)"></span>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th style="width:14%">Time</th>
+              <th style="width:13%">Action</th>
+              <th style="width:18%">Performed by</th>
+              <th style="width:10%">Role</th>
+              <th style="width:45%">Details</th>
+            </tr></thead>
+            <tbody id="audit-tbody">
+              <tr><td colspan="5"><div class="loading"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -1330,6 +1488,7 @@ async function doLogin(){
     if(d.admin.must_reset_password){document.getElementById('reset-overlay').classList.add('on');}
     if(ROLE==='superadmin'){document.getElementById('sec-admins').style.display='block';document.getElementById('nb-admins').style.display='flex';}
     applyRoleRestrictions();
+    fetchCsrfToken();
     loadDash();
   }catch(e){err.classList.add('on');}
 }
@@ -1363,7 +1522,7 @@ function nav(id,btn){
   var pg=document.getElementById('pg-'+id);
   if(pg)pg.classList.add('on');
   btn.classList.add('on');
-  var loaders={dashboard:loadDash,analytics:loadAnalytics,users:loadUsers,broadcast:loadBroadcasts,revenue:loadRevenue,tx:loadTx,pricing:loadPricing,niches:loadNiches,coupons:loadCoupons,queue:loadQueue,logs:loadLogs,admins:loadAdmins,feedback:loadFeedback};
+  var loaders={dashboard:loadDash,analytics:loadAnalytics,users:loadUsers,broadcast:loadBroadcasts,revenue:loadRevenue,tx:loadTx,pricing:loadPricing,niches:loadNiches,coupons:loadCoupons,queue:loadQueue,logs:loadLogs,admins:loadAdmins,feedback:loadFeedback,costs:loadCosts,audit:loadAudit};
   if(loaders[id])loaders[id]();
 }
 
@@ -2312,6 +2471,227 @@ function searchSymbols(q){
   results.innerHTML=matches.map(function(s){
     return '<button class="ep-btn" data-sym="'+encodeURIComponent(s.sym)+'" onclick="insertSymbol(decodeURIComponent(this.dataset.sym))" title="'+s.name+'">'+s.sym+'</button>';
   }).join('');
+}
+
+// ── CSRF token management ─────────────────────────────────────────────────────
+var CSRF_TOKEN = '';
+
+async function fetchCsrfToken() {
+  try {
+    var r = await apiFetch('/csrf-token');
+    CSRF_TOKEN = r.csrf_token || '';
+  } catch(e) {
+    console.warn('CSRF fetch failed', e);
+  }
+}
+
+// Wrap apiFetch to auto-attach CSRF header on mutating requests
+// Patch apiFetch to auto-attach CSRF header — runs after apiFetch is defined
+(function() {
+  var _orig = apiFetch;
+  apiFetch = function(path, opts) {
+    opts = opts || {};
+    var method = (opts.method || 'GET').toUpperCase();
+    if (['POST','PUT','DELETE','PATCH'].indexOf(method) >= 0 && CSRF_TOKEN) {
+      // Merge CSRF into existing opts.headers without overwriting
+      opts = Object.assign({}, opts);
+      opts.headers = Object.assign({'x-csrf-token': CSRF_TOKEN}, opts.headers || {});
+    }
+    return _orig(path, opts).then(function(result) {
+      if (['POST','PUT','DELETE','PATCH'].indexOf(method) >= 0) {
+        fetchCsrfToken(); // rotate after mutating call
+      }
+      return result;
+    });
+  };
+})();
+
+// ── Cost & margin ─────────────────────────────────────────────────────────────
+
+var COST_DATA = {};
+
+async function loadCosts() {
+  try {
+    var d = await apiFetch('/costs/summary');
+    COST_DATA = d.plans || {};
+    var rate = d.exchange_rate || 1600;
+
+    // ── Plan margin cards ──────────────────────────────────────────────────
+    var colors = {starter:'violet', pro:'gold', studio:'teal', free:'rose'};
+    var grid = document.getElementById('cost-plan-grid');
+    if (grid) {
+      grid.innerHTML = Object.entries(COST_DATA).map(function(e) {
+        var k = e[0], p = e[1];
+        var cls = colors[k] || 'gold';
+        var marginColor = p.margin_pct >= 50 ? 'var(--teal)' : p.margin_pct >= 20 ? 'var(--gold)' : 'var(--rose)';
+        return '<div class="stat ' + cls + '">'
+          + '<div class="stat-label">' + (p.plan_label || k) + '</div>'
+          + '<div class="stat-val" style="font-size:22px;color:' + marginColor + '">' + p.margin_pct.toFixed(1) + '%</div>'
+          + '<div class="stat-meta" style="display:flex;flex-direction:column;gap:3px;margin-top:6px">'
+          + '<span>Revenue: $' + (p.price_usd || 0).toFixed(4) + ' <span style="color:var(--text3);font-size:10px">(₦' + fmt(p.price_ngn || 0) + ')</span></span>'
+          + '<span>Avg cost: $' + (p.avg_cost_usd || 0).toFixed(4) + '</span>'
+          + '<span>Margin: $' + (p.margin_usd || 0).toFixed(4) + '</span>'
+          + '<span style="color:var(--text3);font-size:11px">' + fmt(p.renders || 0) + ' renders tracked</span>'
+          + '</div></div>';
+      }).join('') || '<div class="loading">No cost data yet — costs are recorded after each render</div>';
+    }
+
+    // ── Breakdown table ────────────────────────────────────────────────────
+    var tbody = document.getElementById('cost-breakdown-tbody');
+    if (tbody) {
+      tbody.innerHTML = Object.entries(COST_DATA).map(function(e) {
+        var k = e[0], p = e[1];
+        var bd = p.cost_breakdown || {};
+        var marginColor = p.margin_pct >= 50 ? 'var(--teal)' : p.margin_pct >= 20 ? 'var(--gold)' : 'var(--rose)';
+        var marginBg = p.margin_pct >= 50 ? 'rgba(45,212,191,0.08)' : p.margin_pct >= 20 ? 'rgba(201,168,76,0.08)' : 'rgba(248,113,113,0.08)';
+        return '<tr style="background:' + marginBg + '">'
+          + '<td><span class="tag tag-' + (k === 'pro' ? 'pro' : k === 'studio' ? 'studio' : k === 'starter' ? 'starter' : 'free') + '">' + (p.plan_label || k) + '</span></td>'
+          + '<td style="font-family:DM Mono,monospace;color:var(--teal)">$' + (p.price_usd || 0).toFixed(4) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:11px">$' + (bd.voice || 0).toFixed(5) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:11px">$' + (bd.visual || 0).toFixed(5) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:11px">$' + (bd.ai || 0).toFixed(5) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:11px">$' + (bd.compute || 0).toFixed(5) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:11px">$' + (bd.storage || 0).toFixed(5) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;color:var(--rose)">$' + (p.avg_cost_usd || 0).toFixed(5) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;color:' + marginColor + '">$' + (p.margin_usd || 0).toFixed(4) + '</td>'
+          + '<td><span style="font-weight:700;color:' + marginColor + '">' + (p.margin_pct || 0).toFixed(1) + '%</span></td>'
+          + '</tr>';
+      }).join('') || '<tr><td colspan="10" class="loading">No data yet</td></tr>';
+    }
+
+    // ── Recent costs ───────────────────────────────────────────────────────
+    var recent = await apiFetch('/costs/recent');
+    var records = recent.records || [];
+    var rtbody = document.getElementById('cost-recent-tbody');
+    if (rtbody) {
+      rtbody.innerHTML = records.length ? records.map(function(r) {
+        var mc = r.margin_pct >= 50 ? 'var(--teal)' : r.margin_pct >= 20 ? 'var(--gold)' : 'var(--rose)';
+        return '<tr>'
+          + '<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text3)">' + r.job_id.slice(0,8) + '…</td>'
+          + '<td>' + planTag(r.plan || 'free') + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:12px;color:var(--rose)">$' + (r.total_cost_usd || 0).toFixed(5) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:12px;color:' + mc + '">' + (r.margin_pct || 0).toFixed(1) + '%</td>'
+          + '<td style="color:var(--text3);font-size:11px">' + ago(r.ts) + '</td>'
+          + '</tr>';
+      }).join('') : '<tr><td colspan="5" class="loading">No renders tracked yet</td></tr>';
+    }
+
+  } catch(e) {
+    console.error('loadCosts error:', e);
+    var g = document.getElementById('cost-plan-grid');
+    if (g) g.innerHTML = '<div class="loading">Failed to load cost data</div>';
+  }
+}
+
+// ── Audit trail ───────────────────────────────────────────────────────────────
+
+var AUDIT_ENTRIES = [];
+
+var AUDIT_ACTION_ICONS = {
+  top_up:         {i:'↑', c:'var(--teal)',   bg:'rgba(45,212,191,0.12)'},
+  set_tokens:     {i:'✏', c:'var(--violet)', bg:'rgba(167,139,250,0.12)'},
+  set_plan:       {i:'◈', c:'var(--violet)', bg:'rgba(167,139,250,0.12)'},
+  pricing_update: {i:'₦', c:'var(--gold)',   bg:'rgba(201,168,76,0.12)'},
+  plan_added:     {i:'+', c:'var(--teal)',   bg:'rgba(45,212,191,0.12)'},
+  suspend:        {i:'⊘', c:'var(--rose)',   bg:'rgba(248,113,113,0.12)'},
+  unsuspend:      {i:'✓', c:'var(--teal)',   bg:'rgba(45,212,191,0.12)'},
+  broadcast:      {i:'✉', c:'#60a5fa',       bg:'rgba(96,165,250,0.12)'},
+  delete_user:    {i:'✗', c:'var(--rose)',   bg:'rgba(248,113,113,0.12)'},
+  coupon_created: {i:'◆', c:'var(--teal)',   bg:'rgba(45,212,191,0.12)'},
+  coupon_deleted: {i:'◇', c:'var(--rose)',   bg:'rgba(248,113,113,0.12)'},
+};
+
+function auditDetails(e) {
+  var parts = [];
+  if (e.user_id)    parts.push('User: ' + e.user_id.slice(0,8) + '…');
+  if (e.tokens)     parts.push(fmt(e.tokens) + ' tokens');
+  if (e.plan)       parts.push('Plan: ' + e.plan);
+  if (e.plan_key)   parts.push('Plan key: ' + e.plan_key);
+  if (e.amount)     parts.push('₦' + fmt(e.amount));
+  if (e.subject)    parts.push('"' + e.subject.slice(0,40) + '"');
+  if (e.sent)       parts.push(fmt(e.sent) + ' sent');
+  if (e.reason)     parts.push(e.reason.slice(0,50));
+  if (e.email)      parts.push(e.email);
+  if (e.old !== undefined) parts.push(fmt(e.old) + ' → ' + fmt(e.tokens));
+  return parts.join(' · ') || '—';
+}
+
+function renderAuditTable(entries) {
+  var tbody = document.getElementById('audit-tbody');
+  if (!tbody) return;
+  if (!entries.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="loading">No audit events yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = entries.map(function(e) {
+    var ic = AUDIT_ACTION_ICONS[e.action] || {i:'•', c:'var(--text3)', bg:'rgba(255,255,255,0.06)'};
+    var roleColor = {superadmin:'var(--rose)', admin:'var(--violet)', analytics:'var(--teal)', support:'var(--gold)'}[e.performed_by_role] || 'var(--text3)';
+    return '<tr>'
+      + '<td style="font-size:11px;color:var(--text3);white-space:nowrap">' + ago(e.ts) + '<div style="font-size:10px;color:var(--text3);margin-top:1px">' + (e.ts || '').slice(11,19) + ' UTC</div></td>'
+      + '<td><span style="display:inline-flex;align-items:center;gap:5px;background:' + ic.bg + ';color:' + ic.c + ';border-radius:6px;padding:3px 8px;font-size:11.5px;font-weight:600">'
+      + '<span>' + ic.i + '</span>' + (e.action || '').replace(/_/g,' ') + '</span></td>'
+      + '<td><div style="font-size:12.5px;font-weight:600;color:var(--text)">' + (e.performed_by_name || e.performed_by_email || 'unknown') + '</div>'
+      + '<div style="font-size:11px;color:var(--text3)">' + (e.performed_by_email || '') + '</div></td>'
+      + '<td><span style="font-size:11px;font-weight:600;color:' + roleColor + ';text-transform:capitalize">' + (e.performed_by_role || '—') + '</span></td>'
+      + '<td style="font-size:12px;color:var(--text2)">' + auditDetails(e) + '</td>'
+      + '</tr>';
+  }).join('');
+  var countEl = document.getElementById('audit-count');
+  if (countEl) countEl.textContent = entries.length + ' events';
+}
+
+function filterAuditLocal() {
+  var q = (document.getElementById('audit-search').value || '').toLowerCase();
+  if (!q) { renderAuditTable(AUDIT_ENTRIES); return; }
+  renderAuditTable(AUDIT_ENTRIES.filter(function(e) {
+    return JSON.stringify(e).toLowerCase().includes(q);
+  }));
+}
+
+async function loadAudit() {
+  var actionFilter  = (document.getElementById('audit-filter-action') || {}).value || '';
+  var adminFilter   = (document.getElementById('audit-filter-admin')  || {}).value || '';
+  var tbody = document.getElementById('audit-tbody');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="5"><div class="loading"></div></td></tr>';
+
+  try {
+    // Load filter options on first run
+    var actionSel = document.getElementById('audit-filter-action');
+    if (actionSel && actionSel.options.length <= 1) {
+      try {
+        var meta = await apiFetch('/audit/actions');
+        (meta.actions || []).forEach(function(a) {
+          var opt = document.createElement('option');
+          opt.value = a; opt.textContent = a.replace(/_/g,' ');
+          actionSel.appendChild(opt);
+        });
+        var adminSel = document.getElementById('audit-filter-admin');
+        (meta.admins || []).forEach(function(a) {
+          var opt = document.createElement('option');
+          opt.value = a; opt.textContent = a;
+          adminSel.appendChild(opt);
+        });
+      } catch(e) {}
+    }
+
+    var qs = '';
+    if (actionFilter) qs += '?action=' + actionFilter;
+    if (adminFilter)  qs += (qs ? '&' : '?') + 'performed_by=' + encodeURIComponent(adminFilter);
+    var d = await apiFetch('/audit' + qs);
+    AUDIT_ENTRIES = d.entries || [];
+
+    // Summary stats
+    function _s(id, v) { var el = document.getElementById(id); if(el) el.textContent = v; }
+    _s('audit-total',      fmt(AUDIT_ENTRIES.length));
+    _s('audit-deletes',    fmt(AUDIT_ENTRIES.filter(function(e){ return e.action === 'delete_user'; }).length));
+    _s('audit-broadcasts', fmt(AUDIT_ENTRIES.filter(function(e){ return e.action === 'broadcast'; }).length));
+    _s('audit-tokens',     fmt(AUDIT_ENTRIES.filter(function(e){ return ['top_up','set_tokens'].indexOf(e.action) >= 0; }).length));
+
+    filterAuditLocal();
+  } catch(e) {
+    if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--rose);padding:20px">Failed to load audit log</td></tr>';
+    console.error('loadAudit error:', e);
+  }
 }
 </script>
 </body>
