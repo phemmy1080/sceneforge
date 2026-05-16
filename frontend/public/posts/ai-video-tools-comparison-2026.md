@@ -72,4 +72,4 @@ The key differences:
 
 For short-form content creators who want to build an audience through consistent, high-quality video — AI script-to-video tools are the clear choice. The question is which one.
 
-SceneForge is free to start with no credit card required. [Try it at sceneraforge.com](https://sceneraforge.com).
+SceneForge is free to start with no credit card required. [Try it at scenraforge.com](https://scenraforge.com).
