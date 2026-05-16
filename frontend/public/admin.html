@@ -281,6 +281,40 @@ tr:hover td{background:rgba(255,255,255,0.018)}
   .login-title{font-size:30px}
   .ph-actions .btn{font-size:11px;padding:6px 10px}
 }
+
+/* ── Broadcast AI components ────────────────────────── */
+.bc-tab{
+  padding:6px 14px;border-radius:8px;border:none;background:none;
+  color:var(--text3);font-size:12.5px;font-weight:500;cursor:pointer;
+  transition:all var(--transition);font-family:inherit;
+  display:flex;align-items:center;gap:5px;
+}
+.bc-tab.on{background:var(--ink2);color:var(--text);border:1px solid var(--border2)}
+.bc-tab:hover{color:var(--text2)}
+.bc-goal-card{
+  background:var(--ink3);border:1px solid var(--border2);border-radius:10px;
+  padding:12px;cursor:pointer;transition:all var(--transition);
+}
+.bc-goal-card:hover{border-color:rgba(201,168,76,0.3)}
+.bc-goal-card.on{border-color:var(--teal);background:rgba(45,212,191,0.06)}
+.assist-btn{
+  padding:7px 10px;background:var(--ink3);border:1px solid var(--border2);
+  border-radius:8px;color:var(--text2);font-size:12px;cursor:pointer;
+  text-align:left;transition:all var(--transition);font-family:inherit;
+  display:flex;align-items:center;gap:6px;
+}
+.assist-btn:hover{border-color:rgba(45,212,191,0.3);color:var(--teal);background:rgba(45,212,191,0.05)}
+.bc-accordion{border-bottom:1px solid var(--border)}
+.bc-accordion:last-child{border-bottom:none}
+.bc-accordion-hdr:hover{background:rgba(255,255,255,0.02)}
+.bc-tb-btn{
+  background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);
+  border-radius:5px;color:var(--text2);font-size:12px;padding:3px 8px;
+  cursor:pointer;transition:all var(--transition);min-width:28px;font-family:inherit;
+}
+.bc-tb-btn:hover{background:rgba(255,255,255,0.1);color:var(--text)}
+#bc-editor:empty:before{content:attr(data-placeholder);color:var(--text3);pointer-events:none;white-space:pre-wrap}
+#subj-suggestions{display:none;flex-direction:column;gap:6px}
 </style>
 </head>
 <body>
@@ -573,163 +607,330 @@ tr:hover td{background:rgba(255,255,255,0.018)}
 
     <!-- BROADCAST -->
     <div class="pg" id="pg-broadcast">
-      <div class="ph"><div class="ph-title">Email broadcast</div><div class="ph-sub">Compose and send targeted emails to your users</div></div>
-      <div id="alert-broadcast" class="alert"></div>
-      <div class="two-col">
-
-        <!-- LEFT: Compose -->
-        <div class="card">
-          <div class="card-hdr">
-            <span class="card-title">Compose</span>
-            <div class="card-actions">
-              <button class="btn btn-ghost btn-xs" onclick="bcLoadTemplate()" title="Load from history">&#128196; Template</button>
-            </div>
-          </div>
-          <div style="padding:20px">
-
-            <!-- Target selector -->
-            <div class="field">
-              <label>Send to</label>
-              <div style="display:flex;gap:6px;flex-wrap:wrap">
-                <button id="bt-all"    class="btn btn-teal btn-sm"  onclick="setBcTarget('all')"    style="flex:1;min-width:80px">&#127760; All</button>
-                <button id="bt-plan"   class="btn btn-ghost btn-sm" onclick="setBcTarget('plan')"   style="flex:1;min-width:80px">&#128203; By plan</button>
-                <button id="bt-user"   class="btn btn-ghost btn-sm" onclick="setBcTarget('user')"   style="flex:1;min-width:80px">&#128100; One user</button>
-                <button id="bt-upload" class="btn btn-ghost btn-sm" onclick="setBcTarget('upload')" style="flex:1;min-width:80px">&#128229; Upload CSV</button>
-              </div>
-            </div>
-
-            <div id="bc-plan-row" class="field" style="display:none">
-              <label>Plan</label>
-              <select id="bc-plan" style="width:100%;background:var(--ink3);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-size:13px;padding:10px 13px;outline:none">
-                <option value="free">Free</option><option value="starter">Starter</option>
-                <option value="pro">Pro</option><option value="studio">Studio</option>
-              </select>
-            </div>
-
-            <div id="bc-user-row" class="field" style="display:none">
-              <label>User ID or email</label>
-              <input type="text" id="bc-user-id" placeholder="UUID or user@email.com">
-            </div>
-
-            <div id="bc-upload-row" class="field" style="display:none">
-              <label>Upload email list (CSV or TXT, one email per line)</label>
-              <div style="border:2px dashed rgba(255,255,255,0.12);border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:border-color var(--transition)"
-                onclick="document.getElementById('bc-csv-input').click()"
-                ondragover="event.preventDefault();this.style.borderColor='var(--gold)'"
-                ondragleave="this.style.borderColor='rgba(255,255,255,0.12)'"
-                ondrop="bcHandleDrop(event)">
-                <input type="file" id="bc-csv-input" accept=".csv,.txt" style="display:none" onchange="bcReadFile(this.files[0])">
-                <div style="font-size:22px;margin-bottom:6px">&#128229;</div>
-                <div style="font-size:12.5px;color:var(--text2);margin-bottom:3px">Drop CSV/TXT here or click to browse</div>
-                <div style="font-size:11px;color:var(--text3)">One email per line or comma-separated</div>
-              </div>
-              <div id="bc-upload-status" style="margin-top:8px;font-size:12px;color:var(--teal);display:none"></div>
-              <textarea id="bc-email-list" rows="3" placeholder="Or paste emails directly: user@a.com, user@b.com" style="margin-top:8px;width:100%;background:var(--ink3);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-size:12px;padding:9px 12px;outline:none;resize:vertical"></textarea>
-            </div>
-
-            <!-- Subject -->
-            <div class="field">
-              <label>Subject &mdash; use {{name}} to personalise</label>
-              <input type="text" id="bc-subject" placeholder="e.g. Big news from SceneForge!">
-            </div>
-
-            <!-- Mini editor toolbar -->
-            <div class="field">
-              <label>Message body</label>
-              <div style="border:1px solid var(--border2);border-radius:10px;overflow:hidden;background:var(--ink3)">
-                <!-- Toolbar -->
-                <div style="display:flex;align-items:center;gap:4px;padding:8px 10px;border-bottom:1px solid var(--border);flex-wrap:wrap;background:var(--ink2)">
-                  <button class="bc-tb-btn" title="Bold" onclick="bcFormat('bold')"><b>B</b></button>
-                  <button class="bc-tb-btn" title="Italic" onclick="bcFormat('italic')"><i>I</i></button>
-                  <button class="bc-tb-btn" title="Underline" onclick="bcFormat('underline')"><u>U</u></button>
-                  <div style="width:1px;height:18px;background:var(--border2);margin:0 2px"></div>
-                  <button class="bc-tb-btn" title="Bullet list" onclick="bcFormat('insertUnorderedList')">&#8226;&#8212;</button>
-                  <button class="bc-tb-btn" title="Numbered list" onclick="bcFormat('insertOrderedList')">1&#8212;</button>
-                  <div style="width:1px;height:18px;background:var(--border2);margin:0 2px"></div>
-                  <select onchange="bcFormat('fontSize',this.value);this.selectedIndex=0" title="Font size"
-                    style="background:var(--ink3);border:1px solid var(--border2);border-radius:5px;color:var(--text2);font-size:11px;padding:3px 5px;outline:none;cursor:pointer">
-                    <option value="">Size</option>
-                    <option value="1">Small</option>
-                    <option value="3">Normal</option>
-                    <option value="5">Large</option>
-                    <option value="7">Huge</option>
-                  </select>
-                  <select onchange="bcFormat('fontName',this.value);this.selectedIndex=0" title="Font"
-                    style="background:var(--ink3);border:1px solid var(--border2);border-radius:5px;color:var(--text2);font-size:11px;padding:3px 5px;outline:none;cursor:pointer">
-                    <option value="">Font</option>
-                    <option value="Arial">Arial</option>
-                    <option value="Georgia">Georgia</option>
-                    <option value="Courier New">Courier</option>
-                    <option value="Verdana">Verdana</option>
-                  </select>
-                  <div style="width:1px;height:18px;background:var(--border2);margin:0 2px"></div>
-                  <button class="bc-tb-btn" title="Insert link" onclick="bcInsertLink()">&#128279;</button>
-                  <button class="bc-tb-btn" title="Insert personalisation tag" onclick="bcInsertTag()" style="font-size:10px;padding:3px 7px">{{name}}</button>
-                  <div style="margin-left:auto;display:flex;gap:4px">
-                    <button class="bc-tb-btn" title="Undo" onclick="bcFormat('undo')">&#8630;</button>
-                    <button class="bc-tb-btn" title="Redo" onclick="bcFormat('redo')">&#8631;</button>
-                  </div>
-                </div>
-                <!-- Editable area -->
-                <div id="bc-editor"
-                  contenteditable="true"
-                  style="min-height:160px;padding:14px;font-size:13.5px;color:var(--text);outline:none;line-height:1.7;font-family:'Instrument Sans',sans-serif"
-                  data-placeholder="Hi {{name}},&#10;&#10;We have exciting news...&#10;&#10;— SceneForge Team"
-                  oninput="bcEditorInput()"
-                ></div>
-              </div>
-              <div style="font-size:10.5px;color:var(--text3);margin-top:5px">
-                Use <code style="background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:3px">{{name}}</code> or
-                <code style="background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:3px">{{email}}</code> for personalisation
-              </div>
-            </div>
-
-            <!-- Preview -->
-            <div id="bc-preview-wrap" style="display:none;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:16px;margin-bottom:12px">
-              <div style="font-size:10px;color:var(--teal);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em;font-weight:600">&#128065; Preview ({{name}} = "Creator")</div>
-              <div id="bc-preview-body" style="font-size:13px;color:rgba(255,255,255,0.75);line-height:1.7"></div>
-            </div>
-
-            <div style="display:flex;gap:8px;margin-bottom:12px">
-              <button class="btn btn-ghost btn-sm" onclick="toggleBcPreview()" style="flex:1">&#128065; Preview</button>
-              <button class="btn btn-ghost btn-sm" onclick="bcClear()" style="flex:1">&#10006; Clear</button>
-            </div>
-
-            <button class="btn btn-gold" style="width:100%;justify-content:center;font-size:14px" onclick="doBroadcast()">
-              Send broadcast &rarr;
+      <div class="ph">
+        <div class="ph-top">
+          <div><div class="ph-title">Email broadcast</div><div class="ph-sub">AI-powered campaigns and writing assistant</div></div>
+          <div class="ph-actions">
+            <button class="btn btn-ghost btn-sm" onclick="loadBroadcasts()">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 8a6 6 0 0112 0M14 4v4h-4"/></svg>
+              Refresh history
             </button>
-            <p style="font-size:11px;color:var(--text3);text-align:center;margin-top:10px">Suspended accounts are always skipped</p>
           </div>
-        </div>
-
-        <!-- RIGHT: History -->
-        <div class="card" style="display:flex;flex-direction:column">
-          <div class="card-hdr">
-            <span class="card-title">Sent broadcasts</span>
-            <button class="btn btn-ghost btn-sm" onclick="loadBroadcasts()">Refresh</button>
-          </div>
-          <div id="broadcast-history"></div>
         </div>
       </div>
+      <div id="alert-broadcast" class="alert"></div>
 
-      <!-- Broadcast detail modal -->
-      <div id="bc-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(10,10,15,0.85);backdrop-filter:blur(8px);z-index:600;align-items:center;justify-content:center">
-        <div style="background:var(--ink2);border:1px solid var(--border2);border-radius:20px;width:100%;max-width:560px;overflow:hidden;animation:fadeUp .2s ease">
-          <div style="background:linear-gradient(135deg,rgba(201,168,76,0.12),rgba(45,212,191,0.06));padding:22px 28px;border-bottom:1px solid var(--border);position:relative">
-            <div style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent)"></div>
-            <button onclick="closeBcDetail()" style="position:absolute;top:14px;right:16px;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);color:var(--text3);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center">&times;</button>
-            <div id="bc-detail-badge" style="margin-bottom:10px"></div>
-            <div id="bc-detail-subject" style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--text);margin-bottom:4px"></div>
-            <div id="bc-detail-meta" style="font-size:12px;color:var(--text3)"></div>
+      <div style="display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:start">
+
+        <!-- LEFT: Compose + AI Campaign -->
+        <div>
+
+          <!-- Tab switcher -->
+          <div style="display:flex;gap:2px;background:var(--ink3);border-radius:10px;padding:3px;margin-bottom:16px;width:fit-content">
+            <button id="bctab-compose" class="bc-tab on" onclick="switchBcTab('compose')">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" style="vertical-align:-1px"><path d="M12 2l2 2-9 9H3v-2z"/></svg>
+              Compose
+            </button>
+            <button id="bctab-campaign" class="bc-tab" onclick="switchBcTab('campaign')">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" style="vertical-align:-1px"><path d="M8 2l1.5 3 3.5.5-2.5 2.5.5 3.5L8 10l-3 1.5.5-3.5L3 5.5l3.5-.5z"/></svg>
+              AI Campaign
+            </button>
           </div>
-          <div style="padding:24px 28px;max-height:400px;overflow-y:auto">
-            <div style="font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;font-weight:600">Message body</div>
-            <div id="bc-detail-body" style="font-size:13.5px;color:var(--text2);line-height:1.75;white-space:pre-wrap"></div>
+
+          <!-- COMPOSE TAB -->
+          <div id="bcpanel-compose">
+
+            <!-- Target -->
+            <div class="card" style="margin-bottom:14px">
+              <div class="card-hdr"><span class="card-title">Send to</span></div>
+              <div style="padding:14px 16px;display:flex;gap:6px;flex-wrap:wrap">
+                <button id="bt-all"    class="btn btn-teal btn-sm" onclick="setBcTarget('all')">🌐 All users</button>
+                <button id="bt-plan"   class="btn btn-ghost btn-sm" onclick="setBcTarget('plan')">📋 By plan</button>
+                <button id="bt-user"   class="btn btn-ghost btn-sm" onclick="setBcTarget('user')">👤 One user</button>
+                <button id="bt-upload" class="btn btn-ghost btn-sm" onclick="setBcTarget('upload')">📩 Upload CSV</button>
+              </div>
+              <div id="bc-plan-row" style="display:none;padding:0 16px 14px">
+                <div class="field" style="margin:0"><label>Plan</label>
+                  <select id="bc-plan">
+                    <option value="free">Free</option><option value="starter">Starter</option>
+                    <option value="pro">Pro</option><option value="studio">Studio</option>
+                  </select>
+                </div>
+              </div>
+              <div id="bc-user-row" style="display:none;padding:0 16px 14px">
+                <div class="field" style="margin:0"><label>User ID or email</label>
+                  <input type="text" id="bc-user-id" placeholder="UUID or user@email.com">
+                </div>
+              </div>
+              <div id="bc-upload-row" style="display:none;padding:0 16px 14px">
+                <div style="border:2px dashed rgba(255,255,255,0.1);border-radius:10px;padding:16px;text-align:center;cursor:pointer"
+                  onclick="document.getElementById('bc-csv-input').click()"
+                  ondragover="event.preventDefault();this.style.borderColor='var(--gold)'"
+                  ondragleave="this.style.borderColor='rgba(255,255,255,0.1)'"
+                  ondrop="bcHandleDrop(event)">
+                  <input type="file" id="bc-csv-input" accept=".csv,.txt" style="display:none" onchange="bcReadFile(this.files[0])">
+                  <div style="font-size:11px;color:var(--text2)">Drop CSV/TXT or click to browse</div>
+                </div>
+                <div id="bc-upload-status" style="display:none;font-size:12px;color:var(--teal);margin-top:8px"></div>
+                <textarea id="bc-email-list" rows="3" placeholder="Or paste emails: user@a.com, user@b.com" style="margin-top:8px;width:100%;background:var(--ink3);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-size:12px;padding:9px 12px;outline:none;resize:vertical"></textarea>
+              </div>
+            </div>
+
+            <!-- Subject + AI suggestions -->
+            <div class="card" style="margin-bottom:14px">
+              <div class="card-hdr">
+                <span class="card-title">Subject line</span>
+                <button class="btn btn-ghost btn-xs" onclick="generateSubjectSuggestions()" id="subj-gen-btn">
+                  <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" style="vertical-align:-1px"><path d="M8 2l1.5 3 3.5.5-2.5 2.5.5 3.5L8 10l-3 1.5.5-3.5L3 5.5l3.5-.5z"/></svg>
+                  AI suggest
+                </button>
+              </div>
+              <div style="padding:12px 16px">
+                <input type="text" id="bc-subject" placeholder="e.g. Big news from SceneForge!" style="width:100%;background:var(--ink3);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-size:13px;padding:10px 13px;outline:none">
+                <div id="subj-suggestions" style="display:none;margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
+              </div>
+            </div>
+
+            <!-- Body editor -->
+            <div class="card" style="margin-bottom:14px">
+              <div class="card-hdr">
+                <span class="card-title">Message body</span>
+                <div style="display:flex;gap:6px">
+                  <button class="btn btn-ghost btn-xs" onclick="toggleBcPreview()">👁 Preview</button>
+                  <button class="btn btn-ghost btn-xs" onclick="bcClear()">✕ Clear</button>
+                </div>
+              </div>
+              <div style="padding:12px 16px 0">
+                <!-- Toolbar -->
+                <div style="display:flex;align-items:center;gap:4px;padding:7px 10px;background:var(--ink3);border:1px solid var(--border2);border-top-left-radius:9px;border-top-right-radius:9px;flex-wrap:wrap">
+                  <button class="bc-tb-btn" onclick="bcFormat('bold')"><b>B</b></button>
+                  <button class="bc-tb-btn" onclick="bcFormat('italic')"><i>I</i></button>
+                  <button class="bc-tb-btn" onclick="bcFormat('underline')"><u>U</u></button>
+                  <div style="width:1px;height:16px;background:var(--border2);margin:0 2px"></div>
+                  <button class="bc-tb-btn" id="ls-bullet" onclick="setListStyle('bullet',this)" title="Bullet list">• List</button>
+                  <button class="bc-tb-btn" id="ls-square" onclick="setListStyle('square',this)" title="Square list">▪ List</button>
+                  <div style="width:1px;height:16px;background:var(--border2);margin:0 2px"></div>
+                  <select onchange="bcFormat('fontSize',this.value);this.selectedIndex=0" style="background:var(--ink3);border:1px solid var(--border2);border-radius:5px;color:var(--text2);font-size:11px;padding:2px 4px;outline:none;cursor:pointer">
+                    <option value="">Size</option><option value="1">Small</option><option value="3">Normal</option><option value="5">Large</option><option value="7">Huge</option>
+                  </select>
+                  <div style="width:1px;height:16px;background:var(--border2);margin:0 2px"></div>
+                  <button class="bc-tb-btn" onclick="bcInsertLink()">🔗</button>
+                  <button class="bc-tb-btn" onclick="bcInsertTag()" style="font-size:10px">{{name}}</button>
+                  <div style="margin-left:auto;display:flex;gap:4px">
+                    <button class="bc-tb-btn" onclick="bcFormat('undo')">↺</button>
+                    <button class="bc-tb-btn" onclick="bcFormat('redo')">↻</button>
+                  </div>
+                </div>
+                <div id="bc-editor" contenteditable="true"
+                  style="min-height:140px;padding:12px 14px;background:var(--ink3);border:1px solid var(--border2);border-top:none;border-bottom-left-radius:9px;border-bottom-right-radius:9px;font-size:13px;color:var(--text);outline:none;line-height:1.7"
+                  data-placeholder="Hi {{name}},&#10;&#10;We have exciting news...&#10;&#10;— SceneForge Team"
+                  oninput="bcEditorInput();checkAiHints()"></div>
+              </div>
+
+              <!-- AI inline suggestion bar -->
+              <div id="bc-ai-hint" style="display:none;margin:8px 16px;padding:9px 12px;background:rgba(45,212,191,0.07);border:1px solid rgba(45,212,191,0.2);border-radius:9px;display:none;align-items:center;gap:10px">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--teal)" stroke-width="1.8"><path d="M8 2l1.5 3 3.5.5-2.5 2.5.5 3.5L8 10l-3 1.5.5-3.5L3 5.5l3.5-.5z"/></svg>
+                <span id="bc-ai-hint-text" style="font-size:12px;color:var(--teal);flex:1"></span>
+                <button class="btn btn-teal btn-xs" onclick="applyAiHint()" id="bc-ai-hint-apply">Apply</button>
+                <button onclick="document.getElementById('bc-ai-hint').style.display='none'" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;line-height:1">×</button>
+              </div>
+
+              <!-- Preview -->
+              <div id="bc-preview-wrap" style="display:none;margin:8px 16px 12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:9px;padding:14px">
+                <div style="font-size:10px;color:var(--teal);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em;font-weight:600">👁 Preview ({{name}} = "Creator")</div>
+                <div id="bc-preview-body" style="font-size:13px;color:var(--text2);line-height:1.7"></div>
+              </div>
+
+              <div style="padding:0 16px 16px;margin-top:4px">
+                <button class="btn btn-gold" style="width:100%;justify-content:center;font-size:14px" onclick="doBroadcast()">
+                  Send broadcast →
+                </button>
+                <p style="font-size:11px;color:var(--text3);text-align:center;margin-top:8px">Suspended accounts are always skipped</p>
+              </div>
+            </div>
+
           </div>
-          <div style="padding:16px 28px;border-top:1px solid var(--border);display:flex;gap:10px">
-            <button class="btn btn-teal btn-sm" onclick="bcReuseTemplate()" style="flex:1">&#9166; Reuse as template</button>
-            <button class="btn btn-ghost btn-sm" onclick="closeBcDetail()">Close</button>
+
+          <!-- CAMPAIGN TAB -->
+          <div id="bcpanel-campaign" style="display:none">
+            <div class="card" style="margin-bottom:14px">
+              <div class="card-hdr"><span class="card-title">Choose campaign goal</span></div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:14px">
+                <div class="bc-goal-card on" data-goal="re-engage" onclick="selectCampaignGoal(this)">
+                  <div style="font-size:18px;margin-bottom:5px">🔄</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Re-engage inactive</div>
+                  <div style="font-size:11px;color:var(--text3);line-height:1.4">Win back users silent for 14+ days</div>
+                </div>
+                <div class="bc-goal-card" data-goal="upgrade" onclick="selectCampaignGoal(this)">
+                  <div style="font-size:18px;margin-bottom:5px">⬆️</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Promote upgrade</div>
+                  <div style="font-size:11px;color:var(--text3);line-height:1.4">Convert Free users to paid plan</div>
+                </div>
+                <div class="bc-goal-card" data-goal="feature" onclick="selectCampaignGoal(this)">
+                  <div style="font-size:18px;margin-bottom:5px">📢</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Feature launch</div>
+                  <div style="font-size:11px;color:var(--text3);line-height:1.4">Announce a new product feature</div>
+                </div>
+                <div class="bc-goal-card" data-goal="thankyou" onclick="selectCampaignGoal(this)">
+                  <div style="font-size:18px;margin-bottom:5px">❤️</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Thank you</div>
+                  <div style="font-size:11px;color:var(--text3);line-height:1.4">Appreciate paying subscribers</div>
+                </div>
+                <div class="bc-goal-card" data-goal="promo" onclick="selectCampaignGoal(this)">
+                  <div style="font-size:18px;margin-bottom:5px">🏷️</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Promo code</div>
+                  <div style="font-size:11px;color:var(--text3);line-height:1.4">Send a limited-time discount</div>
+                </div>
+                <div class="bc-goal-card" data-goal="tips" onclick="selectCampaignGoal(this)">
+                  <div style="font-size:18px;margin-bottom:5px">🎓</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Tips & tutorial</div>
+                  <div style="font-size:11px;color:var(--text3);line-height:1.4">Educational content to boost usage</div>
+                </div>
+              </div>
+
+              <div style="padding:0 16px 6px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div class="field" style="margin:0">
+                  <label>Tone</label>
+                  <select id="camp-tone">
+                    <option value="friendly">Friendly &amp; conversational</option>
+                    <option value="professional">Professional &amp; formal</option>
+                    <option value="excited">Excited &amp; energetic</option>
+                    <option value="personal">Personal &amp; heartfelt</option>
+                  </select>
+                </div>
+                <div class="field" style="margin:0">
+                  <label>Target segment</label>
+                  <select id="camp-segment">
+                    <option value="all">All users</option>
+                    <option value="free">Free plan only</option>
+                    <option value="starter">Starter plan only</option>
+                    <option value="pro">Pro plan only</option>
+                    <option value="studio">Studio plan only</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style="padding:12px 16px">
+                <div class="field" style="margin-bottom:12px">
+                  <label>Extra context (optional)</label>
+                  <input type="text" id="camp-context" placeholder="e.g. We launched Ken Burns motion effects last week">
+                </div>
+                <button class="btn btn-gold" style="width:100%;justify-content:center" onclick="generateCampaign()" id="gen-camp-btn">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" style="vertical-align:-1px"><path d="M8 2l1.5 3 3.5.5-2.5 2.5.5 3.5L8 10l-3 1.5.5-3.5L3 5.5l3.5-.5z"/></svg>
+                  Generate full campaign
+                </button>
+              </div>
+            </div>
+
+            <!-- Generated result -->
+            <div id="camp-result" style="display:none">
+              <div class="card" style="margin-bottom:14px">
+                <div class="card-hdr">
+                  <span class="card-title">Generated campaign</span>
+                  <button class="btn btn-teal btn-sm" onclick="useCampaign()">Use this campaign →</button>
+                </div>
+                <div style="padding:14px 16px">
+                  <div style="font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Subject line</div>
+                  <div id="camp-result-subject" style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:14px;padding:10px 12px;background:var(--ink3);border-radius:8px;border:1px solid var(--border2)"></div>
+                  <div style="font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Email body</div>
+                  <div id="camp-result-body" style="font-size:13px;color:var(--text2);line-height:1.7;padding:12px 14px;background:var(--ink3);border-radius:8px;border:1px solid var(--border2);white-space:pre-wrap;max-height:260px;overflow-y:auto"></div>
+                </div>
+              </div>
+            </div>
           </div>
+
+        </div>
+
+        <!-- RIGHT: AI Assistant + Send time + History -->
+        <div style="display:flex;flex-direction:column;gap:14px">
+
+          <!-- AI Writing Assistant -->
+          <div class="card">
+            <div class="card-hdr">
+              <span class="card-title">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="var(--teal)" stroke-width="1.8" style="vertical-align:-1px;margin-right:4px"><path d="M8 2l1.5 3 3.5.5-2.5 2.5.5 3.5L8 10l-3 1.5.5-3.5L3 5.5l3.5-.5z"/></svg>
+                AI writing assistant
+              </span>
+              <span style="font-size:10px;color:var(--teal);background:rgba(45,212,191,0.1);border:1px solid rgba(45,212,191,0.2);border-radius:100px;padding:2px 8px">✦ Active</span>
+            </div>
+            <div style="padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
+              <button class="assist-btn" onclick="assistAction('shorten')">✂️ Shorten</button>
+              <button class="assist-btn" onclick="assistAction('emotional')">❤️ More emotional</button>
+              <button class="assist-btn" onclick="assistAction('cta')">⚡ Stronger CTA</button>
+              <button class="assist-btn" onclick="assistAction('rewrite')">🔄 Rewrite</button>
+              <button class="assist-btn" onclick="assistAction('simplify')">💡 Simplify</button>
+              <button class="assist-btn" onclick="assistAction('urgent')">🔥 More urgent</button>
+            </div>
+            <div style="padding:0 10px 10px;display:flex;gap:6px">
+              <input type="text" id="assist-input" placeholder="Ask AI anything about the email..." style="flex:1;background:var(--ink3);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:12px;padding:8px 11px;outline:none" onkeydown="if(event.key==='Enter')assistCustom()">
+              <button class="btn btn-teal btn-sm" onclick="assistCustom()">→</button>
+            </div>
+            <div id="assist-result" style="display:none;margin:0 10px 10px;padding:10px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px">
+              <div style="font-size:10.5px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">AI suggestion</div>
+              <div id="assist-result-text" style="font-size:12.5px;color:var(--text2);line-height:1.6;max-height:120px;overflow-y:auto"></div>
+              <div style="display:flex;gap:6px;margin-top:8px">
+                <button class="btn btn-teal btn-xs" onclick="applyAssistResult()" style="flex:1">Apply →</button>
+                <button class="btn btn-ghost btn-xs" onclick="document.getElementById('assist-result').style.display='none'">Dismiss</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Send time optimiser -->
+          <div class="card">
+            <div class="card-hdr">
+              <span class="card-title">⏰ Best time to send</span>
+            </div>
+            <div style="padding:12px 14px">
+              <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Based on your target segment &amp; Nigerian creator audience</div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 11px;background:rgba(45,212,191,0.08);border:1px solid rgba(45,212,191,0.2);border-radius:8px">
+                  <div>
+                    <div style="font-size:12.5px;font-weight:600;color:var(--text)">Tuesday 9 AM</div>
+                    <div style="font-size:11px;color:var(--teal)">~38% open rate</div>
+                  </div>
+                  <span style="font-size:10px;background:rgba(45,212,191,0.15);color:var(--teal);border:1px solid rgba(45,212,191,0.25);border-radius:100px;padding:3px 9px;font-weight:600">Best</span>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 11px;background:var(--ink3);border:1px solid var(--border);border-radius:8px">
+                  <div style="font-size:12px;color:var(--text2)">Thursday 8 AM</div>
+                  <div style="font-size:11px;color:var(--text3)">~31% open rate</div>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 11px;background:var(--ink3);border:1px solid var(--border);border-radius:8px">
+                  <div style="font-size:12px;color:var(--text2)">Wednesday 7 PM</div>
+                  <div style="font-size:11px;color:var(--text3)">~27% open rate</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Audience preview -->
+          <div class="card">
+            <div class="card-hdr"><span class="card-title">Audience preview</span></div>
+            <div style="padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:12px;color:var(--text2)">Target segment</span>
+                <span id="aud-segment" style="font-size:12px;font-weight:600;color:var(--text)">All users</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:12px;color:var(--text2)">Suspended (skipped)</span>
+                <span style="font-size:12px;color:var(--rose)">—</span>
+              </div>
+              <div style="height:1px;background:var(--border)"></div>
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:12px;font-weight:600;color:var(--text)">Will receive</span>
+                <span style="font-size:13px;font-weight:700;color:var(--teal)">—</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- History -->
+          <div class="card">
+            <div class="card-hdr">
+              <span class="card-title">Sent broadcasts</span>
+              <button class="btn btn-ghost btn-xs" onclick="loadBroadcasts()">Refresh</button>
+            </div>
+            <div id="broadcast-history" style="max-height:320px;overflow-y:auto"></div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -1162,34 +1363,68 @@ async function doTopUp(){
 }
 function setTopup(n){document.getElementById('topup-amount').value=n;}
 
+
 var BC_TARGET='all';
 var BC_UPLOADED_EMAILS=[];
 var BC_HISTORY=[];
 var BC_DETAIL=null;
+var BC_GOAL='re-engage';
+var BC_ASSIST_RESULT='';
+var BC_AI_HINT_ACTION='';
 
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchBcTab(id){
+  ['compose','campaign'].forEach(function(t){
+    var btn=document.getElementById('bctab-'+t);
+    var panel=document.getElementById('bcpanel-'+t);
+    if(btn) btn.classList.toggle('on', t===id);
+    if(panel) panel.style.display=t===id?'block':'none';
+  });
+}
+
+// ── Target selector ───────────────────────────────────────────────────────────
 function setBcTarget(t){
   BC_TARGET=t;
   ['all','plan','user','upload'].forEach(function(x){
     var btn=document.getElementById('bt-'+x);
-    if(btn)btn.className='btn btn-sm '+(x===t?'btn-teal':'btn-ghost');
+    if(btn) btn.className='btn btn-sm '+(x===t?'btn-teal':'btn-ghost');
   });
-  document.getElementById('bc-plan-row').style.display=t==='plan'?'block':'none';
-  document.getElementById('bc-user-row').style.display=t==='user'?'block':'none';
-  document.getElementById('bc-upload-row').style.display=t==='upload'?'block':'none';
+  ['plan','user','upload'].forEach(function(x){
+    var row=document.getElementById('bc-'+x+'-row');
+    if(row) row.style.display=t===x?'block':'none';
+  });
+  // Update audience label
+  var labels={all:'All users',plan:'By plan',user:'One user',upload:'Upload list'};
+  var el=document.getElementById('aud-segment');
+  if(el) el.textContent=labels[t]||t;
 }
 
-// ── Editor helpers ────────────────────────────────────────────────────────────
+// ── List style ─────────────────────────────────────────────────────────────────
+function setListStyle(style,el){
+  ['ls-bullet','ls-square'].forEach(function(id){
+    var b=document.getElementById(id);
+    if(b){b.style.background='';b.style.borderColor='';b.style.color='';}
+  });
+  if(el){el.style.background='rgba(45,212,191,0.15)';el.style.borderColor='rgba(45,212,191,0.3)';el.style.color='var(--teal)';}
+  document.getElementById('bc-editor').focus();
+  document.execCommand('insertUnorderedList',false,null);
+  // Apply style via CSS on editor ULs
+  var editor=document.getElementById('bc-editor');
+  editor.querySelectorAll('ul li').forEach(function(li){
+    li.style.listStyleType=style==='square'?'square':'disc';
+  });
+}
+
+// ── Editor helpers ─────────────────────────────────────────────────────────────
 function bcFormat(cmd,val){
   document.getElementById('bc-editor').focus();
   document.execCommand(cmd,false,val||null);
 }
-function bcEditorInput(){
-  // keep placeholder logic handled by CSS :empty
-}
+function bcEditorInput(){}
 function bcInsertLink(){
   var url=prompt('Enter URL:','https://');
   if(!url)return;
-  var text=prompt('Link text (leave blank to use URL):','')||url;
+  var text=prompt('Link text:','')||url;
   document.getElementById('bc-editor').focus();
   document.execCommand('insertHTML',false,'<a href="'+url+'" style="color:#A78BFA">'+text+'</a>');
 }
@@ -1197,205 +1432,281 @@ function bcInsertTag(){
   document.getElementById('bc-editor').focus();
   document.execCommand('insertText',false,'{{name}}');
 }
-function bcGetContent(){
-  return document.getElementById('bc-editor').innerHTML;
-}
-function bcGetText(){
-  return document.getElementById('bc-editor').innerText||'';
-}
+function bcGetContent(){ return document.getElementById('bc-editor').innerHTML; }
+function bcGetText(){ return document.getElementById('bc-editor').innerText||''; }
 function bcClear(){
   document.getElementById('bc-editor').innerHTML='';
   document.getElementById('bc-subject').value='';
   document.getElementById('bc-preview-wrap').style.display='none';
+  document.getElementById('bc-ai-hint').style.display='none';
+  document.getElementById('subj-suggestions').style.display='none';
+  document.getElementById('assist-result').style.display='none';
   BC_UPLOADED_EMAILS=[];
-  document.getElementById('bc-upload-status').style.display='none';
-  document.getElementById('bc-email-list').value='';
+  var us=document.getElementById('bc-upload-status');
+  if(us) us.style.display='none';
+  var el=document.getElementById('bc-email-list');
+  if(el) el.value='';
 }
 
-// ── CSV upload ────────────────────────────────────────────────────────────────
+// ── CSV upload ─────────────────────────────────────────────────────────────────
 function bcReadFile(file){
   if(!file)return;
   var reader=new FileReader();
-  reader.onload=function(e){
-    bcParseEmails(e.target.result);
-  };
+  reader.onload=function(e){bcParseEmails(e.target.result);};
   reader.readAsText(file);
 }
 function bcHandleDrop(e){
   e.preventDefault();
-  e.currentTarget.style.borderColor='rgba(255,255,255,0.12)';
+  e.currentTarget.style.borderColor='rgba(255,255,255,0.1)';
   var file=e.dataTransfer.files[0];
   if(file)bcReadFile(file);
 }
 function bcParseEmails(text){
   var emails=text.split(/[\n,;\r]+/).map(function(e){
     return e.trim().replace(/^["']|["']$/g,'').toLowerCase();
-  }).filter(function(e){
-    return e.indexOf('@')>0 && e.indexOf('.')>1;
-  });
+  }).filter(function(e){return e.indexOf('@')>0&&e.indexOf('.')>1;});
   var unique=[...new Set(emails)];
   BC_UPLOADED_EMAILS=unique;
   var el=document.getElementById('bc-upload-status');
-  el.style.display='block';
-  el.textContent='✓ '+unique.length+' valid email'+(unique.length===1?'':'s')+' loaded';
-  document.getElementById('bc-email-list').value=unique.join('\n');
+  if(el){el.style.display='block';el.textContent='✓ '+unique.length+' valid email'+(unique.length===1?'':'s')+' loaded';}
+  var list=document.getElementById('bc-email-list');
+  if(list) list.value=unique.join('\n');
 }
 
-// ── Preview ───────────────────────────────────────────────────────────────────
+// ── Preview ────────────────────────────────────────────────────────────────────
 function toggleBcPreview(){
   var w=document.getElementById('bc-preview-wrap');
-  if(w.style.display==='none'||!w.style.display){
-    w.style.display='block';
-    var html=bcGetContent().replace(/{{name}}/g,'Creator').replace(/{{email}}/g,'creator@example.com');
-    document.getElementById('bc-preview-body').innerHTML=html;
-  }else{w.style.display='none';}
+  if(w.style.display==='block'){w.style.display='none';return;}
+  w.style.display='block';
+  var html=bcGetContent().replace(/\{\{name\}\}/g,'Creator').replace(/\{\{email\}\}/g,'creator@example.com');
+  document.getElementById('bc-preview-body').innerHTML=html;
 }
 
-// ── Send ──────────────────────────────────────────────────────────────────────
+// ── AI hint bar ────────────────────────────────────────────────────────────────
+var AI_HINT_TIMER=null;
+function checkAiHints(){
+  clearTimeout(AI_HINT_TIMER);
+  AI_HINT_TIMER=setTimeout(function(){
+    var text=bcGetText().trim();
+    var hint=document.getElementById('bc-ai-hint');
+    if(!hint) return;
+    if(text.length>80 && text.indexOf('http')<0){
+      document.getElementById('bc-ai-hint-text').textContent='Tip: Add a CTA button (link to the app) to boost click-through rate by ~40%';
+      BC_AI_HINT_ACTION='cta';
+      hint.style.display='flex';
+    } else if(text.length>200 && text.split(' ').length>60){
+      document.getElementById('bc-ai-hint-text').textContent='This email is quite long — AI can shorten it while keeping the key message';
+      BC_AI_HINT_ACTION='shorten';
+      hint.style.display='flex';
+    }
+  }, 2000);
+}
+async function applyAiHint(){
+  document.getElementById('bc-ai-hint').style.display='none';
+  await assistAction(BC_AI_HINT_ACTION);
+}
+
+// ── AI Subject suggestions ─────────────────────────────────────────────────────
+async function generateSubjectSuggestions(){
+  var btn=document.getElementById('subj-gen-btn');
+  var body=bcGetText().trim();
+  var subject=document.getElementById('bc-subject').value.trim();
+  if(!body&&!subject){showAlert('broadcast','Write your message body first to get AI subject suggestions','error');return;}
+  if(btn) btn.textContent='Generating...';
+  var container=document.getElementById('subj-suggestions');
+  container.style.display='flex';
+  container.innerHTML='<div style="font-size:12px;color:var(--text3);padding:6px 0">Generating suggestions...</div>';
+  try{
+    var prompt='You are an email marketing expert for SceneForge, an AI video creation tool for content creators in Nigeria.\n\nEmail body:\n'+( body||subject)+'\n\nGenerate exactly 3 subject lines:\n1. CURIOSITY: Makes reader curious without being clickbait\n2. DIRECT: Clear and benefit-focused\n3. URGENCY: Creates a sense of urgency or FOMO\n\nRespond ONLY with JSON array, no markdown:\n[{"type":"curiosity","subject":"..."},{"type":"direct","subject":"..."},{"type":"urgency","subject":"..."}]';
+    var r=await apiFetch('/broadcast/ai/subjects',{method:'POST',body:JSON.stringify({body:body,subject:subject})});
+    var suggestions=r.suggestions||[];
+    if(!suggestions.length)throw new Error('No suggestions');
+    var colors={curiosity:'rgba(251,191,36,0.15)',direct:'rgba(45,212,191,0.12)',urgency:'rgba(248,113,113,0.12)'};
+    var textColors={curiosity:'#fbbf24',direct:'var(--teal)',urgency:'var(--rose)'};
+    container.innerHTML=suggestions.map(function(s){
+      return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--ink3);border:1px solid var(--border2);border-radius:8px;cursor:pointer" onclick="useSubjectSuggestion(\''+s.subject.replace(/'/g,'\\\'')+'\')">'
+        +'<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:100px;background:'+colors[s.type]+';color:'+textColors[s.type]+';flex-shrink:0;text-transform:capitalize">'+s.type+'</span>'
+        +'<span style="font-size:12px;color:var(--text);flex:1">'+s.subject+'</span>'
+        +'<span style="font-size:11px;color:var(--teal);flex-shrink:0">Use →</span>'
+        +'</div>';
+    }).join('');
+  }catch(e){
+    container.innerHTML='<div style="font-size:12px;color:var(--rose)">Failed to generate suggestions</div>';
+  }
+  if(btn) btn.textContent='↻ Regenerate';
+}
+function useSubjectSuggestion(subject){
+  document.getElementById('bc-subject').value=subject;
+}
+
+// ── AI Campaign generator ──────────────────────────────────────────────────────
+function selectCampaignGoal(el){
+  document.querySelectorAll('.bc-goal-card').forEach(function(c){c.classList.remove('on');});
+  el.classList.add('on');
+  BC_GOAL=el.dataset.goal||'re-engage';
+}
+async function generateCampaign(){
+  var btn=document.getElementById('gen-camp-btn');
+  var tone=document.getElementById('camp-tone').value;
+  var segment=document.getElementById('camp-segment').value;
+  var context=document.getElementById('camp-context').value.trim();
+  btn.textContent='Generating...';btn.disabled=true;
+  document.getElementById('camp-result').style.display='none';
+
+  try{
+
+    var result=await apiFetch('/broadcast/ai/campaign',{method:'POST',body:JSON.stringify({goal:BC_GOAL,tone:tone,segment:document.getElementById('camp-segment').value,context:context})});
+    document.getElementById('camp-result-subject').textContent=result.subject||'';
+    document.getElementById('camp-result-body').textContent=result.body||'';
+    document.getElementById('camp-result').style.display='block';
+    window._campResult=result;
+  }catch(e){
+    showAlert('broadcast','Failed to generate campaign. Try again.','error');
+  }
+  btn.textContent='↻ Regenerate';btn.disabled=false;
+}
+function useCampaign(){
+  if(!window._campResult)return;
+  document.getElementById('bc-subject').value=window._campResult.subject||'';
+  var editor=document.getElementById('bc-editor');
+  editor.innerText=window._campResult.body||'';
+  switchBcTab('compose');
+  showAlert('broadcast','Campaign loaded — review and send when ready','success');
+}
+
+// ── AI Writing assistant ───────────────────────────────────────────────────────
+async function assistAction(action){
+  var body=bcGetText().trim();
+  if(!body){showAlert('broadcast','Write a message body first','error');return;}
+
+  var resultEl=document.getElementById('assist-result');
+  var resultText=document.getElementById('assist-result-text');
+  resultEl.style.display='block';
+  resultText.textContent='Generating...';
+  try{
+    var r=await apiFetch('/broadcast/ai/assist',{method:'POST',body:JSON.stringify({action:action,body:body})});
+    BC_ASSIST_RESULT=r.result||'';
+    resultText.textContent=BC_ASSIST_RESULT;
+  }catch(e){
+    resultText.textContent='Failed to generate. Try again.';
+  }
+}
+async function assistCustom(){
+  var input=document.getElementById('assist-input');
+  var instruction=input.value.trim();
+  if(!instruction)return;
+  var body=bcGetText().trim();
+  var resultEl=document.getElementById('assist-result');
+  var resultText=document.getElementById('assist-result-text');
+  resultEl.style.display='block';
+  resultText.textContent='Generating...';
+  input.value='';
+  try{
+    var r=await apiFetch('/broadcast/ai/assist',{method:'POST',body:JSON.stringify({action:'custom',body:body,instruction:instruction})});
+    BC_ASSIST_RESULT=r.result||'';
+    resultText.textContent=BC_ASSIST_RESULT;
+  }catch(e){
+    resultText.textContent='Failed. Try again.';
+  }
+}
+function applyAssistResult(){
+  if(!BC_ASSIST_RESULT)return;
+  var editor=document.getElementById('bc-editor');
+  editor.innerText=BC_ASSIST_RESULT;
+  document.getElementById('assist-result').style.display='none';
+  BC_ASSIST_RESULT='';
+}
+
+// ── Send broadcast ─────────────────────────────────────────────────────────────
 async function doBroadcast(){
   var subj=document.getElementById('bc-subject').value.trim();
   var html=bcGetContent();
   var text=bcGetText().trim();
   if(!subj||!text){showAlert('broadcast','Fill subject and message','error');return;}
-
   var body={subject:subj,message:text,html:html,target:BC_TARGET};
-
   if(BC_TARGET==='plan'){
     var plan=document.getElementById('bc-plan').value;
     if(!plan){showAlert('broadcast','Select a plan','error');return;}
     body.plan=plan;
-  } else if(BC_TARGET==='user'){
+  }else if(BC_TARGET==='user'){
     var userId=document.getElementById('bc-user-id').value.trim();
     if(!userId){showAlert('broadcast','Enter a user ID or email','error');return;}
     body.user_id=userId;
-  } else if(BC_TARGET==='upload'){
-    // Parse from textarea in case user typed directly
+  }else if(BC_TARGET==='upload'){
     var rawList=document.getElementById('bc-email-list').value;
     if(rawList.trim())bcParseEmails(rawList);
     if(!BC_UPLOADED_EMAILS.length){showAlert('broadcast','Upload or paste email addresses first','error');return;}
-    body.email_list=BC_UPLOADED_EMAILS;
-    body.target='upload';
+    body.email_list=BC_UPLOADED_EMAILS;body.target='upload';
   }
-
-  var label=BC_TARGET==='all'?'ALL users'
-    :BC_TARGET==='plan'?'all '+body.plan.toUpperCase()+' users'
-    :BC_TARGET==='user'?'user '+body.user_id.slice(0,12)+'...'
-    :BC_UPLOADED_EMAILS.length+' uploaded emails';
-
+  var label=BC_TARGET==='all'?'ALL users':BC_TARGET==='plan'?'all '+body.plan.toUpperCase()+' users':BC_TARGET==='user'?'user '+body.user_id.slice(0,12)+'...':BC_UPLOADED_EMAILS.length+' uploaded emails';
   if(!confirm('Send "'+subj+'" to '+label+'?\n\nThis cannot be undone.'))return;
-
   try{
     var r=await apiFetch('/broadcast',{method:'POST',body:JSON.stringify(body)});
     showAlert('broadcast','✅ Sent: '+r.sent+' | Failed: '+r.failed+' | Skipped: '+r.skipped,'success');
-    bcClear();
-    loadBroadcasts();
+    bcClear();loadBroadcasts();
   }catch(e){showAlert('broadcast',e.detail||'Broadcast failed','error');}
 }
 
-// ── History ───────────────────────────────────────────────────────────────────
+// ── Broadcast history (accordion) ─────────────────────────────────────────────
 function bcTargetLabel(b){
   if(b.target==='plan')return '📋 Plan: '+b.plan;
   if(b.target==='user')return '👤 User';
-  if(b.target==='upload')return '📩 '+b.recipients+' uploaded emails';
+  if(b.target==='upload')return '📩 '+(b.recipients||0)+' emails';
   return '🌐 All users';
 }
-
 async function loadBroadcasts(){
   try{
     var d=await apiFetch('/broadcasts'),list=d.broadcasts||[];
     BC_HISTORY=list;
-    if(!list.length){document.getElementById('broadcast-history').innerHTML='<div class="loading">No broadcasts yet</div>';return;}
-    document.getElementById('broadcast-history').innerHTML=list.map(function(b,idx){
-      var colors={all:'var(--teal)',plan:'var(--violet)',user:'var(--gold)',upload:'#60a5fa'};
-      var accentColor=colors[b.target]||'var(--teal)';
+    var el=document.getElementById('broadcast-history');
+    if(!list.length){el.innerHTML='<div class="loading">No broadcasts yet</div>';return;}
+    el.innerHTML=list.map(function(b,idx){
+      var accent={all:'var(--teal)',plan:'var(--violet)',user:'var(--gold)',upload:'#60a5fa'}[b.target]||'var(--teal)';
       return '<div class="bc-accordion" id="bca-'+idx+'">'
-        +'<div class="bc-accordion-hdr" onclick="toggleBcAccordion('+idx+')">'
-        +'<div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">'
-        +'<div style="width:6px;height:6px;border-radius:50%;background:'+accentColor+';flex-shrink:0"></div>'
-        +'<div style="min-width:0">'
-        +'<div class="bc-subj" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+b.subject+'</div>'
-        +'<div class="bc-meta" style="margin-top:2px">'+bcTargetLabel(b)+' &middot; <span style="color:var(--teal)">'+b.sent+' sent</span>'+(b.failed>0?' &middot; <span style="color:var(--rose)">'+b.failed+' failed</span>':'')+'</div>'
+        +'<div class="bc-accordion-hdr" onclick="toggleBcAccordion('+idx+')" style="display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer">'
+        +'<div style="width:6px;height:6px;border-radius:50%;background:'+accent+';flex-shrink:0"></div>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+b.subject+'</div>'
+        +'<div style="font-size:11px;color:var(--text3);margin-top:1px">'+bcTargetLabel(b)+' · <span style="color:var(--teal)">'+b.sent+' sent</span>'+(b.failed>0?' · <span style="color:var(--rose)">'+b.failed+' failed</span>':'')+'</div>'
+        +'</div>'
+        +'<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">'
+        +'<span style="font-size:10px;color:var(--text3)">'+ago(b.ts)+'</span>'
+        +'<svg id="bcchev-'+idx+'" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color:var(--text3);transition:transform .18s"><path d="M4 6l4 4 4-4"/></svg>'
         +'</div></div>'
-        +'<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'
-        +'<span style="font-size:11px;color:var(--text3)">'+ago(b.ts)+'</span>'
-        +'<svg class="bc-chevron" id="bcchev-'+idx+'" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="transition:transform 0.2s;color:var(--text3)"><path d="M4 6l4 4 4-4"/></svg>'
-        +'</div></div>'
-        +'<div class="bc-accordion-body" id="bcbody-'+idx+'" style="display:none">'
-        +'<div style="font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;font-weight:600">Message body</div>'
-        +'<div style="font-size:13px;color:var(--text2);line-height:1.7;white-space:pre-wrap;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:12px">'+(b.html?'<div style="white-space:normal">'+b.html+'</div>':(b.message||b.body||'(no body stored)'))+'</div>'
-        +'<div style="display:flex;gap:8px">'
-        +'<button class="btn btn-teal btn-sm" onclick="bcReuseIdx('+idx+')" style="flex:1">↵ Reuse as template</button>'
-        +'</div></div></div>';
+        +'<div id="bcbody-'+idx+'" style="display:none;padding:0 14px 12px;border-top:1px solid var(--border)">'
+        +'<div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin:10px 0 6px">Message</div>'
+        +'<div style="font-size:12.5px;color:var(--text2);line-height:1.65;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:10px 12px;max-height:160px;overflow-y:auto;white-space:pre-wrap">'+(b.message||'(no body stored)')+'</div>'
+        +'<button class="btn btn-teal btn-sm" style="width:100%;justify-content:center;margin-top:10px" onclick="bcReuseIdx('+idx+')">↵ Reuse as template</button>'
+        +'</div></div>';
     }).join('');
   }catch(e){document.getElementById('broadcast-history').innerHTML='<div class="loading">Failed to load</div>';}
 }
-
 function toggleBcAccordion(idx){
   var body=document.getElementById('bcbody-'+idx);
   var chev=document.getElementById('bcchev-'+idx);
-  var isOpen=body.style.display!=='none';
-  // Close all
-  document.querySelectorAll('.bc-accordion-body').forEach(function(b){b.style.display='none';});
-  document.querySelectorAll('.bc-chevron').forEach(function(c){c.style.transform='';});
-  // Open clicked if was closed
-  if(!isOpen){body.style.display='block';chev.style.transform='rotate(180deg)';}
+  var isOpen=body.style.display==='block';
+  document.querySelectorAll('[id^="bcbody-"]').forEach(function(b){b.style.display='none';});
+  document.querySelectorAll('[id^="bcchev-"]').forEach(function(c){c.style.transform='';});
+  if(!isOpen){body.style.display='block';if(chev)chev.style.transform='rotate(180deg)';}
 }
-
 function bcReuseIdx(idx){
-  var b=BC_HISTORY[idx];if(!b)return;
-  BC_DETAIL=b;bcReuseTemplate();
-}
-
-function openBcDetail(idx){
-  var b=BC_HISTORY[idx];if(!b)return;
-  BC_DETAIL=b;
-  // Badge
-  var tl=bcTargetLabel(b);
-  document.getElementById('bc-detail-badge').innerHTML='<span style="display:inline-flex;align-items:center;gap:6px;background:rgba(201,168,76,0.1);border:1px solid rgba(201,168,76,0.2);border-radius:100px;padding:4px 12px;font-size:11px;color:var(--gold)">'+tl+'</span>';
-  document.getElementById('bc-detail-subject').textContent=b.subject;
-  document.getElementById('bc-detail-meta').innerHTML=
-    '<span style="color:var(--teal)">'+b.sent+' sent</span>'
-    +(b.failed>0?' &middot; <span style="color:var(--rose)">'+b.failed+' failed</span>':'')
-    +' &middot; '+ago(b.ts);
-  // Body - use html if available, else plain text
-  var bodyEl=document.getElementById('bc-detail-body');
-  if(b.html){bodyEl.innerHTML=b.html;bodyEl.style.whiteSpace='normal';}
-  else{bodyEl.textContent=b.message||b.body||'(no body stored)';bodyEl.style.whiteSpace='pre-wrap';}
-  var modal=document.getElementById('bc-detail-modal');
-  modal.style.display='flex';
-}
-function toggleSidebar(){
-  var sb=document.getElementById('sidebar');
-  var ov=document.getElementById('sb-overlay');
-  sb.classList.toggle('open');
-  ov.classList.toggle('open');
-  document.body.style.overflow=sb.classList.contains('open')?'hidden':'';
-}
-
-function closeSidebarOnMobile(){
-  if(window.innerWidth<=768) toggleSidebar();
-}
-
-// Update mobile role badge when logged in
-function updateMobileRole(){
-  var badge=document.getElementById('mobile-role-badge');
-  if(badge&&ROLE) badge.textContent=ROLE.toUpperCase();
-}
-
-function closeBcDetail(){document.getElementById('bc-detail-modal').style.display='none';}
-function bcReuseTemplate(){
-  if(!BC_DETAIL)return;
-  document.getElementById('bc-subject').value=BC_DETAIL.subject||'';
+  var b=BC_HISTORY[idx];
+  if(!b)return;
+  document.getElementById('bc-subject').value=b.subject||'';
   var editor=document.getElementById('bc-editor');
-  if(BC_DETAIL.html)editor.innerHTML=BC_DETAIL.html;
-  else editor.innerText=BC_DETAIL.message||BC_DETAIL.body||'';
-  closeBcDetail();
+  if(b.html)editor.innerHTML=b.html;
+  else editor.innerText=b.message||b.body||'';
+  switchBcTab('compose');
   showAlert('broadcast','Template loaded — edit and send when ready','success');
 }
+function bcReuseTemplate(){if(BC_DETAIL)bcReuseIdx(0);}
 function bcLoadTemplate(){
   if(!BC_HISTORY.length){showAlert('broadcast','No broadcast history yet','error');return;}
-  openBcDetail(0); // open most recent
+  toggleBcAccordion(0);
 }
+function closeBcDetail(){/* kept for compatibility */}
+
+
 
 async function loadRevenue(){
   try{
