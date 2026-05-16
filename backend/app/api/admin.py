@@ -689,7 +689,7 @@ async def ai_generate_campaign(
 
     prompt = (
         "You are a world-class email copywriter for SceneForge, an AI video studio "
-        "for content creators in Nigeria. The app URL is https://scenraforge.com.\n\n"
+        "for content creators in Nigeria. The app URL is https://sceneraforge.com.\n\n"
         f"Campaign goal: {goal_desc}\n"
         f"Tone: {req.tone}\n"
         f"Target segment: {req.segment} users\n"
@@ -754,7 +754,7 @@ async def ai_writing_assist(
     action_prompts = {
         "shorten":   "Shorten this email to under 100 words keeping the core message and CTA. " + _emoji,
         "emotional": "Rewrite this email to be more emotionally resonant and personal. " + _emoji,
-        "cta":       "Add a strong call-to-action button/link to scenraforge.com. " + _emoji,
+        "cta":       "Add a strong call-to-action button/link to sceneraforge.com. " + _emoji,
         "rewrite":   "Rewrite this email in a fresher, more engaging way. " + _emoji,
         "simplify":  "Simplify this email — shorter sentences, simpler words, easier to read. " + _emoji,
         "urgent":    "Rewrite this email with more urgency and FOMO. " + _emoji,
@@ -973,6 +973,80 @@ async def get_job_cost(
     if not rec:
         raise HTTPException(status_code=404, detail="Cost record not found for this job")
     return rec
+
+
+@router.get("/costs/user/{user_id}")
+async def get_user_render_costs(
+    user_id: str,
+    redis=Depends(get_redis),
+    admin: dict = Depends(_require_admin),
+):
+    """
+    All render cost records for a specific user.
+    Scans the cost log and returns records matching user_id,
+    plus an aggregate summary.
+    """
+    from app.services.cost_tracker import get_recent_cost_records
+
+    # Fetch up to 500 recent records and filter by user_id
+    all_records = await get_recent_cost_records(redis, limit=500)
+    user_records = [r for r in all_records if r.get("user_id") == user_id]
+
+    if not user_records:
+        # Also try individual job keys via user's job history
+        cursor = 0
+        user_records = []
+        while True:
+            cursor, keys = await redis.scan(
+                cursor, match="render:cost:*", count=200
+            )
+            for key in keys:
+                raw = await redis.get(key)
+                if raw:
+                    try:
+                        rec = json.loads(raw)
+                        if rec.get("user_id") == user_id:
+                            user_records.append(rec)
+                    except Exception:
+                        pass
+            if cursor == 0:
+                break
+
+    # Sort newest first
+    user_records.sort(key=lambda r: r.get("ts", ""), reverse=True)
+
+    # Aggregate summary
+    total_renders   = len(user_records)
+    total_cost      = sum(r.get("total_cost_usd", 0) for r in user_records)
+    total_revenue   = sum(r.get("revenue_per_render", 0) for r in user_records)
+    total_margin    = sum(r.get("margin_usd", 0) for r in user_records)
+    avg_cost        = total_cost / total_renders if total_renders else 0
+    avg_margin_pct  = (
+        total_margin / total_revenue * 100 if total_revenue > 0 else 0
+    )
+
+    # Cost breakdown totals
+    breakdown = {
+        "voice":   sum(r.get("cost_voice_usd", 0)   for r in user_records),
+        "visual":  sum(r.get("cost_visual_usd", 0)  for r in user_records),
+        "ai":      sum(r.get("cost_ai_usd", 0)      for r in user_records),
+        "compute": sum(r.get("cost_compute_usd", 0) for r in user_records),
+        "storage": sum(r.get("cost_storage_usd", 0) for r in user_records),
+    }
+
+    return {
+        "user_id":       user_id,
+        "total_renders": total_renders,
+        "summary": {
+            "total_cost_usd":    round(total_cost, 6),
+            "total_revenue_usd": round(total_revenue, 4),
+            "total_margin_usd":  round(total_margin, 4),
+            "avg_cost_usd":      round(avg_cost, 6),
+            "avg_margin_pct":    round(avg_margin_pct, 1),
+            "breakdown":         {k: round(v, 6) for k, v in breakdown.items()},
+        },
+        "renders": user_records[:100],   # cap at 100 for response size
+    }
 
 
 # ─── Audit trail ──────────────────────────────────────────────────────────────
