@@ -623,7 +623,7 @@ async def ai_generate_campaign(
 
     prompt = (
         "You are a world-class email copywriter for SceneForge, an AI video studio "
-        "for content creators in Nigeria. The app URL is https://sceneraforge.com.\n\n"
+        "for content creators in Nigeria. The app URL is https://scenraforge.com.\n\n"
         f"Campaign goal: {goal_desc}\n"
         f"Tone: {req.tone}\n"
         f"Target segment: {req.segment} users\n"
@@ -688,7 +688,7 @@ async def ai_writing_assist(
     action_prompts = {
         "shorten":   "Shorten this email to under 100 words keeping the core message and CTA. " + _emoji,
         "emotional": "Rewrite this email to be more emotionally resonant and personal. " + _emoji,
-        "cta":       "Add a strong call-to-action button/link to sceneraforge.com. " + _emoji,
+        "cta":       "Add a strong call-to-action button/link to scenraforge.com. " + _emoji,
         "rewrite":   "Rewrite this email in a fresher, more engaging way. " + _emoji,
         "simplify":  "Simplify this email — shorter sentences, simpler words, easier to read. " + _emoji,
         "urgent":    "Rewrite this email with more urgency and FOMO. " + _emoji,
