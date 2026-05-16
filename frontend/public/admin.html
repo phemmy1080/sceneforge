@@ -1531,7 +1531,16 @@ var TX_DATA=[],ANA_DATA={};
 
 function apiFetch(path,opts){
   opts=opts||{};
-  return fetch(API+path,Object.assign({headers:{'Content-Type':'application/json','Authorization':'Bearer '+KEY,'x-admin-key':KEY}},opts))
+  // Always include auth + CSRF. opts.headers merged on top (never overwrite auth).
+  var headers={
+    'Content-Type':'application/json',
+    'Authorization':'Bearer '+KEY,
+    'x-admin-key':KEY
+  };
+  if(CSRF_TOKEN) headers['x-csrf-token']=CSRF_TOKEN;
+  // Allow caller to add extra headers without losing auth
+  Object.assign(headers, opts.headers||{});
+  return fetch(API+path, Object.assign({},opts,{headers:headers}))
     .then(function(r){return r.ok?r.json():r.json().then(function(e){throw e;});});
 }
 
@@ -2574,24 +2583,7 @@ async function fetchCsrfToken() {
 
 // Wrap apiFetch to auto-attach CSRF header on mutating requests
 // Patch apiFetch to auto-attach CSRF header — runs after apiFetch is defined
-(function() {
-  var _orig = apiFetch;
-  apiFetch = function(path, opts) {
-    opts = opts || {};
-    var method = (opts.method || 'GET').toUpperCase();
-    if (['POST','PUT','DELETE','PATCH'].indexOf(method) >= 0 && CSRF_TOKEN) {
-      // Merge CSRF into existing opts.headers without overwriting
-      opts = Object.assign({}, opts);
-      opts.headers = Object.assign({'x-csrf-token': CSRF_TOKEN}, opts.headers || {});
-    }
-    return _orig(path, opts).then(function(result) {
-      if (['POST','PUT','DELETE','PATCH'].indexOf(method) >= 0) {
-        fetchCsrfToken(); // rotate after mutating call
-      }
-      return result;
-    });
-  };
-})();
+// CSRF token is now handled directly in apiFetch above
 
 // ── Cost & margin ─────────────────────────────────────────────────────────────
 
