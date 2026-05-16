@@ -340,6 +340,43 @@ tr:hover td{background:rgba(255,255,255,0.018)}
 }
 .modal-tab.on{background:var(--ink2);color:var(--text);border:1px solid var(--border2)}
 .modal-tab:hover{color:var(--text2)}
+
+/* ── Niches & Logs ───────────────────────────────── */
+.log-filter-btn{
+  padding:5px 12px;border-radius:7px;border:none;background:none;
+  color:var(--text3);font-size:11.5px;font-weight:500;cursor:pointer;
+  transition:all var(--transition);font-family:inherit;white-space:nowrap;
+}
+.log-filter-btn.on{background:var(--ink2);color:var(--text);border:1px solid var(--border2)}
+.log-filter-btn:hover{color:var(--text2)}
+
+/* ── Niche cards ─────────────────────────────────── */
+.niche-card{
+  background:var(--ink3);border:1px solid var(--border);border-radius:12px;
+  padding:14px 16px;display:flex;flex-direction:column;gap:8px;
+  transition:border-color var(--transition);
+}
+.niche-card:hover{border-color:var(--border2)}
+.niche-edit-btn{
+  background:rgba(201,168,76,0.1);border:1px solid rgba(201,168,76,0.2);
+  border-radius:6px;width:26px;height:26px;cursor:pointer;color:var(--gold);
+  font-size:13px;display:flex;align-items:center;justify-content:center;
+  transition:background var(--transition);
+}
+.niche-edit-btn:hover{background:rgba(201,168,76,0.22)}
+.niche-del-btn{
+  background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.15);
+  border-radius:6px;width:26px;height:26px;cursor:pointer;color:var(--rose);
+  font-size:15px;display:flex;align-items:center;justify-content:center;
+  transition:background var(--transition);
+}
+.niche-del-btn:hover{background:rgba(248,113,113,0.2)}
+.log-row-item{
+  display:grid;grid-template-columns:36px 130px 1fr auto;gap:12px;
+  align-items:center;padding:12px 20px;border-bottom:1px solid var(--border);
+  transition:background var(--transition);
+}
+.log-row-item:hover{background:rgba(255,255,255,0.02)}
 </style>
 </head>
 <body>
@@ -1131,24 +1168,99 @@ tr:hover td{background:rgba(255,255,255,0.018)}
 
     <!-- NICHES -->
     <div class="pg" id="pg-niches">
-      <div class="ph"><div class="ph-title">Niches</div><div class="ph-sub">Manage content niches — changes reflect immediately in the app</div></div>
-      <div id="alert-niches" class="alert"></div>
-      <div class="two-col">
-        <div class="card">
-          <div class="card-hdr"><span class="card-title">Add niche</span></div>
-          <div style="padding:20px">
-            <div class="field"><label>Label</label><input type="text" id="nn-label" placeholder="e.g. Parenting"></div>
-            <div class="field"><label>Key</label><input type="text" id="nn-key" placeholder="e.g. Parenting"></div>
-            <div class="field"><label>Quick-add suggestions (one per line)</label><textarea id="nn-sugg" rows="5" placeholder="Best parenting tips&#10;How to raise confident kids&#10;Screen time advice"></textarea></div>
-            <button class="btn btn-gold" style="width:100%;justify-content:center" onclick="addNiche()">Add niche</button>
+      <div class="ph">
+        <div class="ph-top">
+          <div>
+            <div class="ph-title">Content niches</div>
+            <div class="ph-sub">Manage niches available to users — changes go live instantly</div>
+          </div>
+          <div class="ph-actions">
+            <button class="btn btn-ghost btn-sm" onclick="loadNiches()">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 8a6 6 0 0112 0M14 4v4h-4"/></svg>
+              Refresh
+            </button>
           </div>
         </div>
-        <div class="card">
-          <div class="card-hdr"><span class="card-title">Active niches</span><button class="btn btn-ghost btn-sm" onclick="loadNiches()">Refresh</button></div>
-          <div id="niches-list"><div class="loading"></div></div>
+      </div>
+      <div id="alert-niches" class="alert"></div>
+
+      <div style="display:grid;grid-template-columns:340px 1fr;gap:18px;align-items:start">
+
+        <!-- Left: form + stats -->
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="card">
+            <div class="card-hdr">
+              <span class="card-title">Add niche</span>
+            </div>
+            <div style="padding:18px 20px 0">
+              <div class="field">
+                <label>Display label</label>
+                <input type="text" id="nn-label" placeholder="e.g. Parenting"
+                  oninput="document.getElementById('nn-key').value=this.value.trim().replace(/\s+/g,'_').toLowerCase()">
+              </div>
+              <div class="field">
+                <label>Key <span style="color:var(--text3);font-weight:400">(auto-filled)</span></label>
+                <input type="text" id="nn-key" placeholder="e.g. parenting" style="font-family:DM Mono,monospace;font-size:12px">
+              </div>
+              <div class="field" style="margin-bottom:0">
+                <label>Quick-start suggestions <span style="color:var(--text3);font-weight:400">— one per line</span></label>
+                <textarea id="nn-sugg" rows="6" placeholder="Best parenting tips&#10;How to raise confident kids&#10;Screen time advice&#10;Toddler activities" style="font-size:12.5px;line-height:1.6"></textarea>
+                <div style="font-size:11px;color:var(--text3);margin-top:5px">These appear as idea prompts when users pick this niche</div>
+              </div>
+            </div>
+            <div style="padding:14px 20px 18px">
+              <button class="btn btn-gold" style="width:100%;justify-content:center" onclick="addNiche()">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v12M2 8h12"/></svg>
+                Add niche
+              </button>
+            </div>
+          </div>
+
+          <!-- Stats -->
+          <div class="card">
+            <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="font-size:12.5px;color:var(--text2)">Total niches</span>
+                <span id="niche-count" style="font-family:Syne,sans-serif;font-size:24px;font-weight:800;color:var(--gold)">—</span>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="font-size:12.5px;color:var(--text2)">Avg suggestions/niche</span>
+                <span id="niche-avg-sugg" style="font-size:13px;font-weight:600;color:var(--text)">—</span>
+              </div>
+              <div style="height:1px;background:var(--border)"></div>
+              <div style="font-size:11.5px;color:var(--text3);line-height:1.6">Changes are live immediately for all users on their next session.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: active niches -->
+        <div class="card" style="min-height:320px">
+          <div class="card-hdr">
+            <span class="card-title">Active niches</span>
+            <input type="text" id="niche-search" placeholder="Filter..." oninput="filterNiches(this.value)"
+              style="background:var(--ink3);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:12px;padding:5px 11px;outline:none;width:140px">
+          </div>
+          <div id="niches-list" style="padding:16px 20px"><div class="loading"></div></div>
+        </div>
+      </div>
+
+      <!-- Edit modal -->
+      <div id="niche-edit-modal" style="display:none;position:fixed;inset:0;background:rgba(7,7,14,0.88);backdrop-filter:blur(12px);z-index:500;align-items:center;justify-content:center;padding:16px">
+        <div style="background:var(--ink2);border:1px solid var(--border2);border-radius:18px;padding:28px;width:100%;max-width:460px;animation:fadeUp .2s ease">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+            <div style="font-family:Syne,sans-serif;font-size:16px;font-weight:700;letter-spacing:-.3px">Edit niche</div>
+            <button onclick="closeNicheEdit()" style="background:rgba(255,255,255,0.07);border:1px solid var(--border2);border-radius:50%;width:28px;height:28px;cursor:pointer;color:var(--text3);font-size:16px;display:flex;align-items:center;justify-content:center">&times;</button>
+          </div>
+          <div class="field"><label>Display label</label><input type="text" id="ne-label"></div>
+          <div class="field"><label>Suggestions <span style="color:var(--text3);font-weight:400">— one per line</span></label><textarea id="ne-sugg" rows="6" style="font-size:12.5px;line-height:1.6"></textarea></div>
+          <div style="display:flex;gap:10px;margin-top:4px">
+            <button class="btn btn-gold" style="flex:1;justify-content:center" onclick="saveNicheEdit()">Save changes</button>
+            <button class="btn btn-ghost" onclick="closeNicheEdit()">Cancel</button>
+          </div>
         </div>
       </div>
     </div>
+
 
     <!-- COUPONS -->
     <div class="pg" id="pg-coupons">
@@ -1248,9 +1360,51 @@ tr:hover td{background:rgba(255,255,255,0.018)}
 
     <!-- LOGS -->
     <div class="pg" id="pg-logs">
-      <div class="ph"><div class="ph-title">Activity logs</div><div class="ph-sub">Recent admin actions — last 50 entries</div></div>
-      <div class="card" id="logs-card"><div class="loading"></div></div>
+      <div class="ph">
+        <div class="ph-top">
+          <div>
+            <div class="ph-title">Activity logs</div>
+            <div class="ph-sub">Admin actions — last 50 events across all admins</div>
+          </div>
+          <div class="ph-actions">
+            <button class="btn btn-ghost btn-sm" onclick="loadLogs()">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 8a6 6 0 0112 0M14 4v4h-4"/></svg>
+              Refresh
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stat-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:22px">
+        <div class="stat teal"><div class="stat-label">Token top-ups</div><div class="stat-val" id="ls-topups">—</div></div>
+        <div class="stat violet"><div class="stat-label">Plan changes</div><div class="stat-val" id="ls-plans">—</div></div>
+        <div class="stat" style="--accent:#60a5fa"><div class="stat-label">Broadcasts</div><div class="stat-val" id="ls-broadcasts" style="color:#60a5fa">—</div></div>
+        <div class="stat rose"><div class="stat-label">Suspensions</div><div class="stat-val" id="ls-suspensions">—</div></div>
+      </div>
+
+      <!-- Filter + search bar -->
+      <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap">
+        <div style="display:flex;gap:3px;background:var(--ink3);border-radius:9px;padding:3px;flex-wrap:wrap">
+          <button class="log-filter-btn on" data-filter="all"          onclick="filterLogs('all',this)">All</button>
+          <button class="log-filter-btn"    data-filter="top_up"       onclick="filterLogs('top_up',this)">Top-ups</button>
+          <button class="log-filter-btn"    data-filter="set_plan"     onclick="filterLogs('set_plan',this)">Plans</button>
+          <button class="log-filter-btn"    data-filter="broadcast"    onclick="filterLogs('broadcast',this)">Broadcasts</button>
+          <button class="log-filter-btn"    data-filter="suspend"      onclick="filterLogs('suspend',this)">Suspensions</button>
+          <button class="log-filter-btn"    data-filter="delete_user"  onclick="filterLogs('delete_user',this)">Deletions</button>
+          <button class="log-filter-btn"    data-filter="pricing_update" onclick="filterLogs('pricing_update',this)">Pricing</button>
+        </div>
+        <input type="text" id="log-search" placeholder="Search..." oninput="searchLogs(this.value)"
+          class="search-inp" style="max-width:180px;margin:0;padding:6px 12px;font-size:12.5px">
+        <span id="log-count" style="font-size:11px;color:var(--text3);margin-left:auto"></span>
+      </div>
+
+      <!-- Timeline -->
+      <div class="card">
+        <div id="logs-card"><div class="loading"></div></div>
+      </div>
     </div>
+
 
     <!-- ADMINS -->
     <div class="pg" id="pg-admins">
@@ -2210,14 +2364,119 @@ async function deletePlan(k){if(!confirm('Delete plan "'+k+'"?'))return;try{awai
 async function addPlan(){var k=document.getElementById('new-key').value.trim().toLowerCase(),label=document.getElementById('new-label').value.trim(),amount=parseInt(document.getElementById('new-amount').value),tokens=parseInt(document.getElementById('new-tokens').value);if(!k||!label||!amount||!tokens)return;try{await apiFetch('/pricing',{method:'POST',body:JSON.stringify({plan_key:k,label:label,amount:amount,tokens:tokens,currency:'NGN'})});showAlert('pricing','Plan added','success');['new-key','new-label','new-amount','new-tokens'].forEach(function(id){document.getElementById(id).value='';});loadPricing();}catch(e){showAlert('pricing',e.detail||'Failed','error');}}
 
 async function loadNiches(){
-  try{
-    var r=await fetch(NAPI),d=await r.json(),niches=d.niches||[];
-    document.getElementById('niches-list').innerHTML=niches.length?'<div class="niche-grid">'+niches.map(function(n){
-      var suggs=(n.suggestions||[]).slice(0,2).join(', ');
-      return '<div class="niche-chip"><div><div style="font-weight:600;font-size:12px">'+n.label+'</div>'+(suggs?'<div style="font-size:10.5px;color:var(--text3);margin-top:1px">'+suggs+'...</div>':'')+'</div><button class="niche-chip-del" onclick="deleteNiche(\''+n.key+'\')" title="Remove">&#215;</button></div>';
-    }).join('')+'</div>':'<div class="loading">No niches yet</div>';
-  }catch(e){document.getElementById('niches-list').innerHTML='<div class="loading">Failed to load</div>';}
+  var list = document.getElementById('niches-list');
+  list.innerHTML = '<div class="loading"></div>';
+  try {
+    var r = await fetch(NAPI), d = await r.json();
+    ALL_NICHES = d.niches || [];
+
+    // Stats
+    var countEl = document.getElementById('niche-count');
+    var avgEl   = document.getElementById('niche-avg-sugg');
+    if(countEl) countEl.textContent = ALL_NICHES.length;
+    if(avgEl) {
+      var total = ALL_NICHES.reduce(function(a,n){ return a + (n.suggestions||[]).length; }, 0);
+      avgEl.textContent = ALL_NICHES.length ? (total / ALL_NICHES.length).toFixed(1) : '0';
+    }
+
+    renderNiches(ALL_NICHES);
+  } catch(e) {
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--rose);font-size:13px">Failed to load niches</div>';
+  }
 }
+
+var ALL_NICHES = [];
+var EDIT_NICHE_KEY = '';
+
+// ── Niche filter ──────────────────────────────────────────────────────────────
+
+// ── Niche edit modal ──────────────────────────────────────────────────────────
+
+
+
+// ── Log filters ───────────────────────────────────────────────────────────────
+var LOG_ACTIVE_FILTER = 'all';
+var LOG_ACTIVE_SEARCH = '';
+
+
+
+
+
+function renderNiches(niches) {
+  var list = document.getElementById('niches-list');
+  if(!niches.length) {
+    list.innerHTML = '<div style="padding:32px;text-align:center;color:var(--text3);font-size:13px">No niches found</div>';
+    return;
+  }
+  list.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">'
+    + niches.map(function(n) {
+      var suggs = n.suggestions || [];
+      return '<div class="niche-card">'
+        + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">'
+        + '<div>'
+        + '<div style="font-weight:700;font-size:13.5px;color:var(--text);margin-bottom:2px">' + n.label + '</div>'
+        + '<div style="font-family:DM Mono,monospace;font-size:10px;color:var(--text3)">' + n.key + '</div>'
+        + '</div>'
+        + '<div style="display:flex;gap:4px;flex-shrink:0">'
+        + '<button onclick="openNicheEdit(\''+n.key+'\')" title="Edit" class="niche-edit-btn">✎</button>'
+        + '<button onclick="deleteNiche(\''+n.key+'\')" title="Delete" class="niche-del-btn">×</button>'
+        + '</div></div>'
+        + (suggs.length
+          ? '<div style="display:flex;flex-direction:column;gap:3px">'
+            + suggs.slice(0,3).map(function(s){
+                return '<div style="font-size:11px;color:var(--text2);background:rgba(255,255,255,0.04);border-radius:5px;padding:3px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">· '+s+'</div>';
+              }).join('')
+            + (suggs.length > 3 ? '<div style="font-size:10px;color:var(--text3);padding:2px 7px">+' + (suggs.length-3) + ' more</div>' : '')
+            + '</div>'
+          : '<div style="font-size:11px;color:var(--text3);font-style:italic">No suggestions yet</div>')
+        + '<div style="display:flex;align-items:center;justify-content:space-between;padding-top:6px;border-top:1px solid var(--border)">'
+        + '<span style="font-size:10.5px;color:var(--text3)">'+ suggs.length +' suggestion'+(suggs.length!==1?'s':'')+'</span>'
+        + '</div>'
+        + '</div>';
+    }).join('') + '</div>';
+}
+
+
+// ── ORIGINAL renderNiches replaced ─────────────────────────────────────────
+function filterNiches(q) {
+  var filtered = ALL_NICHES.filter(function(n) {
+    return !q || n.label.toLowerCase().includes(q.toLowerCase()) || n.key.toLowerCase().includes(q.toLowerCase());
+  });
+  renderNiches(filtered);
+}
+
+function openNicheEdit(key) {
+  var n = ALL_NICHES.find(function(x){ return x.key === key; });
+  if(!n) return;
+  EDIT_NICHE_KEY = key;
+  document.getElementById('ne-label').value = n.label;
+  document.getElementById('ne-sugg').value = (n.suggestions||[]).join('\n');
+  var modal = document.getElementById('niche-edit-modal');
+  modal.style.display = 'flex';
+}
+
+function closeNicheEdit() {
+  document.getElementById('niche-edit-modal').style.display = 'none';
+  EDIT_NICHE_KEY = '';
+}
+
+async function saveNicheEdit() {
+  var label = document.getElementById('ne-label').value.trim();
+  var suggs = document.getElementById('ne-sugg').value.trim().split('\n').map(function(s){return s.trim();}).filter(Boolean);
+  if(!label) { showAlert('niches','Label is required','error'); return; }
+  try {
+    await fetch(NAPI+'/admin/'+EDIT_NICHE_KEY, {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json','Authorization':'Bearer '+KEY,'x-admin-key':KEY},
+      body: JSON.stringify({label:label, suggestions:suggs})
+    }).then(function(r){ return r.ok ? r.json() : r.json().then(function(e){throw e;}); });
+    showAlert('niches', label + ' updated', 'success');
+    closeNicheEdit();
+    loadNiches();
+  } catch(e) { showAlert('niches', e.detail || 'Failed to save', 'error'); }
+}
+
+
 async function addNiche(){
   var label=document.getElementById('nn-label').value.trim(),key=document.getElementById('nn-key').value.trim().replace(/\s+/g,'');
   var suggs=document.getElementById('nn-sugg').value.trim().split('\n').map(function(s){return s.trim();}).filter(Boolean);
@@ -2244,12 +2503,153 @@ async function loadQueue(){
 }
 
 async function loadLogs(){
-  try{
-    var d=await apiFetch('/logs'),logs=d.logs||[];
-    var ic={top_up:{i:'↑',bg:'rgba(45,212,191,0.12)',c:'var(--teal)'},set_tokens:{i:'✏',bg:'rgba(167,139,250,0.12)',c:'var(--violet)'},set_plan:{i:'◈',bg:'rgba(167,139,250,0.12)',c:'var(--violet)'},pricing_update:{i:'₦',bg:'rgba(201,168,76,0.12)',c:'var(--gold)'},suspend:{i:'⊘',bg:'rgba(248,113,113,0.12)',c:'var(--rose)'},broadcast:{i:'✉',bg:'rgba(96,165,250,0.12)',c:'#60a5fa'},coupon_created:{i:'◆',bg:'rgba(45,212,191,0.12)',c:'var(--teal)'},delete_user:{i:'✗',bg:'rgba(248,113,113,0.12)',c:'var(--rose)'}};
-    document.getElementById('logs-card').innerHTML=logs.length?logs.map(function(l){var s=ic[l.action]||{i:'•',bg:'rgba(255,255,255,0.06)',c:'var(--text3)'};return '<div class="log-row"><div class="log-dot" style="background:'+s.bg+';color:'+s.c+'">'+s.i+'</div><div style="flex:1"><div style="font-weight:600;color:var(--text);font-size:12.5px">'+(l.action||'').replace(/_/g,' ')+'</div><div style="font-size:11.5px;color:var(--text3)">'+(l.reason||'')+' '+(l.tokens?'&middot; '+fmt(l.tokens)+' tokens':'')+' '+(l.user_id?'&middot; '+l.user_id.slice(0,8)+'...':'')+'</div></div><div style="font-family:DM Mono,monospace;font-size:11px;color:var(--text3)">'+ago(l.ts)+'</div></div>';}).join(''):'<div class="loading">No admin actions logged yet</div>';
-  }catch(e){document.getElementById('logs-card').innerHTML='<div class="loading">Failed to load</div>';}
+  var card = document.getElementById('logs-card');
+  card.innerHTML = '<div class="loading"></div>';
+  try {
+    var d = await apiFetch('/logs');
+    ALL_LOGS = d.logs || [];
+    updateLogStats(ALL_LOGS);
+    renderLogs(ALL_LOGS);
+  } catch(e) {
+    card.innerHTML = '<div style="padding:20px;text-align:center;color:var(--rose);font-size:13px">Failed to load logs</div>';
+  }
 }
+
+var ALL_LOGS = [];
+var LOG_FILTER = 'all';
+var LOG_SEARCH = '';
+
+var LOG_ICONS = {
+  top_up:         {i:'↑', bg:'rgba(45,212,191,0.12)',  c:'var(--teal)',   label:'Token top-up'},
+  set_tokens:     {i:'✏', bg:'rgba(167,139,250,0.12)', c:'var(--violet)', label:'Set tokens'},
+  set_plan:       {i:'◈', bg:'rgba(167,139,250,0.12)', c:'var(--violet)', label:'Plan change'},
+  pricing_update: {i:'₦', bg:'rgba(201,168,76,0.12)',  c:'var(--gold)',   label:'Pricing update'},
+  plan_added:     {i:'+', bg:'rgba(45,212,191,0.12)',   c:'var(--teal)',   label:'Plan added'},
+  suspend:        {i:'⊘', bg:'rgba(248,113,113,0.12)', c:'var(--rose)',   label:'Suspended'},
+  unsuspend:      {i:'✓', bg:'rgba(45,212,191,0.12)',  c:'var(--teal)',   label:'Unsuspended'},
+  broadcast:      {i:'✉', bg:'rgba(96,165,250,0.12)',  c:'#60a5fa',       label:'Broadcast'},
+  delete_user:    {i:'✗', bg:'rgba(248,113,113,0.12)', c:'var(--rose)',   label:'User deleted'},
+  coupon_created: {i:'◆', bg:'rgba(45,212,191,0.12)',  c:'var(--teal)',   label:'Coupon created'},
+  coupon_deleted: {i:'◇', bg:'rgba(248,113,113,0.12)', c:'var(--rose)',   label:'Coupon deleted'},
+  unblock_ip:     {i:'✓', bg:'rgba(45,212,191,0.12)',  c:'var(--teal)',   label:'IP unblocked'},
+};
+
+function updateLogStats(logs) {
+  function _s(id, val) { var el=document.getElementById(id); if(el) el.textContent=val; }
+  _s('ls-topups',      fmt(logs.filter(function(l){ return l.action==='top_up'||l.action==='set_tokens'; }).length));
+  _s('ls-plans',       fmt(logs.filter(function(l){ return l.action==='set_plan'; }).length));
+  _s('ls-broadcasts',  fmt(logs.filter(function(l){ return l.action==='broadcast'; }).length));
+  _s('ls-suspensions', fmt(logs.filter(function(l){ return l.action==='suspend'; }).length));
+}
+
+function logDetails(l) {
+  var parts = [];
+  if(l.tokens !== undefined) parts.push(fmt(l.tokens) + ' tokens');
+  if(l.plan)    parts.push('→ ' + l.plan);
+  if(l.reason)  parts.push(l.reason.slice(0,60));
+  if(l.subject) parts.push('"' + l.subject.slice(0,40) + '"');
+  if(l.sent)    parts.push(fmt(l.sent) + ' sent');
+  if(l.ip)      parts.push(l.ip);
+  if(l.amount)  parts.push('₦' + fmt(l.amount));
+  if(l.email)   parts.push(l.email);
+  if(l.user_id) parts.push('uid:' + l.user_id.slice(0,8));
+  return parts.join(' · ') || '—';
+}
+
+function renderLogs(logs) {
+  var card = document.getElementById('logs-card');
+  var countEl = document.getElementById('log-count');
+  if(countEl) countEl.textContent = logs.length + ' event' + (logs.length !== 1 ? 's' : '');
+
+  if(!logs.length) {
+    card.innerHTML = '<div style="padding:56px;text-align:center;color:var(--text3);font-size:13px">No matching events</div>';
+    return;
+  }
+
+  // Group by date
+  var groups = {};
+  logs.forEach(function(l) {
+    var date = l.ts ? l.ts.slice(0,10) : 'Unknown';
+    if(!groups[date]) groups[date] = [];
+    groups[date].push(l);
+  });
+
+  var h = '';
+  Object.keys(groups).sort(function(a,b){ return b.localeCompare(a); }).forEach(function(date) {
+    var label = date;
+    try {
+      var d = new Date(date);
+      var today = new Date(); today.setHours(0,0,0,0);
+      var yesterday = new Date(today); yesterday.setDate(today.getDate()-1);
+      if(d.toDateString() === new Date().toDateString()) label = 'Today';
+      else if(d.toDateString() === yesterday.toDateString()) label = 'Yesterday';
+      else label = d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+    } catch(e) {}
+
+    h += '<div style="display:flex;align-items:center;gap:10px;padding:8px 20px;background:var(--ink3);border-bottom:1px solid var(--border)">'
+       + '<div style="font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em">' + label + '</div>'
+       + '<div style="flex:1;height:1px;background:var(--border)"></div>'
+       + '<div style="font-size:10px;color:var(--text3)">' + groups[date].length + ' event' + (groups[date].length!==1?'s':'') + '</div>'
+       + '</div>';
+
+    groups[date].forEach(function(l, idx) {
+      var s = LOG_ICONS[l.action] || {i:'○', bg:'rgba(255,255,255,0.06)', c:'var(--text3)', label:l.action};
+      var actionLabel = s.label || l.action.replace(/_/g,' ');
+      var time = l.ts ? new Date(l.ts).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '';
+      var details = logDetails(l);
+      var perfBy  = l.performed_by_name || l.performed_by_email || '';
+      var isLast  = idx === groups[date].length - 1;
+
+      h += '<div style="display:grid;grid-template-columns:52px 1fr auto;gap:0;align-items:stretch;border-bottom:1px solid ' + (isLast?'var(--border)':'rgba(255,255,255,0.04)') + ';transition:background .12s" >'
+        // Icon column with connector line
+        + '<div style="display:flex;flex-direction:column;align-items:center;padding:14px 0 0;gap:0">'
+        + '<div style="width:32px;height:32px;border-radius:10px;background:' + s.bg + ';border:1px solid ' + s.bg.replace('0.12','0.3').replace('0.1','0.25').replace('0.08','0.2') + ';display:flex;align-items:center;justify-content:center;font-size:14px;color:' + s.c + ';font-weight:700;flex-shrink:0;position:relative;z-index:1">' + s.i + '</div>'
+        + (!isLast ? '<div style="flex:1;width:1px;background:var(--border);margin-top:4px;margin-bottom:0;min-height:12px"></div>' : '')
+        + '</div>'
+        // Content column
+        + '<div style="padding:14px 16px ' + (isLast?'14px':'12px') + ' 12px;min-width:0">'
+        + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:3px">'
+        + '<span style="font-size:13px;font-weight:600;color:var(--text)">' + actionLabel + '</span>'
+        + (details ? '<span style="font-size:11.5px;color:var(--text2)">·</span><span style="font-size:11.5px;color:var(--text2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:320px">' + details + '</span>' : '')
+        + '</div>'
+        + '<div style="display:flex;align-items:center;gap:10px">'
+        + (perfBy ? '<span style="font-size:11px;color:var(--text3);display:flex;align-items:center;gap:4px"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".6"><circle cx="8" cy="6" r="3"/><path d="M2 14c0-3.3 2.7-5 6-5s6 1.7 6 5"/></svg>' + perfBy + '</span>' : '')
+        + (l.target_user ? '<span style="font-size:11px;color:var(--text3)">→ ' + l.target_user + '</span>' : '')
+        + '</div>'
+        + '</div>'
+        // Time column
+        + '<div style="padding:14px 20px 0;text-align:right;flex-shrink:0">'
+        + '<span style="font-size:11px;color:var(--text3);font-family:DM Mono,monospace">' + time + '</span>'
+        + '</div>'
+        + '</div>';
+    });
+  });
+
+  card.innerHTML = h;
+}
+
+
+function filterLogs(type, btn) {
+  LOG_FILTER = type;
+  document.querySelectorAll('.log-filter-btn').forEach(function(b){ b.classList.remove('on'); });
+  btn.classList.add('on');
+  applyLogFilters();
+}
+
+function searchLogs(q) {
+  LOG_SEARCH = q.toLowerCase();
+  applyLogFilters();
+}
+
+function applyLogFilters() {
+  var filtered = ALL_LOGS.filter(function(l) {
+    var matchType = LOG_FILTER === 'all' || l.action === LOG_FILTER;
+    var matchSearch = !LOG_SEARCH || JSON.stringify(l).toLowerCase().includes(LOG_SEARCH);
+    return matchType && matchSearch;
+  });
+  renderLogs(filtered);
+}
+
 
 async function loadAdmins(){
   try{
