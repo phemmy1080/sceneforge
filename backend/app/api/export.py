@@ -15,7 +15,8 @@ import zipfile
 from pathlib import Path
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Header, Query
+from typing import Optional
 from fastapi.responses import FileResponse, RedirectResponse, Response, StreamingResponse
 
 from app.config import get_settings
