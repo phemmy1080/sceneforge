@@ -547,6 +547,159 @@ async def list_broadcasts(redis=Depends(get_redis), _=Depends(_require_admin)):
     return {"broadcasts": broadcasts}
 
 
+# ─── AI Broadcast helpers ─────────────────────────────────────────────────────
+
+class AICampaignRequest(BaseModel):
+    goal: str           # re-engage | upgrade | feature | thankyou | promo | tips
+    tone: str = "friendly"
+    segment: str = "all"
+    context: str = ""   # extra context from admin
+
+class AISubjectRequest(BaseModel):
+    body: str
+    subject: str = ""
+
+class AIAssistRequest(BaseModel):
+    action: str         # shorten | emotional | cta | rewrite | simplify | urgent | custom
+    body: str
+    instruction: str = ""  # for custom action
+
+
+async def _call_ai(prompt: str, max_tokens: int = 600) -> str:
+    """
+    Call AI for broadcast features.
+    Uses Groq (primary — already in your stack) with OpenAI as fallback.
+    """
+    cfg = get_settings()
+
+    # ── Try Groq first ────────────────────────────────────────────────────
+    if cfg.groq_api_key:
+        try:
+            from groq import AsyncGroq
+            client = AsyncGroq(api_key=cfg.groq_api_key)
+            resp = await client.chat.completions.create(
+                model=cfg.groq_model or "llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=max_tokens,
+                temperature=0.7,
+            )
+            return resp.choices[0].message.content or ""
+        except Exception as e:
+            logger.warning("Groq broadcast AI failed, trying OpenAI: %s", e)
+
+    # ── Fallback: OpenAI ──────────────────────────────────────────────────
+    if cfg.openai_api_key:
+        try:
+            from openai import AsyncOpenAI
+            client = AsyncOpenAI(api_key=cfg.openai_api_key)
+            resp = await client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=max_tokens,
+                temperature=0.7,
+            )
+            return resp.choices[0].message.content or ""
+        except Exception as e:
+            logger.warning("OpenAI broadcast AI failed: %s", e)
+
+    raise HTTPException(status_code=503, detail="No AI provider configured (set GROQ_API_KEY or OPENAI_API_KEY)")
+
+
+@router.post("/broadcast/ai/campaign")
+async def ai_generate_campaign(
+    req: AICampaignRequest,
+    redis=Depends(get_redis),
+    _=Depends(_require_admin),
+):
+    """Generate a full email campaign using Claude."""
+    goal_desc = {
+        "re-engage": "Re-engage inactive users who haven't created a video in 14+ days",
+        "upgrade":   "Encourage Free plan users to upgrade to a paid plan",
+        "feature":   "Announce an exciting new product feature",
+        "thankyou":  "Thank paying subscribers with appreciation and an exclusive offer",
+        "promo":     "Offer a limited-time promo code discount",
+        "tips":      "Share useful tips and tutorials to boost platform usage",
+    }.get(req.goal, req.goal)
+
+    prompt = (
+        "You are a world-class email copywriter for SceneForge, an AI video studio "
+        "for content creators in Nigeria.\n\n"
+        f"Campaign goal: {goal_desc}\n"
+        f"Tone: {req.tone}\n"
+        f"Target segment: {req.segment} users\n"
+        + (f"Extra context: {req.context}\n" if req.context else "")
+        + "\nWrite a complete marketing email:\n"
+        "- Subject line: compelling, max 60 chars\n"
+        "- Email body: conversational, 3-5 short paragraphs, ends with a clear CTA. "
+        "Use {{name}} for personalisation. Sign off as 'The SceneForge Team'.\n\n"
+        "Respond ONLY with JSON, no markdown:\n"
+        '{"subject":"...","body":"..."}'
+    )
+    text = await _call_ai(prompt, max_tokens=800)
+    import re as _re
+    clean = _re.sub(r"```json|```", "", text).strip()
+    try:
+        result = json.loads(clean)
+        return {"subject": result.get("subject", ""), "body": result.get("body", "")}
+    except Exception:
+        return {"subject": "", "body": text}
+
+
+@router.post("/broadcast/ai/subjects")
+async def ai_subject_suggestions(
+    req: AISubjectRequest,
+    redis=Depends(get_redis),
+    _=Depends(_require_admin),
+):
+    """Generate 3 subject line variants for a broadcast."""
+    prompt = (
+        "You are an email marketing expert for SceneForge, an AI video creation tool "
+        "for content creators in Nigeria.\n\n"
+        f"Email body:\n{req.body or req.subject}\n\n"
+        "Generate exactly 3 subject lines:\n"
+        "1. CURIOSITY: Makes reader curious without being clickbait\n"
+        "2. DIRECT: Clear and benefit-focused\n"
+        "3. URGENCY: Creates a sense of urgency or FOMO\n\n"
+        "Respond ONLY with JSON array, no markdown:\n"
+        '[{"type":"curiosity","subject":"..."},{"type":"direct","subject":"..."},{"type":"urgency","subject":"..."}]'
+    )
+    text = await _call_ai(prompt, max_tokens=300)
+    import re as _re
+    clean = _re.sub(r"```json|```", "", text).strip()
+    try:
+        suggestions = json.loads(clean)
+        return {"suggestions": suggestions}
+    except Exception:
+        return {"suggestions": []}
+
+
+@router.post("/broadcast/ai/assist")
+async def ai_writing_assist(
+    req: AIAssistRequest,
+    redis=Depends(get_redis),
+    _=Depends(_require_admin),
+):
+    """AI writing assistant — rewrite, shorten, improve the email body."""
+    action_prompts = {
+        "shorten":   "Shorten this email to under 100 words while keeping the core message and CTA. Return ONLY the rewritten email body.",
+        "emotional": "Rewrite this email to be more emotionally resonant and personal. Return ONLY the rewritten email body.",
+        "cta":       "Add a strong call-to-action button/link to app.sceneraforge.com. Return ONLY the full email with CTA added.",
+        "rewrite":   "Rewrite this email in a fresher, more engaging way. Return ONLY the rewritten email body.",
+        "simplify":  "Simplify this email — shorter sentences, simpler words, easier to read. Return ONLY the simplified email.",
+        "urgent":    "Rewrite this email with more urgency and FOMO. Return ONLY the rewritten email body.",
+        "custom":    req.instruction,
+    }
+    task = action_prompts.get(req.action, req.instruction)
+    prompt = (
+        "SceneForge is an AI video studio for Nigerian content creators.\n\n"
+        f"Original email:\n{req.body}\n\n"
+        f"Task: {task}\n\n"
+        "Return ONLY the result, no preamble or explanation."
+    )
+    result = await _call_ai(prompt, max_tokens=700)
+    return {"result": result}
+
+
 # ─── Coupons ──────────────────────────────────────────────────────────────────
 
 @router.get("/coupons")
