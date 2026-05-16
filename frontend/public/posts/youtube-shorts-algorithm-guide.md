@@ -64,4 +64,4 @@ The creators dominating YouTube Shorts in 2026 post frequently — often daily. 
 
 With SceneForge, you can produce a complete YouTube Short in under 60 seconds — script, voiceover, stock footage, subtitles, and music included. The tool exports in 9:16 format ready for direct upload.
 
-[Start creating YouTube Shorts with AI at sceneraforge.com](https://sceneraforge.com)
+[Start creating YouTube Shorts with AI at scenraforge.com](https://scenraforge.com)
