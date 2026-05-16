@@ -63,4 +63,4 @@ The creators who win in 2026 are not the ones with the best cameras or the most 
 
 SceneForge is built for exactly this. Every feature in 2026 — cinematic motion, voice selection, visual matching, scene transitions — is designed to give your content a produced, professional look without the production overhead.
 
-[Start creating in 2026 for free → sceneraforge.com](https://sceneraforge.com)
+[Start creating in 2026 for free → scenraforge.com](https://scenraforge.com)
