@@ -16,6 +16,10 @@ from app.services.visuals import get_visual_for_scene
 from app.services.storage import upload_job_files, r2_enabled
 from app.services.capcut import build_capcut_draft, write_manifest
 from app.services.cost_tracker import build_cost_record, store_cost_record
+from app.services.security import (
+    register_active_job, unregister_active_job,
+    track_render_abuse,
+)
 
 settings = get_settings()
 logger   = logging.getLogger(__name__)
@@ -43,6 +47,8 @@ async def render_video(ctx, job_id: str, payload: dict):
     user_id         = _uid.decode()  if isinstance(_uid,  bytes) else _uid
     prev_job_stored = _prev.decode() if isinstance(_prev, bytes) else _prev
     output_dir.mkdir(parents=True, exist_ok=True)
+    if user_id:
+        await register_active_job(redis, user_id, job_id)
     logger.info("Job %s — user_id=%s prev_job=%s", job_id, user_id, prev_job_stored)
 
     try:
@@ -258,6 +264,9 @@ async def render_video(ctx, job_id: str, payload: dict):
             "is_re_render":     is_re_render,
         }
         await redis.set(f"job:{job_id}:progress", json.dumps(final_result), ex=86400)
+        if user_id:
+            await unregister_active_job(redis, user_id, job_id)
+            await track_render_abuse(redis, user_id, tokens_used=100, failed=False)
         logger.info("Render complete — job %s | %s", job_id, video_url)
 
         # ── Cost tracking ─────────────────────────────────────────────────────
