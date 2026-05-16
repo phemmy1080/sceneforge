@@ -16,7 +16,7 @@ SceneForge turns any idea into a finished, ready-to-publish video in under 60 se
 
 By the end of this guide you will have a complete video with AI voiceover, stock footage or AI-generated visuals, subtitles, and background music — ready to upload to TikTok, YouTube Shorts, or Instagram Reels.
 
-**What you need:** A SceneForge account (free at sceneraforge.com). Nothing else.
+**What you need:** A SceneForge account (free at scenraforge.com). Nothing else.
 
 ---
 
@@ -238,6 +238,6 @@ That is the complete SceneForge workflow. Eight steps, each taking 30-90 seconds
 
 The first time you do it might take a little longer as you explore the settings. By your third or fourth video, the whole process will take 5 minutes or less.
 
-**Ready to start?** [Create your first video free at sceneraforge.com →](https://sceneraforge.com)
+**Ready to start?** [Create your first video free at scenraforge.com →](https://scenraforge.com)
 
 No camera. No editing experience. No credit card required. Your first video is free.
