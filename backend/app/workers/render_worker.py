@@ -287,7 +287,16 @@ async def render_video(ctx, job_id: str, payload: dict):
             # Count total chars across all scenes for voice cost
             _total_chars = sum(len(s.text) for s in req.scenes)
             _dalle_images = len([v for v in visual_files if hasattr(v, 'source') and v.source == 'dalle'])
-            _voice_provider = "elevenlabs" if settings.elevenlabs_api_key and getattr(req, 'voice_name', '').startswith('el_') else "gtts"
+            # Voice provider: ElevenLabs only for studio plan when key is set
+            # and voice is in the EL voice ID map (Marcus, Sophie, Alex, Jordan, Luna, Kai)
+            _el_voices = {"Marcus", "Sophie", "Alex", "Jordan", "Luna", "Kai"}
+            _voice_provider = (
+                "elevenlabs"
+                if settings.elevenlabs_api_key
+                and _user_plan == "studio"
+                and getattr(req, "voice_name", "") in _el_voices
+                else "edge_tts"
+            )
 
             _cost_rec = build_cost_record(
                 job_id=job_id,
