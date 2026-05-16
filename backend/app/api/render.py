@@ -10,6 +10,11 @@ from app.models.schemas import RenderRequest, RenderJobResponse, JobStatusRespon
 from app.services import auth as auth_service
 from app.middleware.rate_limit import limiter
 from app.services.plans import get_limits, check_scene_limit
+from app.services.security import (
+    check_queue_capacity, check_user_concurrency, check_recursive_job,
+    register_active_job, track_render_abuse, track_ip_request,
+    check_ip_blocked, validate_job_id,
+)
 
 settings = get_settings()
 router = APIRouter()
@@ -52,6 +57,16 @@ async def start_render(
     redis = await _get_redis()
     user_id = _extract_user_id(authorization)
 
+    # ── Security checks ───────────────────────────────────────────────────────
+    from fastapi import Request as _Req
+    client_ip = (
+        request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or (request.client.host if request.client else "unknown")
+    )
+    await check_ip_blocked(redis, client_ip)
+    await track_ip_request(redis, client_ip, "render_start")
+    await check_queue_capacity(redis)
+
     # ── Token check ──────────────────────────────────────────────────────────
     # Generate a new job_id — each render start gets a fresh one
     job_id = str(uuid.uuid4())
@@ -85,6 +100,10 @@ async def start_render(
         limits = get_limits(user_plan)
 
         # Scene count limit (skip for re-renders)
+        # ── Queue isolation: concurrency + spam ────────────────────────────
+        await check_user_concurrency(redis, user_id, user_plan)
+        await check_recursive_job(redis, user_id, job_id, getattr(req, "prev_job_id", None))
+
         if not prev_job_id:
             scene_count = len(req.scenes)
             allowed, max_scenes = check_scene_limit(user_plan, scene_count)
