@@ -1,8 +1,10 @@
+from __future__ import annotations
+from typing import Optional
 """
 backend/app/api/export.py
 Downloads serve from R2 (permanent) → worker proxy → local fallback.
 """
-from __future__ import annotations
+
 
 import io
 import json
@@ -19,6 +21,8 @@ from fastapi.responses import FileResponse, RedirectResponse, Response, Streamin
 from app.config import get_settings
 from app.dependencies import get_redis
 from app.services.storage import get_r2_url, r2_enabled
+from app.services.security import validate_job_id, create_signed_url, verify_signed_url
+from app.services import auth as auth_service
 
 settings  = get_settings()
 router    = APIRouter()
@@ -28,6 +32,38 @@ WORKER_BASE_URL = os.environ.get("WORKER_BASE_URL", "").rstrip("/")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _verify_job_id(job_id: str) -> str:
+    """Validate job_id format to prevent path traversal."""
+    import re
+    if not re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', job_id.lower()):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Invalid job ID format")
+    return job_id.lower()
+
+
+async def _verify_job_ownership(redis, job_id: str, authorization: str | None) -> None:
+    """
+    Verify the requesting user owns this render job.
+    If no auth header — allow (anonymous / preview access).
+    If auth header present — must match the job's owner.
+    """
+    if not authorization:
+        return   # anonymous access allowed (e.g. share links)
+    token = authorization.removeprefix("Bearer ").strip()
+    if not token:
+        return
+    request_user_id = auth_service.verify_token(token)
+    if not request_user_id:
+        return   # invalid token — treat as anonymous
+    raw = await redis.get(f"job:{job_id}:user_id")
+    if not raw:
+        return   # no owner stored — allow (legacy jobs)
+    job_owner = raw.decode() if isinstance(raw, bytes) else raw
+    if job_owner != request_user_id:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="You do not have access to this render job")
+
 
 def _job_dir(job_id: str) -> Path:
     p = Path(settings.renders_dir) / job_id
@@ -69,7 +105,10 @@ async def export_full_video(
     job_id: str,
     title: str = Query(default=""),
     redis=Depends(get_redis),
+    authorization: Optional[str] = Header(None),
 ):
+    job_id = _verify_job_id(job_id)
+    await _verify_job_ownership(redis, job_id, authorization)
     filename = _safe_filename(title, ".mp4") if title else "sceneforge_video.mp4"
 
     # 1. Check R2 — redirect directly (fastest, permanent)
@@ -313,3 +352,53 @@ async def get_manifest(job_id: str, redis=Depends(get_redis)):
         raise HTTPException(status_code=404, detail="Manifest not found")
     with open(manifest) as f:
         return json.load(f)
+
+@router.get("/signed/{job_id}")
+async def create_download_link(
+    job_id: str,
+    redis=Depends(get_redis),
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Create a signed, time-limited download URL for a render.
+    The link expires in 1 hour and can only be used by the requesting user.
+    """
+    from app.config import get_settings
+    cfg = get_settings()
+    secret = cfg.admin_secret_key or "sceneforge-default-signing-key"
+
+    job_id = _verify_job_id(job_id)
+    await _verify_job_ownership(redis, job_id, authorization)
+
+    token = (authorization or "").removeprefix("Bearer ").strip()
+    user_id = auth_service.verify_token(token) if token else "anonymous"
+
+    signed_token = await create_signed_url(redis, job_id, user_id or "anonymous", secret)
+    return {
+        "token": signed_token,
+        "download_url": f"/api/export/download/{job_id}?token={signed_token}",
+        "expires_in": 3600,
+    }
+
+
+@router.get("/download/{job_id}")
+async def download_with_signed_token(
+    job_id: str,
+    token: str = Query(...),
+    title: str = Query(default=""),
+    redis=Depends(get_redis),
+):
+    """Download a render using a signed token (no session required)."""
+    from app.config import get_settings
+    cfg = get_settings()
+    secret = cfg.admin_secret_key or "sceneforge-default-signing-key"
+
+    job_id = _verify_job_id(job_id)
+    await verify_signed_url(redis, token, job_id, secret)
+
+    filename = _safe_filename(title, ".mp4") if title else "sceneforge_video.mp4"
+    for name in ("final_video_music.mp4", "final_video.mp4"):
+        r2_url = await get_r2_url(redis, job_id, name)
+        if r2_url:
+            return RedirectResponse(url=r2_url)
+    raise HTTPException(status_code=404, detail="Video not found")
