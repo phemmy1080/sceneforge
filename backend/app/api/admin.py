@@ -1123,6 +1123,72 @@ async def get_audit_action_types(
             pass
     return {"actions": sorted(actions), "admins": sorted(admins)}
 
+
+# ─── Security monitoring ──────────────────────────────────────────────────────
+
+@router.get("/security/suspicious")
+async def get_suspicious_users_admin(
+    redis=Depends(get_redis),
+    admin: dict = Depends(_require_admin),
+):
+    """Users flagged for suspicious usage — high render rate, token abuse, failed renders."""
+    from app.services.security import get_suspicious_users
+    users = await get_suspicious_users(redis, limit=100)
+    return {"suspicious_users": users, "total": len(users)}
+
+
+@router.get("/security/blocked-ips")
+async def get_blocked_ips_admin(
+    redis=Depends(get_redis),
+    admin: dict = Depends(_require_admin),
+):
+    """IPs currently blocked by the auto-blocker."""
+    from app.services.security import get_blocked_ips
+    ips = await get_blocked_ips(redis)
+    return {"blocked_ips": ips, "total": len(ips)}
+
+
+@router.delete("/security/blocked-ips/{ip}")
+async def unblock_ip_admin(
+    ip: str,
+    redis=Depends(get_redis),
+    admin: dict = Depends(_require_admin),
+):
+    """Manually unblock an IP address."""
+    from app.services.security import unblock_ip
+    await unblock_ip(redis, ip)
+    await _log_action(redis, "unblock_ip", admin=admin, ip=ip)
+    return {"success": True, "unblocked": ip}
+
+
+@router.get("/security/queue")
+async def get_queue_status(
+    redis=Depends(get_redis),
+    admin: dict = Depends(_require_admin),
+):
+    """Current render queue depth and per-user active job counts."""
+    from app.services.security import QUEUE_KEY, USER_JOBS_PREFIX, MAX_QUEUE_DEPTH
+    depth = await redis.llen(QUEUE_KEY)
+    # Scan for per-user job counts
+    per_user = []
+    cursor = 0
+    while True:
+        cursor, keys = await redis.scan(cursor, match=f"{USER_JOBS_PREFIX}*", count=100)
+        for key in keys:
+            uid = key.replace(USER_JOBS_PREFIX, "") if isinstance(key, str) else key.decode().replace(USER_JOBS_PREFIX, "")
+            count = await redis.scard(key)
+            if count > 0:
+                per_user.append({"user_id": uid, "active_jobs": count})
+        if cursor == 0:
+            break
+    return {
+        "queue_depth": depth,
+        "max_queue_depth": MAX_QUEUE_DEPTH,
+        "queue_utilisation_pct": round(depth / MAX_QUEUE_DEPTH * 100, 1),
+        "active_users": len(per_user),
+        "per_user": sorted(per_user, key=lambda x: x["active_jobs"], reverse=True),
+    }
+
 # ─── Backfill utilities ───────────────────────────────────────────────────────
 
 @router.post("/transactions/backfill")
