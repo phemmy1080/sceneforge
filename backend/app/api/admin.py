@@ -567,27 +567,12 @@ class AIAssistRequest(BaseModel):
 
 async def _call_ai(prompt: str, max_tokens: int = 600) -> str:
     """
-    Call AI for broadcast features.
-    Uses Groq (primary — already in your stack) with OpenAI as fallback.
+    Call OpenAI for broadcast AI features (campaign generator, writing assistant,
+    subject suggestions). Falls back to Groq if OpenAI key is not set.
     """
     cfg = get_settings()
 
-    # ── Try Groq first ────────────────────────────────────────────────────
-    if cfg.groq_api_key:
-        try:
-            from groq import AsyncGroq
-            client = AsyncGroq(api_key=cfg.groq_api_key)
-            resp = await client.chat.completions.create(
-                model=cfg.groq_model or "llama-3.3-70b-versatile",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=max_tokens,
-                temperature=0.7,
-            )
-            return resp.choices[0].message.content or ""
-        except Exception as e:
-            logger.warning("Groq broadcast AI failed, trying OpenAI: %s", e)
-
-    # ── Fallback: OpenAI ──────────────────────────────────────────────────
+    # ── Primary: OpenAI ───────────────────────────────────────────────────
     if cfg.openai_api_key:
         try:
             from openai import AsyncOpenAI
@@ -600,9 +585,24 @@ async def _call_ai(prompt: str, max_tokens: int = 600) -> str:
             )
             return resp.choices[0].message.content or ""
         except Exception as e:
-            logger.warning("OpenAI broadcast AI failed: %s", e)
+            logger.warning("OpenAI broadcast AI failed, trying Groq: %s", e)
 
-    raise HTTPException(status_code=503, detail="No AI provider configured (set GROQ_API_KEY or OPENAI_API_KEY)")
+    # ── Fallback: Groq ────────────────────────────────────────────────────
+    if cfg.groq_api_key:
+        try:
+            from groq import AsyncGroq
+            client = AsyncGroq(api_key=cfg.groq_api_key)
+            resp = await client.chat.completions.create(
+                model=cfg.groq_model or "llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=max_tokens,
+                temperature=0.7,
+            )
+            return resp.choices[0].message.content or ""
+        except Exception as e:
+            logger.warning("Groq broadcast AI fallback also failed: %s", e)
+
+    raise HTTPException(status_code=503, detail="No AI provider configured (set OPENAI_API_KEY)")
 
 
 @router.post("/broadcast/ai/campaign")
@@ -631,7 +631,8 @@ async def ai_generate_campaign(
         + "\nWrite a complete marketing email:\n"
         "- Subject line: compelling, max 60 chars\n"
         "- Email body: conversational, 3-5 short paragraphs, ends with a clear CTA. "
-        "Use {{name}} for personalisation. Sign off as 'The SceneForge Team'.\n\n"
+        "Use {{name}} for personalisation. Sign off as 'The SceneForge Team'.\n"
+        "- Use relevant emojis and symbols naturally throughout to boost engagement — attention markers (📢 🔔 👇 ⚠️), visual indicators (✅ 🎯 🔥 🚀), decorative elements (✨ ⭐ 💎 🌟), and emphasis symbols (⚡ 💯 🏆 🎉). Place them at the start of key lines, next to CTAs, and to break up sections. Do not overdo it — 4 to 8 emojis per email is ideal.\n\n"
         "Respond ONLY with JSON, no markdown:\n"
         '{"subject":"...","body":"..."}'
     )
@@ -657,9 +658,9 @@ async def ai_subject_suggestions(
         "for content creators in Nigeria.\n\n"
         f"Email body:\n{req.body or req.subject}\n\n"
         "Generate exactly 3 subject lines:\n"
-        "1. CURIOSITY: Makes reader curious without being clickbait\n"
-        "2. DIRECT: Clear and benefit-focused\n"
-        "3. URGENCY: Creates a sense of urgency or FOMO\n\n"
+        "1. CURIOSITY: Makes reader curious without being clickbait. May include 1 emoji.\n"
+        "2. DIRECT: Clear and benefit-focused. May include 1 emoji.\n"
+        "3. URGENCY: Creates urgency or FOMO. May include 1 emoji like ⏰ 🔥 ‼️.\n\n"
         "Respond ONLY with JSON array, no markdown:\n"
         '[{"type":"curiosity","subject":"..."},{"type":"direct","subject":"..."},{"type":"urgency","subject":"..."}]'
     )
@@ -680,14 +681,18 @@ async def ai_writing_assist(
     _=Depends(_require_admin),
 ):
     """AI writing assistant — rewrite, shorten, improve the email body."""
+    _emoji = (
+        "Use relevant emojis and symbols naturally throughout to boost engagement — attention markers (📢 🔔 👇 ⚠️), visual indicators (✅ 🎯 🔥 🚀), decorative elements (✨ ⭐ 💎 🌟), and emphasis symbols (⚡ 💯 🏆 🎉). Place them at the start of key lines, next to CTAs, and to break up sections. Do not overdo it — 4 to 8 emojis per email is ideal. "
+        "Return ONLY the rewritten email body."
+    )
     action_prompts = {
-        "shorten":   "Shorten this email to under 100 words while keeping the core message and CTA. Return ONLY the rewritten email body.",
-        "emotional": "Rewrite this email to be more emotionally resonant and personal. Return ONLY the rewritten email body.",
-        "cta":       "Add a strong call-to-action button/link to app.sceneraforge.com. Return ONLY the full email with CTA added.",
-        "rewrite":   "Rewrite this email in a fresher, more engaging way. Return ONLY the rewritten email body.",
-        "simplify":  "Simplify this email — shorter sentences, simpler words, easier to read. Return ONLY the simplified email.",
-        "urgent":    "Rewrite this email with more urgency and FOMO. Return ONLY the rewritten email body.",
-        "custom":    req.instruction,
+        "shorten":   "Shorten this email to under 100 words keeping the core message and CTA. " + _emoji,
+        "emotional": "Rewrite this email to be more emotionally resonant and personal. " + _emoji,
+        "cta":       "Add a strong call-to-action button/link to app.sceneraforge.com. " + _emoji,
+        "rewrite":   "Rewrite this email in a fresher, more engaging way. " + _emoji,
+        "simplify":  "Simplify this email — shorter sentences, simpler words, easier to read. " + _emoji,
+        "urgent":    "Rewrite this email with more urgency and FOMO. " + _emoji,
+        "custom":    req.instruction + " Also: " + _emoji,
     }
     task = action_prompts.get(req.action, req.instruction)
     prompt = (
