@@ -633,16 +633,19 @@ class AIAssistRequest(BaseModel):
 
 async def _call_ai(prompt: str, max_tokens: int = 600) -> str:
     """
-    Call OpenAI for broadcast AI features (campaign generator, writing assistant,
-    subject suggestions). Falls back to Groq if OpenAI key is not set.
+    Call AI for broadcast features.
+    Tries OpenAI first, falls back to Groq.
+    Both keys are in settings as openai_api_key / groq_api_key.
     """
     cfg = get_settings()
+    errors = []
 
     # ── Primary: OpenAI ───────────────────────────────────────────────────
-    if cfg.openai_api_key:
+    openai_key = getattr(cfg, "openai_api_key", "") or ""
+    if openai_key:
         try:
             from openai import AsyncOpenAI
-            client = AsyncOpenAI(api_key=cfg.openai_api_key)
+            client = AsyncOpenAI(api_key=openai_key)
             resp = await client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
@@ -651,24 +654,30 @@ async def _call_ai(prompt: str, max_tokens: int = 600) -> str:
             )
             return resp.choices[0].message.content or ""
         except Exception as e:
-            logger.warning("OpenAI broadcast AI failed, trying Groq: %s", e)
+            err_msg = f"OpenAI failed: {e}"
+            logger.error("Broadcast AI — %s", err_msg)
+            errors.append(err_msg)
 
     # ── Fallback: Groq ────────────────────────────────────────────────────
-    if cfg.groq_api_key:
+    groq_key = getattr(cfg, "groq_api_key", "") or ""
+    if groq_key:
         try:
             from groq import AsyncGroq
-            client = AsyncGroq(api_key=cfg.groq_api_key)
+            client = AsyncGroq(api_key=groq_key)
             resp = await client.chat.completions.create(
-                model=cfg.groq_model or "llama-3.3-70b-versatile",
+                model=getattr(cfg, "groq_model", None) or "llama-3.3-70b-versatile",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=max_tokens,
                 temperature=0.7,
             )
             return resp.choices[0].message.content or ""
         except Exception as e:
-            logger.warning("Groq broadcast AI fallback also failed: %s", e)
+            err_msg = f"Groq failed: {e}"
+            logger.error("Broadcast AI fallback — %s", err_msg)
+            errors.append(err_msg)
 
-    raise HTTPException(status_code=503, detail="No AI provider configured (set OPENAI_API_KEY)")
+    detail = "; ".join(errors) if errors else "No AI provider configured (set OPENAI_API_KEY or GROQ_API_KEY in Railway)"
+    raise HTTPException(status_code=503, detail=detail)
 
 
 @router.post("/broadcast/ai/campaign")
