@@ -61,4 +61,4 @@ Over 30 days, that's 30-90 videos in your niche. That kind of volume teaches you
 
 ## Start Creating Today
 
-SceneForge is free to start. Create your first AI video at [sceneraforge.com](https://sceneraforge.com) — no camera, no editing software, no prior experience needed.
+SceneForge is free to start. Create your first AI video at [scenraforge.com](https://scenraforge.com) — no camera, no editing software, no prior experience needed.
