@@ -473,6 +473,10 @@ tr:hover td{background:rgba(255,255,255,0.018)}
       <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3h10v10H3z"/><path d="M6 6h4M6 9h3"/></svg>
       Audit trail
     </button>
+    <button class="nb" id="nb-security" onclick="nav('security',this)">
+      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2l5 2v5c0 3-2.5 5-5 6C5.5 14 3 12 3 9V4z"/><path d="M6 8l2 2 3-3"/></svg>
+      Security
+    </button>
     <button class="nb" id="nb-queue" onclick="nav('queue',this)">
       <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
       Render queue
@@ -1438,6 +1442,95 @@ tr:hover td{background:rgba(255,255,255,0.018)}
       </div>
     </div>
 
+    <!-- SECURITY -->
+    <div class="pg" id="pg-security">
+      <div class="ph">
+        <div class="ph-top">
+          <div><div class="ph-title">Security</div><div class="ph-sub">IP blocks, suspicious users, queue health</div></div>
+          <div class="ph-actions">
+            <button class="btn btn-ghost btn-sm" onclick="loadSecurity()">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 8a6 6 0 0112 0M14 4v4h-4"/></svg>
+              Refresh
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stat-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:24px">
+        <div class="stat rose"><div class="stat-label">Blocked IPs</div><div class="stat-val" id="sec-blocked-count">—</div><div class="stat-meta">Auto-blocked for flooding</div></div>
+        <div class="stat gold"><div class="stat-label">Suspicious users</div><div class="stat-val" id="sec-suspicious-count">—</div><div class="stat-meta">Flagged for review</div></div>
+        <div class="stat teal"><div class="stat-label">Queue depth</div><div class="stat-val" id="sec-queue-depth">—</div><div class="stat-meta">Active render jobs</div></div>
+        <div class="stat violet"><div class="stat-label">Queue used</div><div class="stat-val" id="sec-queue-pct">—</div><div class="stat-meta">Of max capacity</div></div>
+      </div>
+
+      <div class="two-col" style="margin-bottom:18px">
+
+        <!-- Suspicious users -->
+        <div class="card">
+          <div class="card-hdr">
+            <span class="card-title">⚠️ Suspicious users</span>
+            <span style="font-size:11px;color:var(--text3)">High render/token burn rate</span>
+          </div>
+          <div id="sec-suspicious-list"><div class="loading"></div></div>
+        </div>
+
+        <!-- Blocked IPs -->
+        <div class="card">
+          <div class="card-hdr">
+            <span class="card-title">🚫 Blocked IPs</span>
+            <span style="font-size:11px;color:var(--text3)">Auto-blocked for flood attacks</span>
+          </div>
+          <div id="sec-blocked-list"><div class="loading"></div></div>
+        </div>
+      </div>
+
+      <!-- Queue status -->
+      <div class="card">
+        <div class="card-hdr"><span class="card-title">🎬 Queue isolation — active renders per user</span></div>
+        <div id="sec-queue-users"><div class="loading"></div></div>
+      </div>
+
+      <!-- Security rules reference -->
+      <div class="card" style="margin-top:18px">
+        <div class="card-hdr"><span class="card-title">Protection rules active</span></div>
+        <div style="padding:16px 20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">
+          <div style="background:var(--ink3);border-radius:10px;padding:12px;border-left:3px solid var(--teal)">
+            <div style="font-size:12.5px;font-weight:600;color:var(--teal);margin-bottom:4px">📁 File upload validation</div>
+            <div style="font-size:12px;color:var(--text2)">Magic byte detection · MIME type check · 100 MB limit (25 MB free) · Dangerous extension block</div>
+          </div>
+          <div style="background:var(--ink3);border-radius:10px;padding:12px;border-left:3px solid var(--violet)">
+            <div style="font-size:12.5px;font-weight:600;color:var(--violet);margin-bottom:4px">🔐 Signed download URLs</div>
+            <div style="font-size:12px;color:var(--text2)">HMAC-SHA256 signed · 1-hour TTL · User-bound · Job ownership enforced</div>
+          </div>
+          <div style="background:var(--ink3);border-radius:10px;padding:12px;border-left:3px solid var(--gold)">
+            <div style="font-size:12.5px;font-weight:600;color:var(--gold);margin-bottom:4px">🔢 Queue isolation</div>
+            <div style="font-size:12px;color:var(--text2)">Max 50 global jobs · Free plan: 1 concurrent · Paid: 2 concurrent · Recursive job detection</div>
+          </div>
+          <div style="background:var(--ink3);border-radius:10px;padding:12px;border-left:3px solid var(--rose)">
+            <div style="font-size:12.5px;font-weight:600;color:var(--rose);margin-bottom:4px">🛡 Worker protection</div>
+            <div style="font-size:12px;color:var(--text2)">Spam detection: >10 renders/5 min · Abuse tracking · Auto-unregister on failure</div>
+          </div>
+          <div style="background:var(--ink3);border-radius:10px;padding:12px;border-left:3px solid #60a5fa">
+            <div style="font-size:12.5px;font-weight:600;color:#60a5fa;margin-bottom:4px">🌐 IP monitoring</div>
+            <div style="font-size:12px;color:var(--text2)">Auto-block at 120 req/min · 24-hour IP ban · Forwarded-For header aware</div>
+          </div>
+          <div style="background:var(--ink3);border-radius:10px;padding:12px;border-left:3px solid var(--teal)">
+            <div style="font-size:12.5px;font-weight:600;color:var(--teal);margin-bottom:4px">📊 Token abuse detection</div>
+            <div style="font-size:12px;color:var(--text2)">>20 renders/hr · >500 tokens/hr · >10 failures/hr → suspicious flag</div>
+          </div>
+          <div style="background:var(--ink3);border-radius:10px;padding:12px;border-left:3px solid var(--gold)">
+            <div style="font-size:12.5px;font-weight:600;color:var(--gold);margin-bottom:4px">🔒 CORS locked</div>
+            <div style="font-size:12px;color:var(--text2)">Restricted to FRONTEND_ORIGIN env var. No wildcard * in production.</div>
+          </div>
+          <div style="background:var(--ink3);border-radius:10px;padding:12px;border-left:3px solid var(--violet)">
+            <div style="font-size:12.5px;font-weight:600;color:var(--violet);margin-bottom:4px">✅ Schema hardening</div>
+            <div style="font-size:12px;color:var(--text2)">Scene text: 1000 char max · Max 20 scenes · UUID job ID format enforced · Path traversal blocked</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -1604,7 +1697,7 @@ function nav(id,btn){
   var pg=document.getElementById('pg-'+id);
   if(pg)pg.classList.add('on');
   btn.classList.add('on');
-  var loaders={dashboard:loadDash,analytics:loadAnalytics,users:loadUsers,broadcast:loadBroadcasts,revenue:loadRevenue,tx:loadTx,pricing:loadPricing,niches:loadNiches,coupons:loadCoupons,queue:loadQueue,logs:loadLogs,admins:loadAdmins,feedback:loadFeedback,costs:loadCosts,audit:loadAudit};
+  var loaders={dashboard:loadDash,analytics:loadAnalytics,users:loadUsers,broadcast:loadBroadcasts,revenue:loadRevenue,tx:loadTx,pricing:loadPricing,niches:loadNiches,coupons:loadCoupons,queue:loadQueue,logs:loadLogs,admins:loadAdmins,feedback:loadFeedback,costs:loadCosts,audit:loadAudit,security:loadSecurity};
   if(loaders[id])loaders[id]();
 }
 
@@ -2872,6 +2965,91 @@ async function loadUserRenderCosts(uid) {
   } catch(e) {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--rose);padding:20px;font-size:13px">Failed to load render costs</td></tr>';
     console.error('loadUserRenderCosts error:', e);
+  }
+}
+
+// ── Security monitoring ───────────────────────────────────────────────────────
+
+async function loadSecurity() {
+  try {
+    var [sus, blocked, queue] = await Promise.all([
+      apiFetch('/security/suspicious'),
+      apiFetch('/security/blocked-ips'),
+      apiFetch('/security/queue'),
+    ]);
+
+    // Stats
+    function _s(id, v) { var el=document.getElementById(id); if(el) el.textContent=v; }
+    _s('sec-blocked-count',   fmt(blocked.total || 0));
+    _s('sec-suspicious-count', fmt(sus.total || 0));
+    _s('sec-queue-depth',     fmt(queue.queue_depth || 0));
+    _s('sec-queue-pct',       (queue.queue_utilisation_pct || 0).toFixed(1) + '%');
+
+    // Suspicious users
+    var susList = document.getElementById('sec-suspicious-list');
+    if(susList) {
+      var users = sus.suspicious_users || [];
+      susList.innerHTML = users.length ? users.map(function(u) {
+        return '<div style="padding:12px 20px;border-bottom:1px solid var(--border)">'
+          + '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">'
+          + '<div style="font-family:DM Mono,monospace;font-size:11.5px;color:var(--text)">' + u.user_id.slice(0,16) + '…</div>'
+          + '<span style="font-size:10px;color:var(--text3)">' + ago(u.ts) + '</span>'
+          + '</div>'
+          + '<div style="display:flex;flex-wrap:wrap;gap:5px">'
+          + (u.reasons||[]).map(function(r) {
+            return '<span style="font-size:11px;background:rgba(248,113,113,0.1);color:var(--rose);border:1px solid rgba(248,113,113,0.2);border-radius:5px;padding:2px 8px">' + r + '</span>';
+          }).join('')
+          + '</div>'
+          + '<div style="font-size:11px;color:var(--text3);margin-top:4px">'
+          + fmt(u.renders||0) + ' renders · ' + fmt(u.tokens||0) + ' tokens · ' + fmt(u.failures||0) + ' failures'
+          + '</div></div>';
+      }).join('') : '<div class="loading">No suspicious activity detected</div>';
+    }
+
+    // Blocked IPs
+    var blockedList = document.getElementById('sec-blocked-list');
+    if(blockedList) {
+      var ips = blocked.blocked_ips || [];
+      blockedList.innerHTML = ips.length ? ips.map(function(ip) {
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 20px;border-bottom:1px solid var(--border)">'
+          + '<div style="font-family:DM Mono,monospace;font-size:12.5px;color:var(--text)">' + ip + '</div>'
+          + '<button class="btn btn-ghost btn-xs" onclick="unblockIp(\'' + ip + '\')" style="color:var(--teal)">Unblock</button>'
+          + '</div>';
+      }).join('') : '<div class="loading">No blocked IPs</div>';
+    }
+
+    // Queue per-user
+    var queueUsers = document.getElementById('sec-queue-users');
+    if(queueUsers) {
+      var users2 = queue.per_user || [];
+      queueUsers.innerHTML = users2.length
+        ? '<div style="padding:16px 20px;display:flex;flex-direction:column;gap:8px">'
+          + users2.map(function(u) {
+            return '<div style="display:flex;align-items:center;justify-content:space-between">'
+              + '<span style="font-family:DM Mono,monospace;font-size:12px;color:var(--text2)">' + u.user_id.slice(0,16) + '…</span>'
+              + '<div style="display:flex;align-items:center;gap:8px">'
+              + '<div style="width:80px;height:4px;background:rgba(255,255,255,0.07);border-radius:2px;overflow:hidden">'
+              + '<div style="height:100%;width:' + Math.min(u.active_jobs/2*100,100) + '%;background:var(--teal);border-radius:2px"></div>'
+              + '</div>'
+              + '<span style="font-size:12.5px;font-weight:600;color:var(--teal)">' + u.active_jobs + ' active</span>'
+              + '</div></div>';
+          }).join('') + '</div>'
+        : '<div class="loading">No active render jobs</div>';
+    }
+
+  } catch(e) {
+    console.error('loadSecurity:', e);
+  }
+}
+
+async function unblockIp(ip) {
+  if(!confirm('Unblock IP ' + ip + '?')) return;
+  try {
+    await apiFetch('/security/blocked-ips/' + ip, {method: 'DELETE'});
+    showAlert('broadcast', 'IP ' + ip + ' unblocked', 'success');
+    loadSecurity();
+  } catch(e) {
+    alert('Failed to unblock: ' + (e.detail || e.message || e));
   }
 }
 </script>
