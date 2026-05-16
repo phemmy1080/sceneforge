@@ -1,933 +1,2698 @@
-from __future__ import annotations
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SceneForge — Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{
+  --ink:#07070E;--ink2:#0F0F1A;--ink3:#161625;--ink4:#1E1E30;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.11);
+  --gold:#C9A84C;--gold2:#E8C97A;--gold-dim:rgba(201,168,76,0.12);
+  --teal:#2DD4BF;--rose:#F87171;--violet:#A78BFA;--blue:#60A5FA;
+  --text:#F0F0FF;--text2:rgba(240,240,255,0.62);--text3:rgba(240,240,255,0.32);
+  --sb-w:240px;--transition:200ms cubic-bezier(0.4,0,0.2,1);
+  --radius:12px;--radius-sm:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Instrument Sans',sans-serif;background:var(--ink);color:var(--text);min-height:100vh;overflow-x:hidden}
+input,select,textarea,button{font-family:inherit}
+::selection{background:var(--gold-dim);color:var(--gold2)}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.12);border-radius:2px}
 
-"""
-Admin API — protected by ADMIN_SECRET_KEY header.
-"""
+/* ── LOGIN ── */
+#login-screen{min-height:100vh;display:flex;flex-direction:column;background:var(--ink);position:relative;overflow:hidden}
+#login-screen::before{content:'';position:absolute;width:600px;height:600px;background:radial-gradient(circle,rgba(201,168,76,0.05) 0%,transparent 70%);top:50%;left:50%;transform:translate(-50%,-60%);pointer-events:none}
+.login-nav{padding:20px 40px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);position:relative;z-index:1}
+.logo-mark{font-family:Syne,sans-serif;font-weight:800;font-size:18px;letter-spacing:-0.5px;color:var(--text)}
+.logo-mark em{font-style:normal;color:var(--gold)}
+.nav-chip{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--text3);border:1px solid var(--border2);padding:3px 10px;border-radius:20px;font-family:DM Mono,monospace}
+.login-body{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 20px;position:relative;z-index:1}
+.login-card{width:100%;max-width:400px}
+.login-eyebrow{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-bottom:14px;font-family:DM Mono,monospace;display:flex;align-items:center;gap:10px}
+.login-eyebrow::before{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--gold),transparent)}
+.login-title{font-family:Syne,sans-serif;font-size:38px;font-weight:800;letter-spacing:-1.5px;line-height:1.05;margin-bottom:6px}
+.login-sub{font-size:13.5px;color:var(--text3);margin-bottom:32px;line-height:1.6}
+.inp-wrap{margin-bottom:14px}
+.inp-wrap label{display:block;font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px}
+.inp-field{position:relative}
+.inp-field input{width:100%;background:var(--ink3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:14px;padding:12px 16px;outline:none;transition:border-color var(--transition),box-shadow var(--transition)}
+.inp-field input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,168,76,0.1)}
+.show-btn{position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;font-family:DM Mono,monospace;transition:color var(--transition)}
+.show-btn:hover{color:var(--text2)}
+#login-error{background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;color:var(--rose);margin-bottom:14px;display:none}
+#login-error.on{display:block}
+.login-btn{width:100%;background:linear-gradient(135deg,var(--gold),#b8952a);color:#000;border:none;border-radius:var(--radius-sm);padding:14px;font-size:14px;font-weight:700;cursor:pointer;font-family:Syne,sans-serif;letter-spacing:.03em;transition:all var(--transition);display:flex;align-items:center;justify-content:center;gap:8px}
+.login-btn:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 8px 28px rgba(201,168,76,0.25)}
+.login-divider{display:flex;align-items:center;gap:12px;margin-top:24px}
+.login-divider span{font-size:11px;color:var(--text3);white-space:nowrap;font-family:DM Mono,monospace}
+.login-divider::before,.login-divider::after{content:'';flex:1;height:1px;background:var(--border2)}
 
-import csv
-import io
-import json
-import logging
-import uuid
-from datetime import datetime, timezone
-from typing import Optional
+/* ── RESET ── */
+#reset-overlay{display:none;position:fixed;inset:0;background:rgba(7,7,14,0.92);backdrop-filter:blur(16px);z-index:9999;align-items:center;justify-content:center}
+#reset-overlay.on{display:flex}
+.reset-card{width:100%;max-width:400px;background:var(--ink2);border:1px solid var(--border2);border-radius:20px;overflow:hidden}
+.reset-head{background:linear-gradient(135deg,rgba(201,168,76,0.08),rgba(7,7,14,0));padding:28px 32px;border-bottom:1px solid var(--border)}
+.reset-body{padding:24px 32px}
+#reset-error{background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--rose);margin-bottom:14px;display:none}
+#reset-error.on{display:block}
+.strength-track{height:3px;background:rgba(255,255,255,0.07);border-radius:2px;margin-top:6px;overflow:hidden}
+.strength-fill{height:100%;border-radius:2px;transition:all .4s}
 
-from fastapi import APIRouter, HTTPException, Header, Depends
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+/* ── SHELL ── */
+#admin-shell{display:none;min-height:100vh}
+#admin-shell.on{display:flex}
 
-from app.config import get_settings
-from app.dependencies import get_redis
-from app.services import auth as auth_service
-from app.services import pricing as pricing_service
-from app.services import admin_auth as admin_auth_service
-from app.services import coupons as coupon_service
-from app.services import analytics as analytics_service
-from app.services.email import send_token_confirmation
+/* ── SIDEBAR ── */
+.sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:199;backdrop-filter:blur(4px)}
+.sb-overlay.open{display:block}
+.sb{
+  width:var(--sb-w);flex-shrink:0;
+  background:var(--ink2);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  position:fixed;top:0;bottom:0;left:0;
+  overflow-y:auto;z-index:200;
+  transition:transform var(--transition);
+}
+.sb-brand{padding:22px 20px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.sb-logo-text{font-family:Syne,sans-serif;font-weight:800;font-size:17px;letter-spacing:-0.5px}
+.sb-logo-text em{font-style:normal;color:var(--gold)}
+.sb-cmd-badge{font-family:DM Mono,monospace;font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--rose);background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.18);padding:2px 7px;border-radius:4px}
+.sb-close-btn{display:none;background:rgba(255,255,255,0.06);border:1px solid var(--border2);border-radius:7px;padding:5px;cursor:pointer;color:var(--text3)}
+.sb-close-btn svg{display:block}
+.sb-section{font-family:DM Mono,monospace;font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--text3);padding:16px 20px 6px}
+.nb{
+  width:100%;display:flex;align-items:center;gap:10px;
+  padding:9px 20px;border:none;background:none;
+  color:var(--text3);font-size:13px;cursor:pointer;text-align:left;
+  transition:all var(--transition);font-family:inherit;font-weight:500;
+  border-left:2px solid transparent;
+}
+.nb:hover{color:var(--text2);background:rgba(255,255,255,0.03)}
+.nb.on{color:var(--gold);background:rgba(201,168,76,0.08);border-left-color:var(--gold)}
+.nb-icon{width:15px;height:15px;flex-shrink:0;opacity:.55;transition:opacity var(--transition)}
+.nb:hover .nb-icon,.nb.on .nb-icon{opacity:1}
+.sb-footer{margin-top:auto;border-top:1px solid var(--border);padding:14px 16px}
+.user-pill{display:flex;align-items:center;gap:10px;padding:8px 4px;margin-bottom:10px}
+.user-av{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#7C3AED,#0891B2);display:flex;align-items:center;justify-content:center;font-family:Syne,sans-serif;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.user-info{min-width:0;flex:1}
+.user-name{font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-role{font-size:10.5px;color:var(--text3);margin-top:2px}
+.logout-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:7px;padding:8px;background:rgba(248,113,113,0.07);border:1px solid rgba(248,113,113,0.14);border-radius:8px;color:rgba(248,113,113,0.65);font-size:12px;font-weight:600;cursor:pointer;transition:all var(--transition)}
+.logout-btn:hover{background:rgba(248,113,113,0.13);color:var(--rose)}
 
-settings = get_settings()
-router = APIRouter()
-logger = logging.getLogger(__name__)
+/* ── TOPBAR (mobile) ── */
+.mobile-topbar{display:none;align-items:center;gap:12px;padding:12px 16px;background:var(--ink2);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px)}
+.hamburger{background:rgba(255,255,255,0.06);border:1px solid var(--border2);border-radius:8px;width:36px;height:36px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text2);transition:all var(--transition);flex-shrink:0}
+.hamburger:hover{background:rgba(255,255,255,0.1)}
 
-COUPON_PREFIX = "coupon:"
-BROADCAST_KEY = "admin:broadcasts"
+/* ── MAIN ── */
+.main{margin-left:var(--sb-w);flex:1;min-height:100vh;transition:margin var(--transition)}
+
+/* ── PAGE ── */
+.pg{display:none;animation:fadeUp .22s ease;padding:28px 32px}
+.pg.on{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.ph{margin-bottom:26px}
+.ph-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.ph-title{font-family:Syne,sans-serif;font-size:24px;font-weight:800;letter-spacing:-0.8px;color:var(--text)}
+.ph-sub{font-size:13px;color:var(--text3);margin-top:3px}
+.ph-actions{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ── STAT CARDS ── */
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px}
+.stat{background:var(--ink2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;position:relative;overflow:hidden;transition:border-color var(--transition),transform var(--transition)}
+.stat:hover{border-color:var(--border2);transform:translateY(-1px)}
+.stat::after{content:'';position:absolute;top:0;left:0;right:0;height:1.5px;background:linear-gradient(90deg,transparent,var(--accent,var(--gold)),transparent);opacity:.7}
+.stat.gold{--accent:var(--gold)}.stat.teal{--accent:var(--teal)}.stat.rose{--accent:var(--rose)}.stat.violet{--accent:var(--violet)}
+.stat-label{font-family:DM Mono,monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--text3);margin-bottom:10px}
+.stat-val{font-family:Syne,sans-serif;font-size:30px;font-weight:800;letter-spacing:-1.5px;line-height:1;margin-bottom:5px}
+.stat.gold .stat-val{color:var(--gold)}.stat.teal .stat-val{color:var(--teal)}.stat.rose .stat-val{color:var(--rose)}.stat.violet .stat-val{color:var(--violet)}
+.stat-meta{font-size:11.5px;color:var(--text3)}
+.stat-icon{position:absolute;bottom:14px;right:16px;opacity:.06;font-size:38px}
+
+/* ── CARDS ── */
+.card{background:var(--ink2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:18px}
+.card-hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 20px;border-bottom:1px solid var(--border);background:rgba(255,255,255,0.015)}
+.card-title{font-family:Syne,sans-serif;font-size:13.5px;font-weight:700;letter-spacing:-.3px}
+.card-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+
+/* ── TABLES ── */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;min-width:520px}
+th{text-align:left;font-family:DM Mono,monospace;font-size:9px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.13em;padding:10px 16px;border-bottom:1px solid var(--border);background:rgba(255,255,255,0.015);white-space:nowrap}
+td{padding:12px 16px;font-size:12.5px;color:var(--text2);border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,0.018)}
+
+/* ── TAGS ── */
+.tag{display:inline-flex;align-items:center;font-family:DM Mono,monospace;font-size:9.5px;font-weight:500;padding:3px 8px;border-radius:5px;letter-spacing:.04em;white-space:nowrap}
+.tag-free{background:rgba(255,255,255,0.07);color:var(--text3)}
+.tag-starter{background:rgba(167,139,250,0.1);color:var(--violet)}
+.tag-pro{background:rgba(201,168,76,0.12);color:var(--gold)}
+.tag-studio{background:rgba(45,212,191,0.1);color:var(--teal)}
+.tag-red{background:rgba(248,113,113,0.1);color:var(--rose)}
+.tag-green{background:rgba(74,222,128,0.1);color:#4ade80}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 15px;border-radius:var(--radius-sm);font-size:12.5px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all var(--transition);white-space:nowrap}
+.btn-gold{background:linear-gradient(135deg,var(--gold),#b8952a);color:#000;font-weight:700}.btn-gold:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.btn-ghost{background:rgba(255,255,255,0.06);color:var(--text2);border-color:var(--border2)}.btn-ghost:hover{background:rgba(255,255,255,0.1);color:var(--text)}
+.btn-danger{background:rgba(248,113,113,0.1);color:var(--rose);border-color:rgba(248,113,113,0.2)}.btn-danger:hover{background:rgba(248,113,113,0.18)}
+.btn-teal{background:rgba(45,212,191,0.12);color:var(--teal);border-color:rgba(45,212,191,0.22)}.btn-teal:hover{background:rgba(45,212,191,0.2)}
+.btn-sm{padding:6px 12px;font-size:11.5px;border-radius:7px}
+.btn-xs{padding:4px 10px;font-size:11px;border-radius:6px}
+
+/* ── FORMS ── */
+.field{margin-bottom:14px}
+.field label{display:block;font-family:DM Mono,monospace;font-size:9.5px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
+.field input,.field select,.field textarea{width:100%;background:var(--ink3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;padding:10px 13px;outline:none;transition:border-color var(--transition),box-shadow var(--transition)}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,168,76,0.08)}
+.field select option{background:var(--ink2)}
+.field textarea{resize:vertical;min-height:90px}
+
+/* ── ALERTS ── */
+.alert{padding:11px 16px;border-radius:var(--radius-sm);font-size:13px;margin-bottom:14px;display:none;animation:fadeUp .2s ease;border:1px solid transparent}
+.alert.on{display:block}
+.alert-ok{background:rgba(45,212,191,0.08);border-color:rgba(45,212,191,0.2);color:var(--teal)}
+.alert-err{background:rgba(248,113,113,0.08);border-color:rgba(248,113,113,0.2);color:var(--rose)}
+
+/* ── SEARCH ── */
+.search-wrap{display:flex;gap:10px;margin-bottom:16px}
+.search-inp{flex:1;background:var(--ink2);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;padding:9px 14px;outline:none;transition:border-color var(--transition)}
+.search-inp:focus{border-color:var(--gold)}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(7,7,14,0.85);backdrop-filter:blur(10px);z-index:500;display:none;align-items:center;justify-content:center;padding:16px}
+.modal-overlay.on{display:flex}
+.modal{background:var(--ink2);border:1px solid var(--border2);border-radius:18px;padding:28px;width:100%;max-width:460px;animation:fadeUp .2s ease}
+.modal-title{font-family:Syne,sans-serif;font-size:17px;font-weight:700;margin-bottom:4px;letter-spacing:-.4px}
+.modal-sub{font-size:12.5px;color:var(--text3);margin-bottom:20px}
+.modal-metas{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+.modal-meta{background:var(--ink3);border-radius:10px;padding:14px}
+.modal-meta-val{font-family:Syne,sans-serif;font-size:24px;font-weight:800;letter-spacing:-1px;margin-bottom:2px}
+.modal-meta-lbl{font-size:10.5px;color:var(--text3)}
+.modal-row{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.modal-row input,.modal-row select{flex:1;min-width:100px;background:var(--ink3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-size:12.5px;padding:9px 12px;outline:none;transition:border-color var(--transition)}
+.modal-row input:focus,.modal-row select:focus{border-color:var(--gold)}
+
+/* ── TWO-COL ── */
+.two-col{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
+.two-col .card{margin-bottom:0}
+
+/* ── PLAN GRID ── */
+.plan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:18px}
+.plan-card{background:var(--ink3);border:1px solid var(--border2);border-radius:var(--radius);padding:18px;transition:border-color var(--transition)}
+.plan-card:hover{border-color:rgba(201,168,76,0.25)}
+
+/* ── MISC ── */
+.loading{text-align:center;padding:40px;color:var(--text3);font-size:13px;font-family:DM Mono,monospace;letter-spacing:.05em}
+.log-row{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border);transition:background var(--transition)}
+.log-row:hover{background:rgba(255,255,255,0.018)}
+.log-row:last-child{border-bottom:none}
+.log-dot{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px}
+.queue-row{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border)}
+.queue-row:last-child{border-bottom:none}
+.q-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.q-bar{flex:1;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;max-width:120px}
+.q-fill{height:100%;border-radius:2px}
+.niche-grid{display:flex;flex-wrap:wrap;gap:8px;padding:16px 20px}
+.niche-chip{display:inline-flex;align-items:center;gap:8px;background:var(--ink3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:7px 12px;font-size:12px;transition:all var(--transition)}
+.niche-chip:hover{border-color:rgba(201,168,76,0.3);background:var(--gold-dim)}
+.niche-chip-del{background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px;padding:0;line-height:1;transition:color var(--transition)}
+.niche-chip-del:hover{color:var(--rose)}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.bar-label{font-size:12px;color:var(--text2);min-width:72px}
+.bar-track{flex:1;height:5px;background:rgba(255,255,255,0.07);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;transition:width .6s cubic-bezier(0.4,0,0.2,1)}
+.bar-count{font-family:DM Mono,monospace;font-size:11px;color:var(--text3);min-width:28px;text-align:right}
+
+/* ── BROADCAST ACCORDION ── */
+.bc-accordion{border-bottom:1px solid var(--border)}
+.bc-accordion:last-child{border-bottom:none}
+.bc-accordion-hdr{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;cursor:pointer;transition:background var(--transition)}
+.bc-accordion-hdr:hover{background:rgba(255,255,255,0.02)}
+.bc-accordion-body{padding:0 20px 16px;border-top:1px solid var(--border);animation:fadeUp .15s ease}
+.bc-subj{font-weight:600;font-size:13px;color:var(--text)}
+.bc-meta{font-size:11.5px;color:var(--text3);margin-top:2px}
+
+/* ── EDITOR TOOLBAR ── */
+.bc-tb-btn{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:5px;color:var(--text2);font-size:12px;padding:3px 8px;cursor:pointer;transition:all var(--transition);min-width:28px}
+.bc-tb-btn:hover{background:rgba(255,255,255,0.1);color:var(--text);border-color:rgba(255,255,255,0.18)}
+#bc-editor:empty:before{content:attr(data-placeholder);color:var(--text3);pointer-events:none;white-space:pre-wrap}
+
+/* ── RESPONSIVE ── */
+@media(max-width:1024px){
+  :root{--sb-w:220px}
+}
+@media(max-width:768px){
+  .sb{transform:translateX(-100%)}
+  .sb.open{transform:translateX(0)}
+  .sb-overlay.open{display:block}
+  .sb-close-btn{display:flex !important}
+  .main{margin-left:0}
+  .pg{padding:16px}
+  .mobile-topbar{display:flex}
+  .ph{margin-bottom:18px}
+  .ph-title{font-size:20px}
+  .ph-top{flex-direction:column;gap:10px}
+  .ph-actions{width:100%}
+  .stat-row{grid-template-columns:repeat(2,1fr);gap:10px}
+  .two-col{grid-template-columns:1fr}
+  .plan-grid{grid-template-columns:1fr}
+  .card-hdr{flex-wrap:wrap;gap:8px}
+  .modal{padding:20px 18px}
+  .modal-metas{grid-template-columns:1fr 1fr}
+  .hide-mobile{display:none}
+  .bc-accordion-hdr{padding:12px 16px}
+  .bc-accordion-body{padding:0 16px 14px}
+}
+@media(max-width:480px){
+  .stat-row{grid-template-columns:repeat(2,1fr)}
+  .login-title{font-size:30px}
+  .ph-actions .btn{font-size:11px;padding:6px 10px}
+}
+
+/* ── Broadcast AI components ────────────────────────── */
+.bc-tab{
+  padding:6px 14px;border-radius:8px;border:none;background:none;
+  color:var(--text3);font-size:12.5px;font-weight:500;cursor:pointer;
+  transition:all var(--transition);font-family:inherit;
+  display:flex;align-items:center;gap:5px;
+}
+.bc-tab.on{background:var(--ink2);color:var(--text);border:1px solid var(--border2)}
+.bc-tab:hover{color:var(--text2)}
+.bc-goal-card{
+  background:var(--ink3);border:1px solid var(--border2);border-radius:10px;
+  padding:12px;cursor:pointer;transition:all var(--transition);
+}
+.bc-goal-card:hover{border-color:rgba(201,168,76,0.3)}
+.bc-goal-card.on{border-color:var(--teal);background:rgba(45,212,191,0.06)}
+.assist-btn{
+  padding:7px 10px;background:var(--ink3);border:1px solid var(--border2);
+  border-radius:8px;color:var(--text2);font-size:12px;cursor:pointer;
+  text-align:left;transition:all var(--transition);font-family:inherit;
+  display:flex;align-items:center;gap:6px;
+}
+.assist-btn:hover{border-color:rgba(45,212,191,0.3);color:var(--teal);background:rgba(45,212,191,0.05)}
+.bc-accordion{border-bottom:1px solid var(--border)}
+.bc-accordion:last-child{border-bottom:none}
+.bc-accordion-hdr:hover{background:rgba(255,255,255,0.02)}
+.bc-tb-btn{
+  background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);
+  border-radius:5px;color:var(--text2);font-size:12px;padding:3px 8px;
+  cursor:pointer;transition:all var(--transition);min-width:28px;font-family:inherit;
+}
+.bc-tb-btn:hover{background:rgba(255,255,255,0.1);color:var(--text)}
+#bc-editor:empty:before{content:attr(data-placeholder);color:var(--text3);pointer-events:none;white-space:pre-wrap}
+#subj-suggestions{display:none;flex-direction:column;gap:6px}
+
+/* ── Emoji / symbol picker ───────────────────────── */
+.ep-tab{
+  padding:4px 10px;border-radius:7px;border:1px solid var(--border2);
+  background:var(--ink3);color:var(--text3);font-size:11px;cursor:pointer;
+  font-family:inherit;transition:all var(--transition);white-space:nowrap;
+}
+.ep-tab.on{background:rgba(201,168,76,0.12);border-color:rgba(201,168,76,0.3);color:var(--gold)}
+.ep-tab:hover{color:var(--text2)}
+.ep-btn{
+  padding:0;width:30px;height:30px;border:1px solid transparent;background:var(--ink3);
+  border-radius:7px;font-size:16px;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;transition:all var(--transition);line-height:1;
+}
+.ep-btn:hover{background:var(--ink4);border-color:var(--border2);transform:scale(1.15)}
+.ep-panel{animation:fadeUp .15s ease}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <nav class="login-nav">
+    <a href="https://sceneraforge.com" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none;color:var(--text3);font-size:12px;transition:color var(--transition)" onmouseover="this.style.color='var(--text2)'" onmouseout="this.style.color='var(--text3)'">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10 3L5 8l5 5"/></svg>Back to app
+    </a>
+    <div class="logo-mark">Scene<em>Forge</em></div>
+    <div class="nav-chip">Command Center</div>
+  </nav>
+  <div class="login-body">
+    <div class="login-card">
+      <div class="login-eyebrow">Restricted Access</div>
+      <h1 class="login-title">Admin<br>Sign in</h1>
+      <p class="login-sub">Authorised personnel only. All actions are logged and monitored.</p>
+      <div id="login-error">Invalid credentials or insufficient permissions.</div>
+      <div class="inp-wrap">
+        <label>Email address</label>
+        <div class="inp-field"><input type="email" id="admin-email" placeholder="you@example.com" autocomplete="email"></div>
+      </div>
+      <div class="inp-wrap">
+        <label>Password</label>
+        <div class="inp-field">
+          <input type="password" id="admin-pass" placeholder="••••••••••" autocomplete="current-password">
+          <button class="show-btn" onclick="togglePass()">show</button>
+        </div>
+      </div>
+      <button class="login-btn" onclick="doLogin()">
+        Access dashboard
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+      </button>
+      <div class="login-divider"><span>secured by SceneForge</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- RESET PASSWORD -->
+<div id="reset-overlay">
+  <div class="reset-card">
+    <div class="reset-head">
+      <div style="font-family:DM Mono,monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin-bottom:10px">Security Required</div>
+      <div style="font-family:Syne,sans-serif;font-size:22px;font-weight:800;letter-spacing:-.6px;margin-bottom:4px">Set your password</div>
+      <div style="font-size:13px;color:var(--text3)">Your account requires a new password before continuing.</div>
+    </div>
+    <div class="reset-body">
+      <div id="reset-error"></div>
+      <div class="field">
+        <label>New password</label>
+        <input type="password" id="reset-new" placeholder="Minimum 8 characters" oninput="updateStrength(this.value)">
+        <div class="strength-track"><div id="strength-bar" class="strength-fill" style="width:0%"></div></div>
+        <span id="strength-label" style="font-size:11px;color:var(--text3)"></span>
+      </div>
+      <div class="field">
+        <label>Confirm password</label>
+        <input type="password" id="reset-confirm" placeholder="Repeat password">
+      </div>
+      <button class="btn btn-gold" style="width:100%;justify-content:center;margin-top:4px" onclick="doResetPassword()">Set password &amp; continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN SHELL -->
+<div id="admin-shell">
+  <div class="sb-overlay" id="sb-overlay" onclick="toggleSidebar()"></div>
+  <aside class="sb" id="sidebar">
+    <div class="sb-brand">
+      <div>
+        <div class="sb-logo-text">Scene<em>Forge</em></div>
+        <div class="sb-cmd-badge" style="margin-top:5px;display:inline-block">Command Center</div>
+      </div>
+      <button class="sb-close-btn" id="sb-close-btn" onclick="toggleSidebar()" aria-label="Close sidebar">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3l10 10M13 3L3 13"/></svg>
+      </button>
+    </div>
+
+    <div class="sb-section">Overview</div>
+    <button class="nb on" id="nb-dashboard" onclick="nav('dashboard',this)">
+      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
+      Dashboard
+    </button>
+    <button class="nb" id="nb-analytics" onclick="nav('analytics',this)">
+      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="2,12 5,7 8,9 11,5 14,8"/></svg>
+      Analytics
+    </button>
+
+    <div class="sb-section" id="sec-users">Users</div>
+    <button class="nb" id="nb-users" onclick="nav('users',this)">
+      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="5" r="2.5"/><path d="M1 14c0-3 2.2-5 5-5M11 8v6M14 11h-6"/></svg>
+      All users
+    </button>
+    <button class="nb" id="nb-topup" onclick="nav('topup',this)">
+      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v6M5 8h6"/></svg>
+      Token top-up
+    </button>
+    <button class="nb" id="nb-broadcast" onclick="nav('broadcast',this)">
+      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 6h12v7a1 1 0 01-1 1H3a1 1 0 01-1-1z"/><path d="M2 6l6-4 6 4"/></svg>
+      Broadcast
+    </button>
+
+    <div class="sb-section" id="sec-revenue">Revenue</div>
+    <button class="nb" id="nb-revenue" onclick="nav('revenue',this)">
+      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="2,13 5,8 8,10 11,5 14,7"/><path d="M2 13h12"/></svg>
+      Revenue chart
+    </button>
+    <button class="nb" id="nb-tx" onclick="nav('tx',this)">
+      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="12" height="9" rx="1.5"/><path d="M2 7h12"/></svg>
+      Transactions
+    </button>
+    <button class="nb" id="nb-pricing" onclick="nav('pricing',this)">
+      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v5.5M6 6.5h2.5a1 1 0 010 2H7a1 1 0 000 2h2.5"/></svg>
+      Pricing
+    </button>
+    <button class="nb" id="nb-niches" onclick="nav('niches',this)">
+      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2"/><path d="M8 2v2M8 12v2M2 8h2M12 8h2"/></svg>
+      Niches
+    </button>
+    <button class="nb" id="nb-coupons" onclick="nav('coupons',this)">
+      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="12" height="6" rx="1"/><path d="M6 5v6M10 5v6"/></svg>
+      Coupons
+    </button>
+
+    <div class="sb-section" id="sec-system">System</div>
+    <button class="nb" id="nb-costs" onclick="nav('costs',this)">
+      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 4v2M8 10v2M5 6.5h4a1 1 0 010 2H6a1 1 0 000 2h4"/></svg>
+      Cost & margin
+    </button>
+    <button class="nb" id="nb-audit" onclick="nav('audit',this)">
+      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3h10v10H3z"/><path d="M6 6h4M6 9h3"/></svg>
+      Audit trail
+    </button>
+    <button class="nb" id="nb-queue" onclick="nav('queue',this)">
+      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
+      Render queue
+    </button>
+    <button class="nb" id="nb-logs" onclick="nav('logs',this)">
+      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4h10M3 8h7M3 12h5"/></svg>
+      Activity logs
+    </button>
+    <button class="nb" id="nb-feedback" onclick="nav('feedback',this)">
+      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H2a1 1 0 00-1 1v8a1 1 0 001 1h3l3 3 3-3h3a1 1 0 001-1V3a1 1 0 00-1-1z"/><path d="M5 7h6M5 5h4"/></svg>
+      User feedback
+    </button>
+    <div class="sb-section" id="sec-admins" style="display:none">Access</div>
+    <button class="nb" id="nb-admins" style="display:none" onclick="nav('admins',this)">
+      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 8a3 3 0 100-6 3 3 0 000 6z"/><path d="M2 14s1-4 6-4 6 4 6 4"/></svg>
+      Admin users
+    </button>
+
+    <div class="sb-footer">
+      <div class="user-pill">
+        <div class="user-av" id="sb-av">SA</div>
+        <div class="user-info">
+          <div class="user-name" id="sb-name">Admin</div>
+          <div class="user-role" id="sb-role"></div>
+        </div>
+      </div>
+      <button class="logout-btn" onclick="doLogout()">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 3H3a1 1 0 00-1 1v8a1 1 0 001 1h3M10 11l4-3-4-3M14 8H6"/></svg>
+        Sign out
+      </button>
+    </div>
+  </aside>
+
+  <main class="main" id="main-content">
+    <!-- Mobile topbar -->
+    <div class="mobile-topbar" id="mobile-topbar">
+      <button class="hamburger" onclick="toggleSidebar()" aria-label="Open menu">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 5h16M2 10h16M2 15h16"/></svg>
+      </button>
+      <div class="sb-logo-text" style="font-size:15px">Scene<em>Forge</em></div>
+      <div id="mobile-role-badge" style="margin-left:auto;font-size:10px;color:var(--gold);background:rgba(201,168,76,0.1);border:1px solid rgba(201,168,76,0.18);border-radius:20px;padding:3px 10px;font-family:DM Mono,monospace;letter-spacing:.06em"></div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div class="pg on" id="pg-dashboard">
+      <div class="ph">
+        <div class="ph-top">
+          <div>
+            <div class="ph-title">Dashboard</div>
+            <div class="ph-sub">Real-time platform overview</div>
+          </div>
+          <div class="ph-actions">
+            <button class="btn btn-ghost btn-sm" onclick="loadDash()">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 8a6 6 0 0112 0M14 4v4h-4"/></svg>
+              Refresh
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="stat-row" id="stats-grid">
+        <div class="stat gold"><div class="stat-label">Total users</div><div class="stat-val">—</div><div class="stat-meta">Registered accounts</div><div class="stat-icon">👤</div></div>
+        <div class="stat teal"><div class="stat-label">Videos created</div><div class="stat-val">—</div><div class="stat-meta">All-time renders</div><div class="stat-icon">🎬</div></div>
+        <div class="stat rose"><div class="stat-label">Transactions</div><div class="stat-val">—</div><div class="stat-meta">Paid purchases</div><div class="stat-icon">💳</div></div>
+        <div class="stat violet"><div class="stat-label">Tokens in use</div><div class="stat-val">—</div><div class="stat-meta">Circulation balance</div><div class="stat-icon">🪙</div></div>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><span class="card-title">Recent users</span></div>
+        <div id="recent-body"><div class="loading"></div></div>
+      </div>
+    </div>
+
+    <!-- ANALYTICS -->
+    <div class="pg" id="pg-analytics">
+      <div class="ph">
+        <div class="ph-top">
+          <div><div class="ph-title">Analytics</div><div class="ph-sub">Content trends and platform usage</div></div>
+          <div class="ph-actions">
+            <button class="btn btn-ghost btn-sm" onclick="exportAnalyticsExcel()">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 2h7l3 3v9H3z"/><path d="M10 2v4h4"/><path d="M5 9l2 2 4-4"/></svg>
+              Export Excel
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="two-col" style="margin-bottom:18px">
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Top niches</span></div>
+          <div id="niches-analytics" style="padding:18px 20px"><div class="loading"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Plan distribution</span></div>
+          <div id="plans-analytics" style="padding:18px 20px"><div class="loading"></div></div>
+        </div>
+      </div>
+      <div class="stat-row" style="grid-template-columns:repeat(3,1fr)" id="metrics-row">
+        <div class="stat teal"><div class="stat-label">Avg scenes/video</div><div class="stat-val" id="m-avg">—</div></div>
+        <div class="stat violet"><div class="stat-label">Total scenes</div><div class="stat-val" id="m-scenes">—</div></div>
+        <div class="stat gold"><div class="stat-label">Total videos</div><div class="stat-val" id="m-videos">—</div></div>
+      </div>
+    </div>
+
+    <!-- USERS -->
+    <div class="pg" id="pg-users">
+      <div class="ph">
+        <div class="ph-top">
+          <div><div class="ph-title">Users</div><div class="ph-sub">Manage all registered accounts</div></div>
+          <div class="ph-actions">
+            <button class="btn btn-ghost btn-sm" onclick="exportCSV()">Export CSV</button>
+            <button class="btn btn-ghost btn-sm" onclick="loadUsers()">Refresh</button>
+          </div>
+        </div>
+      </div>
+      <div class="search-wrap">
+        <input class="search-inp" type="text" id="user-search" placeholder="Search by name or email..." oninput="filterUsers()">
+      </div>
+      <div id="alert-users" class="alert"></div>
+      <div class="card">
+        <div class="tbl-wrap"><table><thead><tr>
+          <th style="width:30%">User</th><th style="width:14%">Plan</th>
+          <th style="width:13%">Tokens</th><th style="width:8%">Videos</th>
+          <th style="width:12%">Joined</th><th style="width:14%">Actions</th>
+        </tr></thead>
+        <tbody id="users-tbody"><tr><td colspan="6"><div class="loading"></div></td></tr></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- TOKEN TOP-UP -->
+    <div class="pg" id="pg-topup">
+      <div class="ph"><div class="ph-title">Token top-up</div><div class="ph-sub">Manually credit tokens to any user account</div></div>
+      <div id="alert-topup" class="alert"></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px">
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Credit tokens</span></div>
+          <div style="padding:20px">
+            <div class="field"><label>User ID or email</label><input type="text" id="topup-user" placeholder="Enter email or user ID"></div>
+            <div class="field"><label>Tokens to add</label><input type="number" id="topup-amount" value="500" min="1"></div>
+            <div class="field"><label>Reason / note</label><input type="text" id="topup-reason" placeholder="e.g. Goodwill, refund, promo"></div>
+            <button class="btn btn-teal" style="width:100%;justify-content:center" onclick="doTopUp()">Credit tokens</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Quick presets</span></div>
+          <div style="padding:20px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <button class="btn btn-ghost" onclick="setTopup(100)" style="flex-direction:column;height:70px;gap:3px">
+              <span style="font-family:Syne,sans-serif;font-size:20px;font-weight:800;color:var(--gold)">100</span>
+              <span style="font-size:11px;color:var(--text3)">tokens</span>
+            </button>
+            <button class="btn btn-ghost" onclick="setTopup(500)" style="flex-direction:column;height:70px;gap:3px">
+              <span style="font-family:Syne,sans-serif;font-size:20px;font-weight:800;color:var(--gold)">500</span>
+              <span style="font-size:11px;color:var(--text3)">tokens</span>
+            </button>
+            <button class="btn btn-ghost" onclick="setTopup(1000)" style="flex-direction:column;height:70px;gap:3px">
+              <span style="font-family:Syne,sans-serif;font-size:20px;font-weight:800;color:var(--gold)">1,000</span>
+              <span style="font-size:11px;color:var(--text3)">tokens</span>
+            </button>
+            <button class="btn btn-ghost" onclick="setTopup(3500)" style="flex-direction:column;height:70px;gap:3px">
+              <span style="font-family:Syne,sans-serif;font-size:20px;font-weight:800;color:var(--gold)">3,500</span>
+              <span style="font-size:11px;color:var(--text3)">tokens</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BROADCAST -->
+    <div class="pg" id="pg-broadcast">
+      <div class="ph">
+        <div class="ph-top">
+          <div><div class="ph-title">Email broadcast</div><div class="ph-sub">AI-powered campaigns and writing assistant</div></div>
+          <div class="ph-actions">
+            <button class="btn btn-ghost btn-sm" onclick="loadBroadcasts()">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 8a6 6 0 0112 0M14 4v4h-4"/></svg>
+              Refresh history
+            </button>
+          </div>
+        </div>
+      </div>
+      <div id="alert-broadcast" class="alert"></div>
+
+      <div style="display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:start">
+
+        <!-- LEFT: Compose + AI Campaign -->
+        <div>
+
+          <!-- Tab switcher -->
+          <div style="display:flex;gap:2px;background:var(--ink3);border-radius:10px;padding:3px;margin-bottom:16px;width:fit-content">
+            <button id="bctab-compose" class="bc-tab on" onclick="switchBcTab('compose')">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" style="vertical-align:-1px"><path d="M12 2l2 2-9 9H3v-2z"/></svg>
+              Compose
+            </button>
+            <button id="bctab-campaign" class="bc-tab" onclick="switchBcTab('campaign')">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" style="vertical-align:-1px"><path d="M8 2l1.5 3 3.5.5-2.5 2.5.5 3.5L8 10l-3 1.5.5-3.5L3 5.5l3.5-.5z"/></svg>
+              AI Campaign
+            </button>
+          </div>
+
+          <!-- COMPOSE TAB -->
+          <div id="bcpanel-compose">
+
+            <!-- Target -->
+            <div class="card" style="margin-bottom:14px">
+              <div class="card-hdr"><span class="card-title">Send to</span></div>
+              <div style="padding:14px 16px;display:flex;gap:6px;flex-wrap:wrap">
+                <button id="bt-all"    class="btn btn-teal btn-sm" onclick="setBcTarget('all')">🌐 All users</button>
+                <button id="bt-plan"   class="btn btn-ghost btn-sm" onclick="setBcTarget('plan')">📋 By plan</button>
+                <button id="bt-user"   class="btn btn-ghost btn-sm" onclick="setBcTarget('user')">👤 One user</button>
+                <button id="bt-upload" class="btn btn-ghost btn-sm" onclick="setBcTarget('upload')">📩 Upload CSV</button>
+              </div>
+              <div id="bc-plan-row" style="display:none;padding:0 16px 14px">
+                <div class="field" style="margin:0"><label>Plan</label>
+                  <select id="bc-plan">
+                    <option value="free">Free</option><option value="starter">Starter</option>
+                    <option value="pro">Pro</option><option value="studio">Studio</option>
+                  </select>
+                </div>
+              </div>
+              <div id="bc-user-row" style="display:none;padding:0 16px 14px">
+                <div class="field" style="margin:0"><label>User ID or email</label>
+                  <input type="text" id="bc-user-id" placeholder="UUID or user@email.com">
+                </div>
+              </div>
+              <div id="bc-upload-row" style="display:none;padding:0 16px 14px">
+                <div style="border:2px dashed rgba(255,255,255,0.1);border-radius:10px;padding:16px;text-align:center;cursor:pointer"
+                  onclick="document.getElementById('bc-csv-input').click()"
+                  ondragover="event.preventDefault();this.style.borderColor='var(--gold)'"
+                  ondragleave="this.style.borderColor='rgba(255,255,255,0.1)'"
+                  ondrop="bcHandleDrop(event)">
+                  <input type="file" id="bc-csv-input" accept=".csv,.txt" style="display:none" onchange="bcReadFile(this.files[0])">
+                  <div style="font-size:11px;color:var(--text2)">Drop CSV/TXT or click to browse</div>
+                </div>
+                <div id="bc-upload-status" style="display:none;font-size:12px;color:var(--teal);margin-top:8px"></div>
+                <textarea id="bc-email-list" rows="3" placeholder="Or paste emails: user@a.com, user@b.com" style="margin-top:8px;width:100%;background:var(--ink3);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-size:12px;padding:9px 12px;outline:none;resize:vertical"></textarea>
+              </div>
+            </div>
+
+            <!-- Subject + AI suggestions -->
+            <div class="card" style="margin-bottom:14px">
+              <div class="card-hdr">
+                <span class="card-title">Subject line</span>
+                <button class="btn btn-ghost btn-xs" onclick="generateSubjectSuggestions()" id="subj-gen-btn">
+                  <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" style="vertical-align:-1px"><path d="M8 2l1.5 3 3.5.5-2.5 2.5.5 3.5L8 10l-3 1.5.5-3.5L3 5.5l3.5-.5z"/></svg>
+                  AI suggest
+                </button>
+              </div>
+              <div style="padding:12px 16px">
+                <input type="text" id="bc-subject" placeholder="e.g. Big news from SceneForge!" style="width:100%;background:var(--ink3);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-size:13px;padding:10px 13px;outline:none">
+                <div id="subj-suggestions" style="display:none;margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
+              </div>
+            </div>
+
+            <!-- Body editor -->
+            <div class="card" style="margin-bottom:14px">
+              <div class="card-hdr">
+                <span class="card-title">Message body</span>
+                <div style="display:flex;gap:6px">
+                  <button class="btn btn-ghost btn-xs" onclick="toggleBcPreview()">👁 Preview</button>
+                  <button class="btn btn-ghost btn-xs" onclick="bcClear()">✕ Clear</button>
+                </div>
+              </div>
+              <div style="padding:12px 16px 0">
+                <!-- Toolbar -->
+                <div style="display:flex;align-items:center;gap:4px;padding:7px 10px;background:var(--ink3);border:1px solid var(--border2);border-top-left-radius:9px;border-top-right-radius:9px;flex-wrap:wrap">
+                  <button class="bc-tb-btn" onclick="bcFormat('bold')"><b>B</b></button>
+                  <button class="bc-tb-btn" onclick="bcFormat('italic')"><i>I</i></button>
+                  <button class="bc-tb-btn" onclick="bcFormat('underline')"><u>U</u></button>
+                  <div style="width:1px;height:16px;background:var(--border2);margin:0 2px"></div>
+                  <button class="bc-tb-btn" id="ls-bullet" onclick="setListStyle('bullet',this)" title="Bullet list">• List</button>
+                  <button class="bc-tb-btn" id="ls-square" onclick="setListStyle('square',this)" title="Square list">▪ List</button>
+                  <div style="width:1px;height:16px;background:var(--border2);margin:0 2px"></div>
+                  <select onchange="bcFormat('fontSize',this.value);this.selectedIndex=0" style="background:var(--ink3);border:1px solid var(--border2);border-radius:5px;color:var(--text2);font-size:11px;padding:2px 4px;outline:none;cursor:pointer">
+                    <option value="">Size</option><option value="1">Small</option><option value="3">Normal</option><option value="5">Large</option><option value="7">Huge</option>
+                  </select>
+                  <div style="width:1px;height:16px;background:var(--border2);margin:0 2px"></div>
+                  <button class="bc-tb-btn" onclick="bcInsertLink()">🔗</button>
+                  <button class="bc-tb-btn" onclick="bcInsertTag()" style="font-size:10px">{{name}}</button>
+                  <div style="width:1px;height:16px;background:var(--border2);margin:0 2px"></div>
+                  <div style="position:relative">
+                    <button class="bc-tb-btn" onclick="toggleEmojiPicker(event)" title="Add attention icons, emojis and symbols" style="font-size:12px;padding:3px 8px;display:flex;align-items:center;gap:4px">✦ Icons</button>
+                    <div id="emoji-picker" style="display:none;position:absolute;top:calc(100% + 6px);left:0;background:var(--ink2);border:1px solid var(--border2);border-radius:12px;padding:12px;z-index:999;width:300px;box-shadow:0 8px 32px rgba(0,0,0,0.5)">
+                      <div style="display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap">
+                        <button class="ep-tab on" onclick="switchEpTab('attention',this)">👁 Attention</button>
+                        <button class="ep-tab" onclick="switchEpTab('visual',this)">🎨 Visual</button>
+                        <button class="ep-tab" onclick="switchEpTab('decorative',this)">✨ Decor</button>
+                        <button class="ep-tab" onclick="switchEpTab('emphasis',this)">⚡ Emphasis</button>
+                      </div>
+                      <div id="ep-attention" class="ep-panel" style="display:grid;grid-template-columns:repeat(8,1fr);gap:4px">
+                        <button class="ep-btn" onclick="insertSymbol('🚨')" title="Alert">🚨</button>
+                        <button class="ep-btn" onclick="insertSymbol('⚠️')" title="Warning">⚠️</button>
+                        <button class="ep-btn" onclick="insertSymbol('📢')" title="Announce">📢</button>
+                        <button class="ep-btn" onclick="insertSymbol('🔔')" title="Bell">🔔</button>
+                        <button class="ep-btn" onclick="insertSymbol('👀')" title="Eyes">👀</button>
+                        <button class="ep-btn" onclick="insertSymbol('👇')" title="Point down">👇</button>
+                        <button class="ep-btn" onclick="insertSymbol('👆')" title="Point up">👆</button>
+                        <button class="ep-btn" onclick="insertSymbol('➡️')" title="Right">➡️</button>
+                        <button class="ep-btn" onclick="insertSymbol('‼️')" title="Important">‼️</button>
+                        <button class="ep-btn" onclick="insertSymbol('❗')" title="Exclaim">❗</button>
+                        <button class="ep-btn" onclick="insertSymbol('🔴')" title="Red dot">🔴</button>
+                        <button class="ep-btn" onclick="insertSymbol('🟡')" title="Yellow dot">🟡</button>
+                        <button class="ep-btn" onclick="insertSymbol('🟢')" title="Green dot">🟢</button>
+                        <button class="ep-btn" onclick="insertSymbol('📌')" title="Pin">📌</button>
+                        <button class="ep-btn" onclick="insertSymbol('🎯')" title="Target">🎯</button>
+                        <button class="ep-btn" onclick="insertSymbol('🔑')" title="Key">🔑</button>
+                      </div>
+                      <div id="ep-visual" class="ep-panel" style="display:none;grid-template-columns:repeat(8,1fr);gap:4px">
+                        <button class="ep-btn" onclick="insertSymbol('✅')" title="Check">✅</button>
+                        <button class="ep-btn" onclick="insertSymbol('❌')" title="Cross">❌</button>
+                        <button class="ep-btn" onclick="insertSymbol('🎬')" title="Video">🎬</button>
+                        <button class="ep-btn" onclick="insertSymbol('🎥')" title="Camera">🎥</button>
+                        <button class="ep-btn" onclick="insertSymbol('🚀')" title="Launch">🚀</button>
+                        <button class="ep-btn" onclick="insertSymbol('💡')" title="Idea">💡</button>
+                        <button class="ep-btn" onclick="insertSymbol('🏆')" title="Trophy">🏆</button>
+                        <button class="ep-btn" onclick="insertSymbol('💰')" title="Money">💰</button>
+                        <button class="ep-btn" onclick="insertSymbol('🎁')" title="Gift">🎁</button>
+                        <button class="ep-btn" onclick="insertSymbol('📈')" title="Growth">📈</button>
+                        <button class="ep-btn" onclick="insertSymbol('⏰')" title="Time">⏰</button>
+                        <button class="ep-btn" onclick="insertSymbol('🔥')" title="Hot">🔥</button>
+                        <button class="ep-btn" onclick="insertSymbol('💎')" title="Premium">💎</button>
+                        <button class="ep-btn" onclick="insertSymbol('🌟')" title="Star">🌟</button>
+                        <button class="ep-btn" onclick="insertSymbol('💪')" title="Strong">💪</button>
+                        <button class="ep-btn" onclick="insertSymbol('🎉')" title="Celebrate">🎉</button>
+                      </div>
+                      <div id="ep-decorative" class="ep-panel" style="display:none;grid-template-columns:repeat(8,1fr);gap:4px">
+                        <button class="ep-btn" onclick="insertSymbol('✨')" title="Sparkles">✨</button>
+                        <button class="ep-btn" onclick="insertSymbol('⭐')" title="Star">⭐</button>
+                        <button class="ep-btn" onclick="insertSymbol('🌈')" title="Rainbow">🌈</button>
+                        <button class="ep-btn" onclick="insertSymbol('💫')" title="Dizzy">💫</button>
+                        <button class="ep-btn" onclick="insertSymbol('🌸')" title="Blossom">🌸</button>
+                        <button class="ep-btn" onclick="insertSymbol('🦋')" title="Butterfly">🦋</button>
+                        <button class="ep-btn" onclick="insertSymbol('💜')" title="Heart">💜</button>
+                        <button class="ep-btn" onclick="insertSymbol('🧡')" title="Heart">🧡</button>
+                        <button class="ep-btn" onclick="insertSymbol('•')" title="Bullet">•</button>
+                        <button class="ep-btn" onclick="insertSymbol('◆')" title="Diamond">◆</button>
+                        <button class="ep-btn" onclick="insertSymbol('▸')" title="Arrow">▸</button>
+                        <button class="ep-btn" onclick="insertSymbol('»')" title="Angle">»</button>
+                        <button class="ep-btn" onclick="insertSymbol('✦')" title="4-point star">✦</button>
+                        <button class="ep-btn" onclick="insertSymbol('★')" title="Star">★</button>
+                        <button class="ep-btn" onclick="insertSymbol('☑️')" title="Check box">☑️</button>
+                        <button class="ep-btn" onclick="insertSymbol('🎀')" title="Ribbon">🎀</button>
+                      </div>
+                      <div id="ep-emphasis" class="ep-panel" style="display:none;grid-template-columns:repeat(8,1fr);gap:4px">
+                        <button class="ep-btn" onclick="insertSymbol('⚡')" title="Lightning">⚡</button>
+                        <button class="ep-btn" onclick="insertSymbol('💥')" title="Boom">💥</button>
+                        <button class="ep-btn" onclick="insertSymbol('‼️')" title="Double !">‼️</button>
+                        <button class="ep-btn" onclick="insertSymbol('⁉️')" title="!?">⁉️</button>
+                        <button class="ep-btn" onclick="insertSymbol('🆕')" title="New">🆕</button>
+                        <button class="ep-btn" onclick="insertSymbol('🆓')" title="Free">🆓</button>
+                        <button class="ep-btn" onclick="insertSymbol('🔝')" title="Top">🔝</button>
+                        <button class="ep-btn" onclick="insertSymbol('💯')" title="100%">💯</button>
+                        <button class="ep-btn" onclick="insertSymbol('🏅')" title="Medal">🏅</button>
+                        <button class="ep-btn" onclick="insertSymbol('📣')" title="Megaphone">📣</button>
+                        <button class="ep-btn" onclick="insertSymbol('🔮')" title="Crystal">🔮</button>
+                        <button class="ep-btn" onclick="insertSymbol('🧲')" title="Magnet">🧲</button>
+                        <button class="ep-btn" onclick="insertSymbol('🎪')" title="Event">🎪</button>
+                        <button class="ep-btn" onclick="insertSymbol('🏋️')" title="Lift">🏋️</button>
+                        <button class="ep-btn" onclick="insertSymbol('🎙️')" title="Mic">🎙️</button>
+                        <button class="ep-btn" onclick="insertSymbol('📡')" title="Broadcast">📡</button>
+                      </div>
+                      <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
+                        <input id="ep-search" type="text" placeholder="Search symbols..." oninput="searchSymbols(this.value)"
+                          style="width:100%;background:var(--ink3);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:12px;padding:6px 10px;outline:none">
+                        <div id="ep-search-results" style="display:none;margin-top:6px;display:grid;grid-template-columns:repeat(8,1fr);gap:4px;max-height:64px;overflow-y:auto"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div style="margin-left:auto;display:flex;gap:4px">
+                    <button class="bc-tb-btn" onclick="bcFormat('undo')">↺</button>
+                    <button class="bc-tb-btn" onclick="bcFormat('redo')">↻</button>
+                  </div>
+                </div>
+                <div id="bc-editor" contenteditable="true"
+                  style="min-height:140px;padding:12px 14px;background:var(--ink3);border:1px solid var(--border2);border-top:none;border-bottom-left-radius:9px;border-bottom-right-radius:9px;font-size:13px;color:var(--text);outline:none;line-height:1.7"
+                  data-placeholder="Hi {{name}},&#10;&#10;We have exciting news...&#10;&#10;— SceneForge Team"
+                  oninput="bcEditorInput();checkAiHints()"></div>
+              </div>
+
+              <!-- AI inline suggestion bar -->
+              <div id="bc-ai-hint" style="display:none;margin:8px 16px;padding:9px 12px;background:rgba(45,212,191,0.07);border:1px solid rgba(45,212,191,0.2);border-radius:9px;display:none;align-items:center;gap:10px">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--teal)" stroke-width="1.8"><path d="M8 2l1.5 3 3.5.5-2.5 2.5.5 3.5L8 10l-3 1.5.5-3.5L3 5.5l3.5-.5z"/></svg>
+                <span id="bc-ai-hint-text" style="font-size:12px;color:var(--teal);flex:1"></span>
+                <button class="btn btn-teal btn-xs" onclick="applyAiHint()" id="bc-ai-hint-apply">Apply</button>
+                <button onclick="document.getElementById('bc-ai-hint').style.display='none'" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;line-height:1">×</button>
+              </div>
+
+              <!-- Preview -->
+              <div id="bc-preview-wrap" style="display:none;margin:8px 16px 12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:9px;padding:14px">
+                <div style="font-size:10px;color:var(--teal);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em;font-weight:600">👁 Preview ({{name}} = "Creator")</div>
+                <div id="bc-preview-body" style="font-size:13px;color:var(--text2);line-height:1.7"></div>
+              </div>
+
+              <div style="padding:0 16px 16px;margin-top:4px">
+                <button class="btn btn-gold" style="width:100%;justify-content:center;font-size:14px" onclick="doBroadcast()">
+                  Send broadcast →
+                </button>
+                <p style="font-size:11px;color:var(--text3);text-align:center;margin-top:8px">Suspended accounts are always skipped</p>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- CAMPAIGN TAB -->
+          <div id="bcpanel-campaign" style="display:none">
+            <div class="card" style="margin-bottom:14px">
+              <div class="card-hdr"><span class="card-title">Choose campaign goal</span></div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:14px">
+                <div class="bc-goal-card on" data-goal="re-engage" onclick="selectCampaignGoal(this)">
+                  <div style="font-size:18px;margin-bottom:5px">🔄</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Re-engage inactive</div>
+                  <div style="font-size:11px;color:var(--text3);line-height:1.4">Win back users silent for 14+ days</div>
+                </div>
+                <div class="bc-goal-card" data-goal="upgrade" onclick="selectCampaignGoal(this)">
+                  <div style="font-size:18px;margin-bottom:5px">⬆️</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Promote upgrade</div>
+                  <div style="font-size:11px;color:var(--text3);line-height:1.4">Convert Free users to paid plan</div>
+                </div>
+                <div class="bc-goal-card" data-goal="feature" onclick="selectCampaignGoal(this)">
+                  <div style="font-size:18px;margin-bottom:5px">📢</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Feature launch</div>
+                  <div style="font-size:11px;color:var(--text3);line-height:1.4">Announce a new product feature</div>
+                </div>
+                <div class="bc-goal-card" data-goal="thankyou" onclick="selectCampaignGoal(this)">
+                  <div style="font-size:18px;margin-bottom:5px">❤️</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Thank you</div>
+                  <div style="font-size:11px;color:var(--text3);line-height:1.4">Appreciate paying subscribers</div>
+                </div>
+                <div class="bc-goal-card" data-goal="promo" onclick="selectCampaignGoal(this)">
+                  <div style="font-size:18px;margin-bottom:5px">🏷️</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Promo code</div>
+                  <div style="font-size:11px;color:var(--text3);line-height:1.4">Send a limited-time discount</div>
+                </div>
+                <div class="bc-goal-card" data-goal="tips" onclick="selectCampaignGoal(this)">
+                  <div style="font-size:18px;margin-bottom:5px">🎓</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Tips & tutorial</div>
+                  <div style="font-size:11px;color:var(--text3);line-height:1.4">Educational content to boost usage</div>
+                </div>
+              </div>
+
+              <div style="padding:0 16px 6px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div class="field" style="margin:0">
+                  <label>Tone</label>
+                  <select id="camp-tone">
+                    <option value="friendly">Friendly &amp; conversational</option>
+                    <option value="professional">Professional &amp; formal</option>
+                    <option value="excited">Excited &amp; energetic</option>
+                    <option value="personal">Personal &amp; heartfelt</option>
+                  </select>
+                </div>
+                <div class="field" style="margin:0">
+                  <label>Target segment</label>
+                  <select id="camp-segment">
+                    <option value="all">All users</option>
+                    <option value="free">Free plan only</option>
+                    <option value="starter">Starter plan only</option>
+                    <option value="pro">Pro plan only</option>
+                    <option value="studio">Studio plan only</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style="padding:12px 16px">
+                <div class="field" style="margin-bottom:12px">
+                  <label>Extra context (optional)</label>
+                  <input type="text" id="camp-context" placeholder="e.g. We launched Ken Burns motion effects last week">
+                </div>
+                <button class="btn btn-gold" style="width:100%;justify-content:center" onclick="generateCampaign()" id="gen-camp-btn">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" style="vertical-align:-1px"><path d="M8 2l1.5 3 3.5.5-2.5 2.5.5 3.5L8 10l-3 1.5.5-3.5L3 5.5l3.5-.5z"/></svg>
+                  Generate full campaign
+                </button>
+              </div>
+            </div>
+
+            <!-- Generated result -->
+            <div id="camp-result" style="display:none">
+              <div class="card" style="margin-bottom:14px">
+                <div class="card-hdr">
+                  <span class="card-title">Generated campaign</span>
+                  <button class="btn btn-teal btn-sm" onclick="useCampaign()">Use this campaign →</button>
+                </div>
+                <div style="padding:14px 16px">
+                  <div style="font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Subject line</div>
+                  <div id="camp-result-subject" style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:14px;padding:10px 12px;background:var(--ink3);border-radius:8px;border:1px solid var(--border2)"></div>
+                  <div style="font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Email body</div>
+                  <div id="camp-result-body" style="font-size:13px;color:var(--text2);line-height:1.7;padding:12px 14px;background:var(--ink3);border-radius:8px;border:1px solid var(--border2);white-space:pre-wrap;max-height:260px;overflow-y:auto"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- RIGHT: AI Assistant + Send time + History -->
+        <div style="display:flex;flex-direction:column;gap:14px">
+
+          <!-- AI Writing Assistant -->
+          <div class="card">
+            <div class="card-hdr">
+              <span class="card-title">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="var(--teal)" stroke-width="1.8" style="vertical-align:-1px;margin-right:4px"><path d="M8 2l1.5 3 3.5.5-2.5 2.5.5 3.5L8 10l-3 1.5.5-3.5L3 5.5l3.5-.5z"/></svg>
+                AI writing assistant
+              </span>
+              <span style="font-size:10px;color:var(--teal);background:rgba(45,212,191,0.1);border:1px solid rgba(45,212,191,0.2);border-radius:100px;padding:2px 8px">✦ Active</span>
+            </div>
+            <div style="padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
+              <button class="assist-btn" onclick="assistAction('shorten')">✂️ Shorten</button>
+              <button class="assist-btn" onclick="assistAction('emotional')">❤️ More emotional</button>
+              <button class="assist-btn" onclick="assistAction('cta')">⚡ Stronger CTA</button>
+              <button class="assist-btn" onclick="assistAction('rewrite')">🔄 Rewrite</button>
+              <button class="assist-btn" onclick="assistAction('simplify')">💡 Simplify</button>
+              <button class="assist-btn" onclick="assistAction('urgent')">🔥 More urgent</button>
+            </div>
+            <div style="padding:0 10px 10px;display:flex;gap:6px">
+              <input type="text" id="assist-input" placeholder="Ask AI anything about the email..." style="flex:1;background:var(--ink3);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:12px;padding:8px 11px;outline:none" onkeydown="if(event.key==='Enter')assistCustom()">
+              <button class="btn btn-teal btn-sm" onclick="assistCustom()">→</button>
+            </div>
+            <div id="assist-result" style="display:none;margin:0 10px 10px;padding:10px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px">
+              <div style="font-size:10.5px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">AI suggestion</div>
+              <div id="assist-result-text" style="font-size:12.5px;color:var(--text2);line-height:1.6;max-height:120px;overflow-y:auto"></div>
+              <div style="display:flex;gap:6px;margin-top:8px">
+                <button class="btn btn-teal btn-xs" onclick="applyAssistResult()" style="flex:1">Apply →</button>
+                <button class="btn btn-ghost btn-xs" onclick="document.getElementById('assist-result').style.display='none'">Dismiss</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Send time optimiser -->
+          <div class="card">
+            <div class="card-hdr">
+              <span class="card-title">⏰ Best time to send</span>
+            </div>
+            <div style="padding:12px 14px">
+              <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Based on your target segment &amp; Nigerian creator audience</div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 11px;background:rgba(45,212,191,0.08);border:1px solid rgba(45,212,191,0.2);border-radius:8px">
+                  <div>
+                    <div style="font-size:12.5px;font-weight:600;color:var(--text)">Tuesday 9 AM</div>
+                    <div style="font-size:11px;color:var(--teal)">~38% open rate</div>
+                  </div>
+                  <span style="font-size:10px;background:rgba(45,212,191,0.15);color:var(--teal);border:1px solid rgba(45,212,191,0.25);border-radius:100px;padding:3px 9px;font-weight:600">Best</span>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 11px;background:var(--ink3);border:1px solid var(--border);border-radius:8px">
+                  <div style="font-size:12px;color:var(--text2)">Thursday 8 AM</div>
+                  <div style="font-size:11px;color:var(--text3)">~31% open rate</div>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 11px;background:var(--ink3);border:1px solid var(--border);border-radius:8px">
+                  <div style="font-size:12px;color:var(--text2)">Wednesday 7 PM</div>
+                  <div style="font-size:11px;color:var(--text3)">~27% open rate</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Audience preview -->
+          <div class="card">
+            <div class="card-hdr"><span class="card-title">Audience preview</span></div>
+            <div style="padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:12px;color:var(--text2)">Target segment</span>
+                <span id="aud-segment" style="font-size:12px;font-weight:600;color:var(--text)">All users</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:12px;color:var(--text2)">Suspended (skipped)</span>
+                <span style="font-size:12px;color:var(--rose)">—</span>
+              </div>
+              <div style="height:1px;background:var(--border)"></div>
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:12px;font-weight:600;color:var(--text)">Will receive</span>
+                <span style="font-size:13px;font-weight:700;color:var(--teal)">—</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- History -->
+          <div class="card">
+            <div class="card-hdr">
+              <span class="card-title">Sent broadcasts</span>
+              <button class="btn btn-ghost btn-xs" onclick="loadBroadcasts()">Refresh</button>
+            </div>
+            <div id="broadcast-history" style="max-height:320px;overflow-y:auto"></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- REVENUE -->
+    <div class="pg" id="pg-revenue">
+      <div class="ph">
+        <div class="ph-top">
+          <div><div class="ph-title">Revenue</div><div class="ph-sub">NGN earned over the last 30 days</div></div>
+          <div class="ph-actions">
+            <button class="btn btn-ghost btn-sm" onclick="exportRevenueExcel()">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 2h7l3 3v9H3z"/><path d="M10 2v4h4"/><path d="M5 9l2 2 4-4"/></svg>
+              Export Excel
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="loadRevenue()">Refresh</button>
+          </div>
+        </div>
+      </div>
+      <div class="stat-row" style="grid-template-columns:repeat(4,1fr)" id="rev-stats">
+        <div class="stat gold"><div class="stat-label">Total revenue (NGN)</div><div class="stat-val" id="rev-ngn">—</div><div class="stat-meta" id="rev-usd-sub" style="color:var(--teal);font-size:12px;margin-top:4px"></div></div>
+        <div class="stat teal"><div class="stat-label">Total revenue (USD)</div><div class="stat-val" id="rev-usd">—</div><div class="stat-meta" id="rev-rate-sub" style="font-size:11px"></div></div>
+        <div class="stat rose"><div class="stat-label">Transactions</div><div class="stat-val" id="rev-count">—</div></div>
+        <div class="stat violet"><div class="stat-label">Avg transaction</div><div class="stat-val" id="rev-avg">—</div></div>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><span class="card-title">Daily revenue (NGN)</span></div>
+        <div style="padding:20px;height:260px"><canvas id="revenue-chart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- TRANSACTIONS -->
+    <div class="pg" id="pg-tx">
+      <div class="ph">
+        <div class="ph-top">
+          <div><div class="ph-title">Transactions</div><div class="ph-sub">All completed Flutterwave payments</div></div>
+          <div class="ph-actions">
+            <button class="btn btn-ghost btn-sm" onclick="exportTxExcel()">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 2h7l3 3v9H3z"/><path d="M10 2v4h4"/><path d="M5 9l2 2 4-4"/></svg>
+              Export Excel
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="loadTx()">Refresh</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="tbl-wrap"><table><thead><tr>
+          <th style="width:26%">Transaction ID</th><th style="width:16%">Plan</th>
+          <th style="width:14%">Amount</th><th style="width:12%">Tokens</th>
+          <th style="width:20%">User</th><th style="width:12%">Time</th>
+        </tr></thead>
+        <tbody id="tx-tbody"><tr><td colspan="6"><div class="loading"></div></td></tr></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- PRICING -->
+    <div class="pg" id="pg-pricing">
+      <div class="ph"><div class="ph-title">Pricing</div><div class="ph-sub">Edit plans — changes are live immediately in the app</div></div>
+      <div id="alert-pricing" class="alert"></div>
+      <div id="plan-grid" class="plan-grid"><div class="loading"></div></div>
+      <div class="card">
+        <div class="card-hdr"><span class="card-title">Add new plan</span></div>
+        <div style="padding:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;align-items:end">
+          <div class="field" style="margin:0"><label>Key</label><input type="text" id="new-key" placeholder="enterprise"></div>
+          <div class="field" style="margin:0"><label>Label</label><input type="text" id="new-label" placeholder="Enterprise"></div>
+          <div class="field" style="margin:0"><label>Amount (NGN)</label><input type="number" id="new-amount" placeholder="10000"></div>
+          <div class="field" style="margin:0"><label>Tokens</label><input type="number" id="new-tokens" placeholder="8000"></div>
+          <button class="btn btn-gold" onclick="addPlan()">+ Add</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- NICHES -->
+    <div class="pg" id="pg-niches">
+      <div class="ph"><div class="ph-title">Niches</div><div class="ph-sub">Manage content niches — changes reflect immediately in the app</div></div>
+      <div id="alert-niches" class="alert"></div>
+      <div class="two-col">
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Add niche</span></div>
+          <div style="padding:20px">
+            <div class="field"><label>Label</label><input type="text" id="nn-label" placeholder="e.g. Parenting"></div>
+            <div class="field"><label>Key</label><input type="text" id="nn-key" placeholder="e.g. Parenting"></div>
+            <div class="field"><label>Quick-add suggestions (one per line)</label><textarea id="nn-sugg" rows="5" placeholder="Best parenting tips&#10;How to raise confident kids&#10;Screen time advice"></textarea></div>
+            <button class="btn btn-gold" style="width:100%;justify-content:center" onclick="addNiche()">Add niche</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Active niches</span><button class="btn btn-ghost btn-sm" onclick="loadNiches()">Refresh</button></div>
+          <div id="niches-list"><div class="loading"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COUPONS -->
+    <div class="pg" id="pg-coupons">
+      <div class="ph"><div class="ph-title">Coupons</div><div class="ph-sub">Promo codes that grant bonus tokens on signup</div></div>
+      <div id="alert-coupons" class="alert"></div>
+      <div class="two-col">
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Create coupon</span></div>
+          <div style="padding:20px">
+            <div class="field"><label>Code</label><input type="text" id="cp-code" placeholder="e.g. LAUNCH50" style="text-transform:uppercase"></div>
+            <div class="field"><label>Bonus tokens</label><input type="number" id="cp-tokens" value="200" min="1"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="field" style="margin:0"><label>Max uses (0=unlimited)</label><input type="number" id="cp-uses" value="0" min="0"></div>
+              <div class="field" style="margin:0"><label>Expires days (0=never)</label><input type="number" id="cp-days" value="0" min="0"></div>
+            </div>
+            <button class="btn btn-gold" style="width:100%;justify-content:center;margin-top:14px" onclick="createCoupon()">Create coupon</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Active coupons</span><button class="btn btn-ghost btn-sm" onclick="loadCoupons()">Refresh</button></div>
+          <div class="tbl-wrap"><table><thead><tr>
+            <th style="width:30%">Code</th><th style="width:20%">Tokens</th>
+            <th style="width:22%">Uses</th><th style="width:16%">Status</th><th style="width:12%"></th>
+          </tr></thead>
+          <tbody id="coupons-tbody"><tr><td colspan="5"><div class="loading"></div></td></tr></tbody>
+          </table></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUEUE -->
+    <div class="pg" id="pg-queue">
+      <div class="ph">
+        <div class="ph-top">
+          <div><div class="ph-title">Render queue</div><div class="ph-sub">Active and recent video render jobs</div></div>
+          <button class="btn btn-ghost btn-sm" onclick="loadQueue()">Refresh</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:16px;margin-bottom:16px;font-size:12px;color:var(--text3)">
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:var(--violet);display:inline-block"></span>Processing</span>
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:var(--gold);display:inline-block"></span>Queued</span>
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:var(--teal);display:inline-block"></span>Complete</span>
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:var(--rose);display:inline-block"></span>Failed</span>
+      </div>
+      <div class="card" id="queue-card"><div class="loading"></div></div>
+    </div>
+
+    <!-- FEEDBACK -->
+    <div class="pg" id="pg-feedback">
+      <div class="ph">
+        <div class="ph-top">
+          <div>
+            <div class="ph-title">User feedback</div>
+            <div class="ph-sub">Ratings and comments submitted by users</div>
+          </div>
+          <div class="ph-actions">
+            <button class="btn btn-ghost btn-sm" onclick="exportFeedbackExcel()">&#8595; Excel</button>
+            <button class="btn btn-ghost btn-sm" onclick="exportFeedbackPdf()">&#8595; PDF</button>
+            <button class="btn btn-ghost btn-sm" onclick="loadFeedback()">Refresh</button>
+          </div>
+        </div>
+      </div>
+      <div class="stat-row" style="grid-template-columns:repeat(4,1fr)" id="fb-stats">
+        <div class="stat gold"><div class="stat-label">Total responses</div><div class="stat-val" id="fb-total">—</div></div>
+        <div class="stat teal"><div class="stat-label">Avg rating</div><div class="stat-val" id="fb-avg">—</div></div>
+        <div class="stat violet"><div class="stat-label">5-star ratings</div><div class="stat-val" id="fb-five">—</div></div>
+        <div class="stat rose"><div class="stat-label">Improvement requests</div><div class="stat-val" id="fb-improve">—</div></div>
+      </div>
+      <!-- Rating distribution -->
+      <div class="two-col" style="margin-bottom:18px">
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Rating distribution</span></div>
+          <div id="fb-distribution" style="padding:18px 20px"><div class="loading"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Top tags mentioned</span></div>
+          <div id="fb-tags" style="padding:18px 20px"><div class="loading"></div></div>
+        </div>
+      </div>
+      <!-- Individual responses -->
+      <div class="card">
+        <div class="card-hdr">
+          <span class="card-title">All responses</span>
+          <div class="card-actions">
+            <select id="fb-filter" onchange="renderFeedback()" style="background:var(--ink3);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:12px;padding:5px 10px;outline:none">
+              <option value="all">All ratings</option>
+              <option value="5">5 stars only</option>
+              <option value="4">4 stars+</option>
+              <option value="3">3 stars only</option>
+              <option value="1">1-2 stars</option>
+            </select>
+          </div>
+        </div>
+        <div id="fb-list"><div class="loading"></div></div>
+      </div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="pg" id="pg-logs">
+      <div class="ph"><div class="ph-title">Activity logs</div><div class="ph-sub">Recent admin actions — last 50 entries</div></div>
+      <div class="card" id="logs-card"><div class="loading"></div></div>
+    </div>
+
+    <!-- ADMINS -->
+    <div class="pg" id="pg-admins">
+      <div class="ph"><div class="ph-title">Admin users</div><div class="ph-sub">Manage dashboard access and permissions</div></div>
+      <div id="alert-admins" class="alert"></div>
+      <div class="two-col">
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Add admin user</span></div>
+          <div style="padding:20px">
+            <div class="field"><label>Full name</label><input type="text" id="na-name" placeholder="e.g. John Doe"></div>
+            <div class="field"><label>Email</label><input type="email" id="na-email" placeholder="john@example.com"></div>
+            <div class="field"><label>Temporary password</label><input type="password" id="na-pass" placeholder="They'll reset on first login"></div>
+            <div class="field"><label>Role</label>
+              <select id="na-role">
+                <option value="admin">Admin — full dashboard access</option>
+                <option value="analytics">Analytics — read-only stats & revenue</option>
+                <option value="support">Support — users & token top-up only</option>
+              </select>
+            </div>
+            <button class="btn btn-gold" style="width:100%;justify-content:center" onclick="createAdminUser()">Create admin user</button>
+          </div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:14px">
+            <div class="card-hdr"><span class="card-title">Team</span><button class="btn btn-ghost btn-sm" onclick="loadAdmins()">Refresh</button></div>
+            <div class="tbl-wrap"><table><thead><tr>
+              <th style="width:32%">Name</th><th style="width:30%">Email</th>
+              <th style="width:20%">Role</th><th style="width:18%">Actions</th>
+            </tr></thead>
+            <tbody id="admins-tbody"><tr><td colspan="4"><div class="loading"></div></td></tr></tbody>
+            </table></div>
+          </div>
+          <div class="card">
+            <div class="card-hdr"><span class="card-title">Role permissions</span></div>
+            <div id="roles-list" style="padding:16px 20px"><div class="loading"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  
+    <!-- COSTS -->
+    <div class="pg" id="pg-costs">
+      <div class="ph">
+        <div class="ph-top">
+          <div><div class="ph-title">Cost &amp; margin</div><div class="ph-sub">Render economics — revenue vs cost per plan</div></div>
+          <div class="ph-actions">
+            <button class="btn btn-ghost btn-sm" onclick="loadCosts()">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 8a6 6 0 0112 0M14 4v4h-4"/></svg>
+              Refresh
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Plan margin cards -->
+      <div id="cost-plan-grid" class="stat-row" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-bottom:24px">
+        <div class="loading"></div>
+      </div>
+
+      <!-- Cost breakdown table -->
+      <div class="card" style="margin-bottom:18px">
+        <div class="card-hdr">
+          <span class="card-title">Cost breakdown per render</span>
+          <span style="font-size:11px;color:var(--text3)">Avg across all renders on each plan</span>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th>Plan</th><th>Revenue/render</th><th>Voice</th>
+              <th>Visuals</th><th>AI gen</th><th>Compute</th>
+              <th>Storage</th><th>Total cost</th><th>Margin</th><th>Margin %</th>
+            </tr></thead>
+            <tbody id="cost-breakdown-tbody">
+              <tr><td colspan="10"><div class="loading"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Assumptions card -->
+      <div class="two-col">
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Cost assumptions</span></div>
+          <div style="padding:14px 18px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:space-between;font-size:12.5px">
+              <span style="color:var(--text2)">Voice (gTTS)</span>
+              <span style="color:var(--teal);font-family:DM Mono,monospace">$0.00 / render</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px">
+              <span style="color:var(--text2)">Voice (ElevenLabs)</span>
+              <span style="color:var(--gold);font-family:DM Mono,monospace">$0.30 / 1k chars</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px">
+              <span style="color:var(--text2)">Visuals (Pexels)</span>
+              <span style="color:var(--teal);font-family:DM Mono,monospace">$0.00 / render</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px">
+              <span style="color:var(--text2)">Visuals (DALL-E 3)</span>
+              <span style="color:var(--gold);font-family:DM Mono,monospace">$0.04 / image</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px">
+              <span style="color:var(--text2)">AI generation (Groq)</span>
+              <span style="color:var(--teal);font-family:DM Mono,monospace">Free tier</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px">
+              <span style="color:var(--text2)">AI generation (OpenAI)</span>
+              <span style="color:var(--gold);font-family:DM Mono,monospace">$0.00015 / 1k tok</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px">
+              <span style="color:var(--text2)">Compute (Railway)</span>
+              <span style="color:var(--text2);font-family:DM Mono,monospace">$0.000008 / sec</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px">
+              <span style="color:var(--text2)">Storage (R2)</span>
+              <span style="color:var(--text2);font-family:DM Mono,monospace">$0.000025 / render</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Recent render costs</span></div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr>
+                <th>Job</th><th>Plan</th><th>Cost</th><th>Margin</th><th>Time</th>
+              </tr></thead>
+              <tbody id="cost-recent-tbody">
+                <tr><td colspan="5"><div class="loading"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AUDIT TRAIL -->
+    <div class="pg" id="pg-audit">
+      <div class="ph">
+        <div class="ph-top">
+          <div><div class="ph-title">Audit trail</div><div class="ph-sub">Every admin action — who, what, when</div></div>
+          <div class="ph-actions">
+            <button class="btn btn-ghost btn-sm" onclick="loadAudit()">Refresh</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+        <select id="audit-filter-action" onchange="loadAudit()"
+          style="background:var(--ink2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:12.5px;padding:8px 12px;outline:none;min-width:160px">
+          <option value="">All actions</option>
+        </select>
+        <select id="audit-filter-admin" onchange="loadAudit()"
+          style="background:var(--ink2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:12.5px;padding:8px 12px;outline:none;min-width:180px">
+          <option value="">All admins</option>
+        </select>
+        <input type="text" id="audit-search" placeholder="Search..." oninput="filterAuditLocal()"
+          class="search-inp" style="max-width:220px;margin:0">
+      </div>
+
+      <!-- Stats row -->
+      <div class="stat-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px" id="audit-stats">
+        <div class="stat gold"><div class="stat-label">Total events</div><div class="stat-val" id="audit-total">—</div></div>
+        <div class="stat rose"><div class="stat-label">Deletions</div><div class="stat-val" id="audit-deletes">—</div></div>
+        <div class="stat violet"><div class="stat-label">Broadcasts sent</div><div class="stat-val" id="audit-broadcasts">—</div></div>
+        <div class="stat teal"><div class="stat-label">Token adjustments</div><div class="stat-val" id="audit-tokens">—</div></div>
+      </div>
+
+      <!-- Audit log table -->
+      <div class="card">
+        <div class="card-hdr">
+          <span class="card-title">Event log</span>
+          <span id="audit-count" style="font-size:11px;color:var(--text3)"></span>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th style="width:14%">Time</th>
+              <th style="width:13%">Action</th>
+              <th style="width:18%">Performed by</th>
+              <th style="width:10%">Role</th>
+              <th style="width:45%">Details</th>
+            </tr></thead>
+            <tbody id="audit-tbody">
+              <tr><td colspan="5"><div class="loading"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- USER MODAL -->
+<div class="modal-overlay" id="user-modal">
+  <div class="modal">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px">
+      <div class="modal-title" id="modal-title">Manage user</div>
+      <button onclick="closeModal()" style="background:rgba(255,255,255,0.07);border:1px solid var(--border2);border-radius:50%;width:28px;height:28px;cursor:pointer;color:var(--text3);font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0">&times;</button>
+    </div>
+    <div class="modal-sub" id="modal-sub"></div>
+    <div class="modal-metas" id="modal-metas"></div>
+    <div id="modal-body"></div>
+    <div id="modal-alert" class="alert" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<script>
+
+var API='https://sceneforge-production-8d19.up.railway.app/api/admin';
+var USER_CACHE={};
+var AAPI='https://sceneforge-production-8d19.up.railway.app/api/admin-auth';
+var NAPI='https://sceneforge-production-8d19.up.railway.app/api/niches';
+var KEY='',ROLE='',ALL_USERS=[],MODAL_USER=null,revChart=null;
+var CACHED_RATE=0,REV_CHART_DATA=[],REV_TOTAL=0,REV_TX=0,REV_RATE=1600;
+var TX_DATA=[],ANA_DATA={};
+
+function apiFetch(path,opts){
+  opts=opts||{};
+  return fetch(API+path,Object.assign({headers:{'Content-Type':'application/json','Authorization':'Bearer '+KEY,'x-admin-key':KEY}},opts))
+    .then(function(r){return r.ok?r.json():r.json().then(function(e){throw e;});});
+}
+
+function togglePass(){
+  var i=document.getElementById('admin-pass'),b=document.querySelector('.show-btn');
+  i.type=i.type==='password'?'text':'password';b.textContent=i.type==='password'?'show':'hide';
+}
+
+async function doLogin(){
+  var email=document.getElementById('admin-email').value.trim();
+  var pass=document.getElementById('admin-pass').value;
+  var err=document.getElementById('login-error');
+  err.classList.remove('on');
+  if(!email||!pass)return;
+  try{
+    var r=await fetch(AAPI+'/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,password:pass})});
+    if(!r.ok){err.classList.add('on');return;}
+    var d=await r.json();
+    KEY=d.access_token;ROLE=d.admin.role;
+    var parts=(d.admin.full_name||'Admin').trim().split(' ');
+    document.getElementById('sb-av').textContent=(parts.length>=2?parts[0][0]+parts[parts.length-1][0]:parts[0].slice(0,2)).toUpperCase();
+    document.getElementById('sb-name').textContent=d.admin.full_name;
+    var rc={superadmin:'var(--rose)',admin:'var(--violet)',analytics:'var(--teal)',support:'var(--gold)'};
+    document.getElementById('sb-role').innerHTML='<span style="color:'+( rc[ROLE]||'var(--text3)')+';font-size:10.5px;text-transform:capitalize">'+ROLE+'</span>';
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('admin-shell').classList.add('on');
+    if(d.admin.must_reset_password){document.getElementById('reset-overlay').classList.add('on');}
+    if(ROLE==='superadmin'){document.getElementById('sec-admins').style.display='block';document.getElementById('nb-admins').style.display='flex';}
+    applyRoleRestrictions();
+    fetchCsrfToken();
+    loadDash();
+  }catch(e){err.classList.add('on');}
+}
+document.getElementById('admin-email').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
+document.getElementById('admin-pass').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
+
+function applyRoleRestrictions(){
+  var access={analytics:['nb-dashboard','nb-analytics','nb-revenue','nb-tx','nb-feedback'],support:['nb-dashboard','nb-users','nb-topup','nb-queue','nb-logs','nb-feedback']};
+  var allowed=access[ROLE];
+  if(!allowed)return;
+  var all=['nb-dashboard','nb-analytics','nb-users','nb-topup','nb-broadcast','nb-revenue','nb-tx','nb-pricing','nb-niches','nb-coupons','nb-queue','nb-logs','nb-feedback'];
+  all.forEach(function(id){var el=document.getElementById(id);if(el)el.style.display=allowed.indexOf(id)>=0?'flex':'none';});
+  var secs={'sec-users':['nb-users','nb-topup','nb-broadcast'],'sec-revenue':['nb-revenue','nb-tx','nb-pricing','nb-niches','nb-coupons'],'sec-system':['nb-queue','nb-logs','nb-feedback']};
+  Object.keys(secs).forEach(function(s){var el=document.getElementById(s);if(el)el.style.display=secs[s].some(function(id){return allowed.indexOf(id)>=0;})?'block':'none';});
+}
+
+function doLogout(){
+  if(!confirm('Sign out of the dashboard?'))return;
+  KEY='';ROLE='';
+  document.getElementById('admin-email').value='';document.getElementById('admin-pass').value='';
+  document.getElementById('admin-shell').classList.remove('on');
+  document.getElementById('reset-overlay').classList.remove('on');
+  document.getElementById('login-screen').style.display='';
+  document.getElementById('sec-admins').style.display='none';
+  document.getElementById('nb-admins').style.display='none';
+}
+
+function nav(id,btn){
+  document.querySelectorAll('.pg').forEach(function(p){p.classList.remove('on');});
+  document.querySelectorAll('.nb').forEach(function(b){b.classList.remove('on');});
+  var pg=document.getElementById('pg-'+id);
+  if(pg)pg.classList.add('on');
+  btn.classList.add('on');
+  var loaders={dashboard:loadDash,analytics:loadAnalytics,users:loadUsers,broadcast:loadBroadcasts,revenue:loadRevenue,tx:loadTx,pricing:loadPricing,niches:loadNiches,coupons:loadCoupons,queue:loadQueue,logs:loadLogs,admins:loadAdmins,feedback:loadFeedback,costs:loadCosts,audit:loadAudit};
+  if(loaders[id])loaders[id]();
+}
+
+function fmt(n){return Number(n||0).toLocaleString();}
+function ago(ts){if(!ts)return'—';var s=Math.floor((new Date()-new Date(ts))/1000);if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
+function planTag(p){var cls={free:'tag-free',starter:'tag-starter',pro:'tag-pro',studio:'tag-studio'}[p]||'tag-free';return '<span class="tag '+cls+'">'+(p||'free')+'</span>';}
+function showAlert(page,msg,type){var el=document.getElementById('alert-'+page);if(!el)return;el.className='alert alert-'+(type==='success'?'ok':'err')+' on';el.textContent=msg;setTimeout(function(){el.classList.remove('on');},6000);}
+
+async function loadDash(){
+  try{
+    var s=await apiFetch('/stats');
+    var cards=document.getElementById('stats-grid').querySelectorAll('.stat');
+    cards[0].querySelector('.stat-val').textContent=fmt(s.total_users);
+    cards[1].querySelector('.stat-val').textContent=fmt(s.total_videos_created);
+    cards[2].querySelector('.stat-val').textContent=fmt(s.total_transactions);
+    cards[3].querySelector('.stat-val').textContent=fmt(s.total_tokens_in_circulation);
+    var u=await apiFetch('/users');ALL_USERS=u.users||[];
+    var rows=ALL_USERS.slice(0,8).map(function(u){
+      USER_CACHE[u.id]=u;
+      var row='<tr>';
+      row+='<td><div style="font-weight:600;color:var(--text);font-size:13px">'+(u.full_name||'-')+'</div>';
+      row+='<div style="font-size:11px;color:var(--text3)">'+u.email+'</div></td>';
+      row+='<td>'+planTag(u.plan)+'</td>';
+      row+='<td style="font-family:monospace;color:'+(u.tokens_remaining<100?'var(--rose)':'var(--text2)')+'">'+fmt(u.tokens_remaining)+'</td>';
+      row+='<td>'+(u.videos_created||0)+'</td>';
+      row+='<td style="color:var(--text3)">'+ago(u.created_at)+'</td>';
+      row+='<td><button class="btn btn-ghost btn-xs" data-uid="'+u.id+'" onclick="openModal(this.dataset.uid)">Manage</button></td>';
+      row+='</tr>';
+      return row;
+    }).join('');
+    document.getElementById('recent-body').innerHTML='<table><thead><tr><th style="width:30%">User</th><th style="width:12%">Plan</th><th style="width:13%">Tokens</th><th style="width:8%">Videos</th><th style="width:12%">Joined</th><th style="width:14%">Actions</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  }catch(e){console.error(e);}
+}
+
+async function loadAnalytics(){
+  try{
+    var s=await apiFetch('/stats');ANA_DATA=s;
+    document.getElementById('m-avg').textContent=s.avg_scenes_per_video||0;
+    document.getElementById('m-scenes').textContent=fmt(s.total_scenes_generated||0);
+    document.getElementById('m-videos').textContent=fmt(s.total_videos_created||0);
+    var niches=s.top_niches||{},maxN=Math.max.apply(null,Object.values(niches).concat([1]));
+    document.getElementById('niches-analytics').innerHTML=Object.keys(niches).length?Object.entries(niches).sort(function(a,b){return b[1]-a[1];}).map(function(e){return '<div class="bar-row"><span class="bar-label">'+e[0]+'</span><div class="bar-track"><div class="bar-fill" style="width:'+Math.round(e[1]/maxN*100)+'%;background:var(--gold)"></div></div><span class="bar-count">'+e[1]+'</span></div>';}).join(''):'<div style="color:var(--text3);font-size:13px">No niche data yet</div>';
+    var plans=s.users_by_plan||{},total=Math.max(Object.values(plans).reduce(function(a,b){return a+b;},0),1);
+    var pc={free:'rgba(255,255,255,0.3)',starter:'var(--violet)',pro:'var(--gold)',studio:'var(--teal)'};
+    document.getElementById('plans-analytics').innerHTML=Object.entries(plans).map(function(e){return '<div class="bar-row"><span class="bar-label" style="text-transform:capitalize">'+e[0]+'</span><div class="bar-track"><div class="bar-fill" style="width:'+Math.round(e[1]/total*100)+'%;background:'+(pc[e[0]]||'var(--violet)')+'"></div></div><span class="bar-count">'+e[1]+'</span></div>';}).join('');
+  }catch(e){console.error(e);}
+}
+
+async function loadUsers(){
+  document.getElementById('users-tbody').innerHTML='<tr><td colspan="6"><div class="loading"></div></td></tr>';
+  try{var d=await apiFetch('/users');ALL_USERS=d.users||[];renderUsers(ALL_USERS);}
+  catch(e){document.getElementById('users-tbody').innerHTML='<tr><td colspan="6" style="color:var(--rose);text-align:center;padding:20px">Failed to load users</td></tr>';}
+}
+function renderUsers(users){
+  if(!users.length){document.getElementById('users-tbody').innerHTML='<tr><td colspan="6" class="loading">No users found</td></tr>';return;}
+  document.getElementById('users-tbody').innerHTML=users.map(function(u){
+    USER_CACHE[u.id]=u;
+    var susp=u.suspended?'<span class="tag tag-red" style="margin-left:4px">Suspended</span>':'';
+    return '<tr>'
+      +'<td><div style="font-weight:600;color:var(--text);font-size:13px">'+(u.full_name||'—')+'</div>'
+      +'<div style="font-size:11px;color:var(--text3);margin-top:2px">'+u.email+'</div></td>'
+      +'<td>'+planTag(u.plan)+susp+'</td>'
+      +'<td style="font-family:DM Mono,monospace;font-size:12px;color:'+(u.tokens_remaining<100?'var(--rose)':'var(--text2)')+'">'+fmt(u.tokens_remaining)+'</td>'
+      +'<td style="color:var(--text2);text-align:center">'+(u.videos_created||0)+'</td>'
+      +'<td style="color:var(--text3);font-size:11px">'+ago(u.created_at)+'</td>'
+      +'<td><button class="btn btn-ghost btn-xs" data-uid="'+u.id+'" onclick="openModal(this.dataset.uid)">Manage</button></td>'
+      +'</tr>';
+  }).join('');
+}
+function filterUsers(){var q=document.getElementById('user-search').value.toLowerCase();renderUsers(ALL_USERS.filter(function(u){return (u.email||'').toLowerCase().includes(q)||(u.full_name||'').toLowerCase().includes(q);}));}
+async function exportCSV(){var r=await fetch(API+'/users/export/csv',{headers:{'Authorization':'Bearer '+KEY,'x-admin-key':KEY}});var b=await r.blob();var url=URL.createObjectURL(b);var a=document.createElement('a');a.href=url;a.download='sceneforge_users.csv';a.click();URL.revokeObjectURL(url);}
+
+function openModal(uid){
+  var user = USER_CACHE[uid];
+  if (!user) return;
+  MODAL_USER=user;
+  document.getElementById('modal-title').textContent=user.full_name||user.email;
+  document.getElementById('modal-sub').textContent=user.email;
+  document.getElementById('modal-metas').innerHTML='<div class="modal-meta"><div class="modal-meta-val" style="color:'+(user.tokens_remaining<100?'var(--rose)':'var(--teal)')+'">'+fmt(user.tokens_remaining)+'</div><div class="modal-meta-lbl">Tokens remaining</div></div><div class="modal-meta"><div class="modal-meta-val" style="color:var(--gold)">'+(user.videos_created||0)+'</div><div class="modal-meta-lbl">Videos created</div></div>';
+  document.getElementById('modal-body').innerHTML='<div class="modal-row"><input type="number" id="mt" value="'+user.tokens_remaining+'" placeholder="Token amount"><button class="btn btn-teal btn-sm" onclick="mAdd()">Add tokens</button><button class="btn btn-ghost btn-sm" onclick="mSet()">Set exact</button></div><div class="modal-row"><select id="mp"><option value="free"'+(user.plan==='free'?' selected':'')+'>Free</option><option value="starter"'+(user.plan==='starter'?' selected':'')+'>Starter</option><option value="pro"'+(user.plan==='pro'?' selected':'')+'>Pro</option><option value="studio"'+(user.plan==='studio'?' selected':'')+'>Studio</option></select><button class="btn btn-ghost btn-sm" onclick="mPlan()">Set plan</button></div><div class="modal-row"><button class="btn btn-danger btn-sm" style="flex:1" onclick="mSuspend()">'+(user.suspended?'Unsuspend':'Suspend')+' account</button><button class="btn btn-xs" style="background:rgba(248,113,113,0.12);color:var(--rose);border:1px solid rgba(248,113,113,0.2)" onclick="mDelete()">Delete</button></div>';
+  document.getElementById('modal-alert').className='alert';
+  document.getElementById('user-modal').classList.add('on');
+}
+function closeModal(){document.getElementById('user-modal').classList.remove('on');}
+function mAlert(msg,t){var e=document.getElementById('modal-alert');e.className='alert alert-'+(t||'ok')+' on';e.textContent=msg;}
+async function mAdd(){var a=parseInt(document.getElementById('mt').value);if(!a)return;try{var r=await apiFetch('/users/top-up',{method:'POST',body:JSON.stringify({user_id:MODAL_USER.id,tokens:a,reason:'Admin top-up'})});mAlert('Added '+fmt(a)+' tokens. Balance: '+fmt(r.tokens_remaining));loadUsers();}catch(e){mAlert(e.detail||'Error','err');}}
+async function mSet(){var a=parseInt(document.getElementById('mt').value);if(isNaN(a))return;try{await apiFetch('/users/set-tokens',{method:'POST',body:JSON.stringify({user_id:MODAL_USER.id,tokens:a,reason:'Admin set'})});mAlert('Balance set to '+fmt(a));loadUsers();}catch(e){mAlert(e.detail||'Error','err');}}
+async function mPlan(){var p=document.getElementById('mp').value;try{await apiFetch('/users/set-plan',{method:'POST',body:JSON.stringify({user_id:MODAL_USER.id,plan:p})});mAlert('Plan updated to '+p);loadUsers();}catch(e){mAlert(e.detail||'Error','err');}}
+async function mSuspend(){if(!confirm((MODAL_USER.suspended?'Unsuspend':'Suspend')+' '+MODAL_USER.email+'?'))return;try{await apiFetch('/users/suspend',{method:'POST',body:JSON.stringify({user_id:MODAL_USER.id,suspended:!MODAL_USER.suspended,reason:'Admin action'})});mAlert('Done');MODAL_USER.suspended=!MODAL_USER.suspended;loadUsers();}catch(e){mAlert(e.detail||'Error','err');}}
+async function mDelete(){if(!confirm('DELETE '+MODAL_USER.email+'?')||!confirm('This cannot be undone.'))return;try{await apiFetch('/users/'+MODAL_USER.id,{method:'DELETE'});closeModal();loadUsers();}catch(e){mAlert(e.detail||'Error','err');}}
+
+async function doTopUp(){
+  var ref=document.getElementById('topup-user').value.trim(),amt=parseInt(document.getElementById('topup-amount').value),reason=document.getElementById('topup-reason').value.trim()||'Admin top-up';
+  if(!ref||!amt)return;
+  try{
+    var uid=ref;
+    if(ref.indexOf('@')>=0){var d=await apiFetch('/users');var f=(d.users||[]).find(function(u){return (u.email||'').toLowerCase()===ref.toLowerCase();});if(!f){showAlert('topup','User not found','error');return;}uid=f.id;}
+    var r=await apiFetch('/users/top-up',{method:'POST',body:JSON.stringify({user_id:uid,tokens:amt,reason:reason})});
+    showAlert('topup','Credited '+fmt(amt)+' tokens to '+r.user+'. Balance: '+fmt(r.tokens_remaining),'success');
+    document.getElementById('topup-user').value='';document.getElementById('topup-reason').value='';
+  }catch(e){showAlert('topup',e.detail||'Failed','error');}
+}
+function setTopup(n){document.getElementById('topup-amount').value=n;}
 
 
-# ─── Auth guard ───────────────────────────────────────────────────────────────
+var BC_TARGET='all';
+var BC_UPLOADED_EMAILS=[];
+var BC_HISTORY=[];
+var BC_DETAIL=null;
+var BC_GOAL='re-engage';
+var BC_ASSIST_RESULT='';
+var BC_AI_HINT_ACTION='';
 
-async def _require_admin(
-    authorization: Optional[str] = Header(None),
-    x_admin_key: Optional[str] = Header(None),
-    redis=Depends(get_redis),
-):
-    token = (authorization or "").removeprefix("Bearer ").strip()
-    if token.startswith("admin:"):
-        from app.services.auth import verify_token as _vt
-        uid = _vt(token[6:])
-        if uid:
-            admin = await admin_auth_service.get_admin_user(redis, uid)
-            if admin and admin.get("active", True):
-                return admin
-        raise HTTPException(status_code=403, detail="Invalid or expired admin token")
-    if x_admin_key:
-        if settings.admin_secret_key and x_admin_key == settings.admin_secret_key:
-            return {"role": "superadmin", "email": "legacy-key"}
-        raise HTTPException(status_code=403, detail="Invalid admin key")
-    raise HTTPException(status_code=403, detail="Admin authentication required")
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchBcTab(id){
+  ['compose','campaign'].forEach(function(t){
+    var btn=document.getElementById('bctab-'+t);
+    var panel=document.getElementById('bcpanel-'+t);
+    if(btn) btn.classList.toggle('on', t===id);
+    if(panel) panel.style.display=t===id?'block':'none';
+  });
+}
+
+// ── Target selector ───────────────────────────────────────────────────────────
+function setBcTarget(t){
+  BC_TARGET=t;
+  ['all','plan','user','upload'].forEach(function(x){
+    var btn=document.getElementById('bt-'+x);
+    if(btn) btn.className='btn btn-sm '+(x===t?'btn-teal':'btn-ghost');
+  });
+  ['plan','user','upload'].forEach(function(x){
+    var row=document.getElementById('bc-'+x+'-row');
+    if(row) row.style.display=t===x?'block':'none';
+  });
+  // Update audience label
+  var labels={all:'All users',plan:'By plan',user:'One user',upload:'Upload list'};
+  var el=document.getElementById('aud-segment');
+  if(el) el.textContent=labels[t]||t;
+}
+
+// ── List style ─────────────────────────────────────────────────────────────────
+function setListStyle(style,el){
+  ['ls-bullet','ls-square'].forEach(function(id){
+    var b=document.getElementById(id);
+    if(b){b.style.background='';b.style.borderColor='';b.style.color='';}
+  });
+  if(el){el.style.background='rgba(45,212,191,0.15)';el.style.borderColor='rgba(45,212,191,0.3)';el.style.color='var(--teal)';}
+  document.getElementById('bc-editor').focus();
+  document.execCommand('insertUnorderedList',false,null);
+  // Apply style via CSS on editor ULs
+  var editor=document.getElementById('bc-editor');
+  editor.querySelectorAll('ul li').forEach(function(li){
+    li.style.listStyleType=style==='square'?'square':'disc';
+  });
+}
+
+// ── Editor helpers ─────────────────────────────────────────────────────────────
+function bcFormat(cmd,val){
+  document.getElementById('bc-editor').focus();
+  document.execCommand(cmd,false,val||null);
+}
+function bcEditorInput(){}
+function bcInsertLink(){
+  var url=prompt('Enter URL:','https://');
+  if(!url)return;
+  var text=prompt('Link text:','')||url;
+  document.getElementById('bc-editor').focus();
+  document.execCommand('insertHTML',false,'<a href="'+url+'" style="color:#A78BFA">'+text+'</a>');
+}
+function bcInsertTag(){
+  document.getElementById('bc-editor').focus();
+  document.execCommand('insertText',false,'{{name}}');
+}
+function bcGetContent(){ return document.getElementById('bc-editor').innerHTML; }
+function bcGetText(){ return document.getElementById('bc-editor').innerText||''; }
+function bcClear(){
+  document.getElementById('bc-editor').innerHTML='';
+  document.getElementById('bc-subject').value='';
+  document.getElementById('bc-preview-wrap').style.display='none';
+  document.getElementById('bc-ai-hint').style.display='none';
+  document.getElementById('subj-suggestions').style.display='none';
+  document.getElementById('assist-result').style.display='none';
+  BC_UPLOADED_EMAILS=[];
+  var us=document.getElementById('bc-upload-status');
+  if(us) us.style.display='none';
+  var el=document.getElementById('bc-email-list');
+  if(el) el.value='';
+}
+
+// ── CSV upload ─────────────────────────────────────────────────────────────────
+function bcReadFile(file){
+  if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){bcParseEmails(e.target.result);};
+  reader.readAsText(file);
+}
+function bcHandleDrop(e){
+  e.preventDefault();
+  e.currentTarget.style.borderColor='rgba(255,255,255,0.1)';
+  var file=e.dataTransfer.files[0];
+  if(file)bcReadFile(file);
+}
+function bcParseEmails(text){
+  var emails=text.split(/[\n,;\r]+/).map(function(e){
+    return e.trim().replace(/^["']|["']$/g,'').toLowerCase();
+  }).filter(function(e){return e.indexOf('@')>0&&e.indexOf('.')>1;});
+  var unique=[...new Set(emails)];
+  BC_UPLOADED_EMAILS=unique;
+  var el=document.getElementById('bc-upload-status');
+  if(el){el.style.display='block';el.textContent='✓ '+unique.length+' valid email'+(unique.length===1?'':'s')+' loaded';}
+  var list=document.getElementById('bc-email-list');
+  if(list) list.value=unique.join('\n');
+}
+
+// ── Preview ────────────────────────────────────────────────────────────────────
+function toggleBcPreview(){
+  var w=document.getElementById('bc-preview-wrap');
+  if(w.style.display==='block'){w.style.display='none';return;}
+  w.style.display='block';
+  var html=bcGetContent().replace(/\{\{name\}\}/g,'Creator').replace(/\{\{email\}\}/g,'creator@example.com');
+  document.getElementById('bc-preview-body').innerHTML=html;
+}
+
+// ── AI hint bar ────────────────────────────────────────────────────────────────
+var AI_HINT_TIMER=null;
+function checkAiHints(){
+  clearTimeout(AI_HINT_TIMER);
+  AI_HINT_TIMER=setTimeout(function(){
+    var text=bcGetText().trim();
+    var hint=document.getElementById('bc-ai-hint');
+    if(!hint) return;
+    if(text.length>80 && text.indexOf('http')<0){
+      document.getElementById('bc-ai-hint-text').textContent='Tip: Add a CTA button (link to the app) to boost click-through rate by ~40%';
+      BC_AI_HINT_ACTION='cta';
+      hint.style.display='flex';
+    } else if(text.length>200 && text.split(' ').length>60){
+      document.getElementById('bc-ai-hint-text').textContent='This email is quite long — AI can shorten it while keeping the key message';
+      BC_AI_HINT_ACTION='shorten';
+      hint.style.display='flex';
+    }
+  }, 2000);
+}
+async function applyAiHint(){
+  document.getElementById('bc-ai-hint').style.display='none';
+  await assistAction(BC_AI_HINT_ACTION);
+}
+
+// ── AI Subject suggestions ─────────────────────────────────────────────────────
+async function generateSubjectSuggestions(){
+  var btn=document.getElementById('subj-gen-btn');
+  var body=bcGetText().trim();
+  var subject=document.getElementById('bc-subject').value.trim();
+  if(!body&&!subject){showAlert('broadcast','Write your message body first to get AI subject suggestions','error');return;}
+  if(btn) btn.textContent='Generating...';
+  var container=document.getElementById('subj-suggestions');
+  container.style.display='flex';
+  container.innerHTML='<div style="font-size:12px;color:var(--text3);padding:6px 0">Generating suggestions...</div>';
+  try{
+    var prompt='You are an email marketing expert for SceneForge, an AI video creation tool for content creators in Nigeria.\n\nEmail body:\n'+( body||subject)+'\n\nGenerate exactly 3 subject lines:\n1. CURIOSITY: Makes reader curious without being clickbait\n2. DIRECT: Clear and benefit-focused\n3. URGENCY: Creates a sense of urgency or FOMO\n\nRespond ONLY with JSON array, no markdown:\n[{"type":"curiosity","subject":"..."},{"type":"direct","subject":"..."},{"type":"urgency","subject":"..."}]';
+    var r=await apiFetch('/broadcast/ai/subjects',{method:'POST',body:JSON.stringify({body:body,subject:subject})});
+    var suggestions=r.suggestions||[];
+    if(!suggestions.length)throw new Error('No suggestions');
+    var colors={curiosity:'rgba(251,191,36,0.15)',direct:'rgba(45,212,191,0.12)',urgency:'rgba(248,113,113,0.12)'};
+    var textColors={curiosity:'#fbbf24',direct:'var(--teal)',urgency:'var(--rose)'};
+    container.innerHTML=suggestions.map(function(s){
+      return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--ink3);border:1px solid var(--border2);border-radius:8px;cursor:pointer" onclick="useSubjectSuggestion(\''+s.subject.replace(/'/g,'\\\'')+'\')">'
+        +'<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:100px;background:'+colors[s.type]+';color:'+textColors[s.type]+';flex-shrink:0;text-transform:capitalize">'+s.type+'</span>'
+        +'<span style="font-size:12px;color:var(--text);flex:1">'+s.subject+'</span>'
+        +'<span style="font-size:11px;color:var(--teal);flex-shrink:0">Use →</span>'
+        +'</div>';
+    }).join('');
+  }catch(e){
+    container.innerHTML='<div style="font-size:12px;color:var(--rose)">Failed to generate suggestions</div>';
+  }
+  if(btn) btn.textContent='↻ Regenerate';
+}
+function useSubjectSuggestion(subject){
+  document.getElementById('bc-subject').value=subject;
+}
+
+// ── AI Campaign generator ──────────────────────────────────────────────────────
+function selectCampaignGoal(el){
+  document.querySelectorAll('.bc-goal-card').forEach(function(c){c.classList.remove('on');});
+  el.classList.add('on');
+  BC_GOAL=el.dataset.goal||'re-engage';
+}
+async function generateCampaign(){
+  var btn=document.getElementById('gen-camp-btn');
+  var tone=document.getElementById('camp-tone').value;
+  var segment=document.getElementById('camp-segment').value;
+  var context=document.getElementById('camp-context').value.trim();
+  btn.textContent='Generating...';btn.disabled=true;
+  document.getElementById('camp-result').style.display='none';
+
+  try{
+
+    var result=await apiFetch('/broadcast/ai/campaign',{method:'POST',body:JSON.stringify({goal:BC_GOAL,tone:tone,segment:document.getElementById('camp-segment').value,context:context})});
+    document.getElementById('camp-result-subject').textContent=result.subject||'';
+    document.getElementById('camp-result-body').textContent=result.body||'';
+    document.getElementById('camp-result').style.display='block';
+    window._campResult=result;
+  }catch(e){
+    showAlert('broadcast','Failed to generate campaign. Try again.','error');
+  }
+  btn.textContent='↻ Regenerate';btn.disabled=false;
+}
+function useCampaign(){
+  if(!window._campResult)return;
+  document.getElementById('bc-subject').value=window._campResult.subject||'';
+  var editor=document.getElementById('bc-editor');
+  editor.innerText=window._campResult.body||'';
+  switchBcTab('compose');
+  showAlert('broadcast','Campaign loaded — review and send when ready','success');
+}
+
+// ── AI Writing assistant ───────────────────────────────────────────────────────
+async function assistAction(action){
+  var body=bcGetText().trim();
+  if(!body){showAlert('broadcast','Write a message body first','error');return;}
+
+  var resultEl=document.getElementById('assist-result');
+  var resultText=document.getElementById('assist-result-text');
+  resultEl.style.display='block';
+  resultText.textContent='Generating...';
+  try{
+    var r=await apiFetch('/broadcast/ai/assist',{method:'POST',body:JSON.stringify({action:action,body:body})});
+    BC_ASSIST_RESULT=r.result||'';
+    resultText.textContent=BC_ASSIST_RESULT;
+  }catch(e){
+    resultText.textContent='Failed to generate. Try again.';
+  }
+}
+async function assistCustom(){
+  var input=document.getElementById('assist-input');
+  var instruction=input.value.trim();
+  if(!instruction)return;
+  var body=bcGetText().trim();
+  var resultEl=document.getElementById('assist-result');
+  var resultText=document.getElementById('assist-result-text');
+  resultEl.style.display='block';
+  resultText.textContent='Generating...';
+  input.value='';
+  try{
+    var r=await apiFetch('/broadcast/ai/assist',{method:'POST',body:JSON.stringify({action:'custom',body:body,instruction:instruction})});
+    BC_ASSIST_RESULT=r.result||'';
+    resultText.textContent=BC_ASSIST_RESULT;
+  }catch(e){
+    resultText.textContent='Failed. Try again.';
+  }
+}
+function applyAssistResult(){
+  if(!BC_ASSIST_RESULT)return;
+  var editor=document.getElementById('bc-editor');
+  editor.innerText=BC_ASSIST_RESULT;
+  document.getElementById('assist-result').style.display='none';
+  BC_ASSIST_RESULT='';
+}
+
+// ── Send broadcast ─────────────────────────────────────────────────────────────
+async function doBroadcast(){
+  var subj=document.getElementById('bc-subject').value.trim();
+  var html=bcGetContent();
+  var text=bcGetText().trim();
+  if(!subj||!text){showAlert('broadcast','Fill subject and message','error');return;}
+  var body={subject:subj,message:text,html:html,target:BC_TARGET};
+  if(BC_TARGET==='plan'){
+    var plan=document.getElementById('bc-plan').value;
+    if(!plan){showAlert('broadcast','Select a plan','error');return;}
+    body.plan=plan;
+  }else if(BC_TARGET==='user'){
+    var userId=document.getElementById('bc-user-id').value.trim();
+    if(!userId){showAlert('broadcast','Enter a user ID or email','error');return;}
+    body.user_id=userId;
+  }else if(BC_TARGET==='upload'){
+    var rawList=document.getElementById('bc-email-list').value;
+    if(rawList.trim())bcParseEmails(rawList);
+    if(!BC_UPLOADED_EMAILS.length){showAlert('broadcast','Upload or paste email addresses first','error');return;}
+    body.email_list=BC_UPLOADED_EMAILS;body.target='upload';
+  }
+  var label=BC_TARGET==='all'?'ALL users':BC_TARGET==='plan'?'all '+body.plan.toUpperCase()+' users':BC_TARGET==='user'?'user '+body.user_id.slice(0,12)+'...':BC_UPLOADED_EMAILS.length+' uploaded emails';
+  if(!confirm('Send "'+subj+'" to '+label+'?\n\nThis cannot be undone.'))return;
+  try{
+    var r=await apiFetch('/broadcast',{method:'POST',body:JSON.stringify(body)});
+    showAlert('broadcast','✅ Sent: '+r.sent+' | Failed: '+r.failed+' | Skipped: '+r.skipped,'success');
+    bcClear();loadBroadcasts();
+  }catch(e){showAlert('broadcast',e.detail||'Broadcast failed','error');}
+}
+
+// ── Broadcast history (accordion) ─────────────────────────────────────────────
+function bcTargetLabel(b){
+  if(b.target==='plan')return '📋 Plan: '+b.plan;
+  if(b.target==='user')return '👤 User';
+  if(b.target==='upload')return '📩 '+(b.recipients||0)+' emails';
+  return '🌐 All users';
+}
+async function loadBroadcasts(){
+  try{
+    var d=await apiFetch('/broadcasts'),list=d.broadcasts||[];
+    BC_HISTORY=list;
+    var el=document.getElementById('broadcast-history');
+    if(!list.length){el.innerHTML='<div class="loading">No broadcasts yet</div>';return;}
+    el.innerHTML=list.map(function(b,idx){
+      var accent={all:'var(--teal)',plan:'var(--violet)',user:'var(--gold)',upload:'#60a5fa'}[b.target]||'var(--teal)';
+      return '<div class="bc-accordion" id="bca-'+idx+'">'
+        +'<div class="bc-accordion-hdr" onclick="toggleBcAccordion('+idx+')" style="display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer">'
+        +'<div style="width:6px;height:6px;border-radius:50%;background:'+accent+';flex-shrink:0"></div>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+b.subject+'</div>'
+        +'<div style="font-size:11px;color:var(--text3);margin-top:1px">'+bcTargetLabel(b)+' · <span style="color:var(--teal)">'+b.sent+' sent</span>'+(b.failed>0?' · <span style="color:var(--rose)">'+b.failed+' failed</span>':'')+'</div>'
+        +'</div>'
+        +'<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">'
+        +'<span style="font-size:10px;color:var(--text3)">'+ago(b.ts)+'</span>'
+        +'<svg id="bcchev-'+idx+'" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color:var(--text3);transition:transform .18s"><path d="M4 6l4 4 4-4"/></svg>'
+        +'</div></div>'
+        +'<div id="bcbody-'+idx+'" style="display:none;padding:0 14px 12px;border-top:1px solid var(--border)">'
+        +'<div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin:10px 0 6px">Message</div>'
+        +'<div style="font-size:12.5px;color:var(--text2);line-height:1.65;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:10px 12px;max-height:160px;overflow-y:auto;white-space:pre-wrap">'+(b.message||'(no body stored)')+'</div>'
+        +'<button class="btn btn-teal btn-sm" style="width:100%;justify-content:center;margin-top:10px" onclick="bcReuseIdx('+idx+')">↵ Reuse as template</button>'
+        +'</div></div>';
+    }).join('');
+  }catch(e){document.getElementById('broadcast-history').innerHTML='<div class="loading">Failed to load</div>';}
+}
+function toggleBcAccordion(idx){
+  var body=document.getElementById('bcbody-'+idx);
+  var chev=document.getElementById('bcchev-'+idx);
+  var isOpen=body.style.display==='block';
+  document.querySelectorAll('[id^="bcbody-"]').forEach(function(b){b.style.display='none';});
+  document.querySelectorAll('[id^="bcchev-"]').forEach(function(c){c.style.transform='';});
+  if(!isOpen){body.style.display='block';if(chev)chev.style.transform='rotate(180deg)';}
+}
+function bcReuseIdx(idx){
+  var b=BC_HISTORY[idx];
+  if(!b)return;
+  document.getElementById('bc-subject').value=b.subject||'';
+  var editor=document.getElementById('bc-editor');
+  if(b.html)editor.innerHTML=b.html;
+  else editor.innerText=b.message||b.body||'';
+  switchBcTab('compose');
+  showAlert('broadcast','Template loaded — edit and send when ready','success');
+}
+function bcReuseTemplate(){if(BC_DETAIL)bcReuseIdx(0);}
+function bcLoadTemplate(){
+  if(!BC_HISTORY.length){showAlert('broadcast','No broadcast history yet','error');return;}
+  toggleBcAccordion(0);
+}
+function closeBcDetail(){/* kept for compatibility */}
 
 
-# ─── Models ───────────────────────────────────────────────────────────────────
 
-class SetTokensRequest(BaseModel):
-    user_id: str
-    tokens: int
-    reason: str = "Admin adjustment"
+async function loadRevenue(){
+  try{
+    var d=await apiFetch('/revenue/chart'),chart=d.chart||[],total=d.total_revenue||0,txCount=d.total_transactions||0;
+    // Fetch live exchange rate
+    var rate=CACHED_RATE||1600;
+    try{
+      if(!CACHED_RATE){
+        var er=await fetch('https://open.er-api.com/v6/latest/USD');
+        var erd=await er.json();
+        rate=erd.rates&&erd.rates.NGN?erd.rates.NGN:1600;
+        CACHED_RATE=rate;
+      }
+    }catch(e){rate=CACHED_RATE||1600;}
+    var totalUsd=(total/rate);
+    var avgNgn=txCount>0?Math.round(total/txCount):0;
+    function _set(id,val){var el=document.getElementById(id);if(el)el.textContent=val;}
+    _set('rev-ngn','₦'+fmt(Math.round(total)));
+    _set('rev-usd','$'+totalUsd.toFixed(2));
+    _set('rev-usd-sub','≈ $'+totalUsd.toFixed(2)+' USD');
+    _set('rev-rate-sub','Rate: ₦'+Math.round(rate)+'/$1');
+    _set('rev-count',fmt(txCount));
+    _set('rev-avg','₦'+fmt(avgNgn));
+    REV_CHART_DATA=chart; REV_TOTAL=total; REV_TX=txCount; REV_RATE=rate;
+    var ctx=document.getElementById('revenue-chart').getContext('2d');
+    if(revChart)revChart.destroy();
+    revChart=new Chart(ctx,{type:'bar',data:{labels:chart.map(function(c){return c.date.slice(5);}),datasets:[{data:chart.map(function(c){return c.amount;}),backgroundColor:'rgba(201,168,76,0.25)',borderColor:'rgba(201,168,76,0.7)',borderWidth:1,borderRadius:4,hoverBackgroundColor:'rgba(201,168,76,0.4)'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'rgba(240,240,248,0.35)',font:{size:10,family:'DM Mono'}}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'rgba(240,240,248,0.35)',font:{size:10,family:'DM Mono'}},beginAtZero:true}}}});
+  }catch(e){console.error(e);}
+}
 
-class SetPlanRequest(BaseModel):
-    user_id: str
-    plan: str
+async function loadTx(){
+  try{var d=await apiFetch('/transactions'),txns=d.transactions||[];TX_DATA=txns;document.getElementById('tx-tbody').innerHTML=txns.length?txns.map(function(t){return '<tr><td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text3)">'+(t.transaction_id||'—')+'</td><td>'+(t.plan?'<span class="tag tag-green">'+t.plan+'</span>':'—')+'</td><td style="font-family:DM Mono,monospace;color:var(--teal)">'+(t.amount?'N'+fmt(t.amount):'—')+'</td><td style="font-family:DM Mono,monospace">'+(t.tokens?fmt(t.tokens):'—')+'</td><td style="color:var(--text3)">'+(t.email||'—')+'</td><td style="color:var(--text3)">'+ago(t.ts)+'</td></tr>';}).join(''):'<tr><td colspan="6" class="loading">No transactions yet</td></tr>';}
+  catch(e){document.getElementById('tx-tbody').innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--rose);padding:20px">Failed to load</td></tr>';}
+}
 
-class UpdatePlanPricingRequest(BaseModel):
-    plan_key: str
-    amount: int
-    tokens: int
-    label: str
-    currency: str = "NGN"
+async function loadPricing(){
+  try{
+    var d=await apiFetch('/pricing'),plans=d.plans||{};
+    var colors={starter:'var(--violet)',pro:'var(--gold)',studio:'var(--teal)'};
+    document.getElementById('plan-grid').innerHTML=Object.keys(plans).map(function(k){
+      var p=plans[k];
+      return '<div class="plan-card"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px"><div style="font-family:Syne,sans-serif;font-size:15px;font-weight:800;color:'+(colors[k]||'var(--gold)')+'">'+p.label+'</div><button class="btn btn-danger btn-xs" onclick="deletePlan(\''+k+'\')">Remove</button></div><div class="field" style="margin-bottom:8px"><label>Label</label><input type="text" id="lbl-'+k+'" value="'+p.label+'"></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px"><div class="field" style="margin:0"><label>Price (NGN)</label><input type="number" id="amt-'+k+'" value="'+p.amount+'"></div><div class="field" style="margin:0"><label>Tokens</label><input type="number" id="tok-'+k+'" value="'+p.tokens+'"></div></div><div style="font-size:11px;color:var(--text3);margin-bottom:12px">'+Math.floor(p.tokens/100)+' videos &middot; key: <code style="font-family:DM Mono,monospace;background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px">'+k+'</code></div><button class="btn btn-teal btn-sm" style="width:100%;justify-content:center" onclick="savePlan(\''+k+'\')">Save changes</button></div>';
+    }).join('');
+  }catch(e){document.getElementById('plan-grid').innerHTML='<div class="loading">Failed to load</div>';}
+}
+async function savePlan(k){var label=document.getElementById('lbl-'+k).value.trim(),amount=parseInt(document.getElementById('amt-'+k).value),tokens=parseInt(document.getElementById('tok-'+k).value);if(!label||!amount||!tokens)return;try{await apiFetch('/pricing/'+k,{method:'PUT',body:JSON.stringify({plan_key:k,label:label,amount:amount,tokens:tokens,currency:'NGN'})});showAlert('pricing',label+' updated successfully','success');loadPricing();}catch(e){showAlert('pricing',e.detail||'Failed','error');}}
+async function deletePlan(k){if(!confirm('Delete plan "'+k+'"?'))return;try{await apiFetch('/pricing/'+k,{method:'DELETE'});showAlert('pricing','Plan removed','success');loadPricing();}catch(e){showAlert('pricing',e.detail||'Failed','error');}}
+async function addPlan(){var k=document.getElementById('new-key').value.trim().toLowerCase(),label=document.getElementById('new-label').value.trim(),amount=parseInt(document.getElementById('new-amount').value),tokens=parseInt(document.getElementById('new-tokens').value);if(!k||!label||!amount||!tokens)return;try{await apiFetch('/pricing',{method:'POST',body:JSON.stringify({plan_key:k,label:label,amount:amount,tokens:tokens,currency:'NGN'})});showAlert('pricing','Plan added','success');['new-key','new-label','new-amount','new-tokens'].forEach(function(id){document.getElementById(id).value='';});loadPricing();}catch(e){showAlert('pricing',e.detail||'Failed','error');}}
 
-class AddPlanRequest(BaseModel):
-    plan_key: str
-    amount: int
-    tokens: int
-    label: str
-    currency: str = "NGN"
+async function loadNiches(){
+  try{
+    var r=await fetch(NAPI),d=await r.json(),niches=d.niches||[];
+    document.getElementById('niches-list').innerHTML=niches.length?'<div class="niche-grid">'+niches.map(function(n){
+      var suggs=(n.suggestions||[]).slice(0,2).join(', ');
+      return '<div class="niche-chip"><div><div style="font-weight:600;font-size:12px">'+n.label+'</div>'+(suggs?'<div style="font-size:10.5px;color:var(--text3);margin-top:1px">'+suggs+'...</div>':'')+'</div><button class="niche-chip-del" onclick="deleteNiche(\''+n.key+'\')" title="Remove">&#215;</button></div>';
+    }).join('')+'</div>':'<div class="loading">No niches yet</div>';
+  }catch(e){document.getElementById('niches-list').innerHTML='<div class="loading">Failed to load</div>';}
+}
+async function addNiche(){
+  var label=document.getElementById('nn-label').value.trim(),key=document.getElementById('nn-key').value.trim().replace(/\s+/g,'');
+  var suggs=document.getElementById('nn-sugg').value.trim().split('\n').map(function(s){return s.trim();}).filter(Boolean);
+  if(!label||!key){showAlert('niches','Label and key are required','error');return;}
+  try{await fetch(NAPI+'/admin',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+KEY,'x-admin-key':KEY},body:JSON.stringify({key:key,label:label,suggestions:suggs})}).then(function(r){return r.ok?r.json():r.json().then(function(e){throw e;});});showAlert('niches',label+' niche added','success');document.getElementById('nn-label').value='';document.getElementById('nn-key').value='';document.getElementById('nn-sugg').value='';loadNiches();}
+  catch(e){showAlert('niches',e.detail||'Failed','error');}
+}
+async function deleteNiche(key){if(!confirm('Remove niche "'+key+'"?'))return;try{await fetch(NAPI+'/admin/'+key,{method:'DELETE',headers:{'Authorization':'Bearer '+KEY,'x-admin-key':KEY}}).then(function(r){return r.ok?r.json():r.json().then(function(e){throw e;});});showAlert('niches','Removed','success');loadNiches();}catch(e){showAlert('niches',e.detail||'Failed','error');}}
 
-class SuspendUserRequest(BaseModel):
-    user_id: str
-    suspended: bool
-    reason: str = ""
+async function loadCoupons(){
+  try{var d=await apiFetch('/coupons'),coupons=d.coupons||[];document.getElementById('coupons-tbody').innerHTML=coupons.length?coupons.map(function(c){return '<tr><td style="font-family:DM Mono,monospace;font-weight:500;color:var(--gold)">'+c.code+'</td><td style="font-family:DM Mono,monospace">+'+fmt(c.tokens)+'</td><td style="font-family:DM Mono,monospace">'+c.uses+(c.max_uses>0?' / '+c.max_uses:' / &#8734;')+'</td><td>'+(c.active?'<span class="tag tag-green">Active</span>':'<span class="tag tag-free">Off</span>')+'</td><td><button class="btn btn-danger btn-xs" onclick="deleteCoupon(\''+c.code+'\')">Del</button></td></tr>';}).join(''):'<tr><td colspan="5" class="loading">No coupons yet</td></tr>';}
+  catch(e){document.getElementById('coupons-tbody').innerHTML='<tr><td colspan="5" class="loading">Failed</td></tr>';}
+}
+async function createCoupon(){var code=document.getElementById('cp-code').value.trim().toUpperCase(),tokens=parseInt(document.getElementById('cp-tokens').value),max_uses=parseInt(document.getElementById('cp-uses').value)||0,expires_days=parseInt(document.getElementById('cp-days').value)||0;if(!code||!tokens){showAlert('coupons','Fill code and tokens','error');return;}try{await apiFetch('/coupons',{method:'POST',body:JSON.stringify({code:code,tokens:tokens,max_uses:max_uses,expires_days:expires_days})});showAlert('coupons','Coupon '+code+' created','success');document.getElementById('cp-code').value='';loadCoupons();}catch(e){showAlert('coupons',e.detail||'Failed','error');}}
+async function deleteCoupon(code){if(!confirm('Delete coupon '+code+'?'))return;try{await apiFetch('/coupons/'+code,{method:'DELETE'});showAlert('coupons','Deleted','success');loadCoupons();}catch(e){showAlert('coupons',e.detail||'Failed','error');}}
 
-class BroadcastRequest(BaseModel):
-    target:      str = "all"           # "all" | "plan" | "user" | "upload"
-    plan:        Optional[str] = None  # required if target=plan
-    user_id:     Optional[str] = None  # required if target=user
-    email_list:  Optional[list] = None # required if target=upload
-    subject:     str
-    message:     str
-    html:        Optional[str] = None  # rich HTML body from editor
+async function loadQueue(){
+  var card=document.getElementById('queue-card');
+  try{
+    var d=await apiFetch('/queue'),jobs=d.jobs||[];
+    var colors={processing:'var(--violet)',queued:'var(--gold)',complete:'var(--teal)',failed:'var(--rose)'};
+    card.innerHTML=jobs.length?'<div>'+jobs.map(function(j){return '<div class="queue-row"><div class="q-dot" style="background:'+(colors[j.status]||'#888')+'"></div><div style="font-family:DM Mono,monospace;font-size:11px;color:var(--text3);min-width:110px">'+j.job_id.slice(0,8)+'...</div><span class="tag" style="background:'+(colors[j.status]||'#888')+'22;color:'+(colors[j.status]||'#888')+';min-width:80px;justify-content:center">'+j.status+'</span><div style="flex:1;font-size:12px;color:var(--text2)">'+(j.stage||'')+'</div><div class="q-bar"><div class="q-fill" style="width:'+(j.pct||0)+'%;background:'+(colors[j.status]||'#888')+'"></div></div><span style="font-family:DM Mono,monospace;font-size:11px;color:var(--text3);min-width:32px;text-align:right">'+(j.pct||0)+'%</span></div>';}).join('')+'</div>':'<div class="loading">No active render jobs</div>';
+  }catch(e){card.innerHTML='<div class="loading">Failed to load</div>';}
+}
 
-class CouponRequest(BaseModel):
-    code: str
-    tokens: int
-    max_uses: int = 0
-    expires_days: int = 0
+async function loadLogs(){
+  try{
+    var d=await apiFetch('/logs'),logs=d.logs||[];
+    var ic={top_up:{i:'↑',bg:'rgba(45,212,191,0.12)',c:'var(--teal)'},set_tokens:{i:'✏',bg:'rgba(167,139,250,0.12)',c:'var(--violet)'},set_plan:{i:'◈',bg:'rgba(167,139,250,0.12)',c:'var(--violet)'},pricing_update:{i:'₦',bg:'rgba(201,168,76,0.12)',c:'var(--gold)'},suspend:{i:'⊘',bg:'rgba(248,113,113,0.12)',c:'var(--rose)'},broadcast:{i:'✉',bg:'rgba(96,165,250,0.12)',c:'#60a5fa'},coupon_created:{i:'◆',bg:'rgba(45,212,191,0.12)',c:'var(--teal)'},delete_user:{i:'✗',bg:'rgba(248,113,113,0.12)',c:'var(--rose)'}};
+    document.getElementById('logs-card').innerHTML=logs.length?logs.map(function(l){var s=ic[l.action]||{i:'•',bg:'rgba(255,255,255,0.06)',c:'var(--text3)'};return '<div class="log-row"><div class="log-dot" style="background:'+s.bg+';color:'+s.c+'">'+s.i+'</div><div style="flex:1"><div style="font-weight:600;color:var(--text);font-size:12.5px">'+(l.action||'').replace(/_/g,' ')+'</div><div style="font-size:11.5px;color:var(--text3)">'+(l.reason||'')+' '+(l.tokens?'&middot; '+fmt(l.tokens)+' tokens':'')+' '+(l.user_id?'&middot; '+l.user_id.slice(0,8)+'...':'')+'</div></div><div style="font-family:DM Mono,monospace;font-size:11px;color:var(--text3)">'+ago(l.ts)+'</div></div>';}).join(''):'<div class="loading">No admin actions logged yet</div>';
+  }catch(e){document.getElementById('logs-card').innerHTML='<div class="loading">Failed to load</div>';}
+}
 
-class CreateCouponRequest(BaseModel):
-    code: str
-    tokens: int
-    max_uses: int = 1
-    expires_at: Optional[str] = None
-    description: str = ""
+async function loadAdmins(){
+  try{
+    var r=await fetch(AAPI+'/users',{headers:{'Authorization':'Bearer '+KEY}}),d=await r.json(),admins=d.admins||[];
+    var rc={superadmin:'var(--rose)',admin:'var(--violet)',analytics:'var(--teal)',support:'var(--gold)'};
+    document.getElementById('admins-tbody').innerHTML=admins.length?admins.map(function(a){return '<tr><td style="font-weight:600;color:var(--text)">'+a.full_name+'</td><td style="color:var(--text3);font-size:11.5px">'+a.email+'</td><td><span style="color:'+(rc[a.role]||'var(--text3)')+';font-size:11.5px;font-weight:600;text-transform:capitalize">'+a.role+'</span></td><td><button class="btn btn-danger btn-xs" onclick="toggleAdmin(\''+a.id+'\','+a.active+')">'+(a.active?'Disable':'Enable')+'</button></td></tr>';}).join(''):'<tr><td colspan="4" class="loading">No admin users yet</td></tr>';
+    var rr=await fetch(AAPI+'/roles',{headers:{'Authorization':'Bearer '+KEY}}),rd=await rr.json();
+    document.getElementById('roles-list').innerHTML=(rd.roles||[]).map(function(r){return '<div style="padding:10px 14px;background:var(--ink3);border:1px solid var(--border);border-radius:10px;margin-bottom:8px"><div style="font-family:Syne,sans-serif;font-size:13px;font-weight:700;color:'+(rc[r.role]||'var(--gold)')+';text-transform:capitalize;margin-bottom:3px">'+r.label+'</div><div style="font-size:12px;color:var(--text3)">'+r.description+'</div></div>';}).join('');
+  }catch(e){console.error(e);}
+}
+async function createAdminUser(){
+  var name=document.getElementById('na-name').value.trim(),email=document.getElementById('na-email').value.trim(),pass=document.getElementById('na-pass').value,role=document.getElementById('na-role').value;
+  if(!name||!email||!pass){showAlert('admins','Fill all fields','error');return;}
+  try{var r=await fetch(AAPI+'/users',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+KEY},body:JSON.stringify({full_name:name,email:email,password:pass,role:role})});var d=await r.json();if(!r.ok)throw d;showAlert('admins','Admin user '+email+' created as '+role,'success');document.getElementById('na-name').value='';document.getElementById('na-email').value='';document.getElementById('na-pass').value='';loadAdmins();}
+  catch(e){showAlert('admins',e.detail||'Failed','error');}
+}
+async function toggleAdmin(id,active){try{await fetch(AAPI+'/users/'+id,{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+KEY},body:JSON.stringify({active:!active})});showAlert('admins','Admin '+(active?'deactivated':'activated'),'success');loadAdmins();}catch(e){showAlert('admins','Failed','error');}}
+
+async function doResetPassword(){
+  var np=document.getElementById('reset-new').value,cp=document.getElementById('reset-confirm').value,err=document.getElementById('reset-error');
+  err.classList.remove('on');
+  if(!np||!cp){err.textContent='Please fill both fields';err.classList.add('on');return;}
+  if(np!==cp){err.textContent='Passwords do not match';err.classList.add('on');return;}
+  if(np.length<8){err.textContent='Minimum 8 characters';err.classList.add('on');return;}
+  try{var r=await fetch(AAPI+'/reset-password',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+KEY},body:JSON.stringify({new_password:np,confirm_password:cp})});var d=await r.json();if(!r.ok){err.textContent=d.detail||'Reset failed';err.classList.add('on');return;}document.getElementById('reset-overlay').classList.remove('on');}
+  catch(e){err.textContent='Network error';err.classList.add('on');}
+}
+function updateStrength(v){
+  var bar=document.getElementById('strength-bar'),lbl=document.getElementById('strength-label');
+  if(!v){bar.style.width='0%';lbl.textContent='';return;}
+  var s=0;if(v.length>=8)s++;if(/[A-Z]/.test(v))s++;if(/[0-9]/.test(v))s++;if(/[^A-Za-z0-9]/.test(v))s++;
+  var bg=['','#f87171','#f59e0b','#2dd4bf','#4ade80'][s],lbs=['','Weak','Fair','Good','Strong'][s];
+  bar.style.width=(s*25)+'%';bar.style.background=bg;lbl.textContent=lbs;lbl.style.color=bg;
+}
+
+// ── Excel export helpers ──────────────────────────────────────────────────────
+async function _xlsxDownload(wb, filename){
+  var buf=await wb.xlsx.writeBuffer();
+  var blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.download=filename;a.click();
+  URL.revokeObjectURL(url);
+}
+
+function _xlsxHeader(ws, cols){
+  var row=ws.addRow(cols.map(function(c){return c.header;}));
+  row.eachCell(function(cell){
+    cell.font={bold:true,color:{argb:'FFFFFFFF'},size:11};
+    cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF111118'}};
+    cell.border={bottom:{style:'thin',color:{argb:'FF444455'}}};
+    cell.alignment={vertical:'middle'};
+  });
+  cols.forEach(function(c,i){ws.getColumn(i+1).width=c.width||16;});
+}
+
+async function exportRevenueExcel(){
+  if(!REV_CHART_DATA.length){await loadRevenue();}
+  var wb=new ExcelJS.Workbook();
+  wb.creator='SceneForge Admin';wb.created=new Date();
+
+  // Sheet 1 — Daily revenue
+  var ws1=wb.addWorksheet('Daily Revenue');
+  _xlsxHeader(ws1,[
+    {header:'Date',width:14},{header:'Revenue (NGN)',width:18},
+    {header:'Revenue (USD)',width:18}
+  ]);
+  var rate=REV_RATE||1600;
+  REV_CHART_DATA.forEach(function(r){
+    ws1.addRow([r.date, r.amount, parseFloat((r.amount/rate).toFixed(2))]);
+  });
+  // Totals row
+  var tot=ws1.addRow(['TOTAL', REV_TOTAL, parseFloat((REV_TOTAL/rate).toFixed(2))]);
+  tot.eachCell(function(c){c.font={bold:true};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1A1A24'}};});
+
+  // Sheet 2 — Summary
+  var ws2=wb.addWorksheet('Summary');
+  _xlsxHeader(ws2,[{header:'Metric',width:28},{header:'Value',width:20}]);
+  var today=new Date().toISOString().slice(0,10);
+  [
+    ['Report date', today],
+    ['Total revenue (NGN)', '₦'+fmt(Math.round(REV_TOTAL))],
+    ['Total revenue (USD)', '$'+(REV_TOTAL/rate).toFixed(2)],
+    ['Total transactions', REV_TX],
+    ['Avg per transaction (NGN)', REV_TX>0?'₦'+fmt(Math.round(REV_TOTAL/REV_TX)):'—'],
+    ['Exchange rate used', '₦'+Math.round(rate)+'/$1'],
+  ].forEach(function(r){ws2.addRow(r);});
+
+  await _xlsxDownload(wb,'sceneforge_revenue_'+today+'.xlsx');
+}
+
+async function exportTxExcel(){
+  if(!TX_DATA.length){await loadTx();await new Promise(function(r){setTimeout(r,500);});}
+  var wb=new ExcelJS.Workbook();
+  wb.creator='SceneForge Admin';wb.created=new Date();
+  var ws=wb.addWorksheet('Transactions');
+  _xlsxHeader(ws,[
+    {header:'Transaction ID',width:32},{header:'Plan',width:12},
+    {header:'Amount (NGN)',width:16},{header:'Amount (USD)',width:16},
+    {header:'Tokens',width:12},{header:'User email',width:28},
+    {header:'User ID',width:36},{header:'Date',width:20}
+  ]);
+  var rate=CACHED_RATE||1600;
+  TX_DATA.forEach(function(t){
+    ws.addRow([
+      t.transaction_id||'',
+      t.plan||'',
+      t.amount||0,
+      parseFloat(((t.amount||0)/rate).toFixed(2)),
+      t.tokens||0,
+      t.email||'',
+      t.user_id||'',
+      t.ts?new Date(t.ts).toLocaleString():'',
+    ]);
+  });
+  // Summary row
+  var totalNgn=TX_DATA.reduce(function(s,t){return s+(t.amount||0);},0);
+  var sumRow=ws.addRow(['TOTAL','',totalNgn,parseFloat((totalNgn/rate).toFixed(2)),
+    TX_DATA.reduce(function(s,t){return s+(t.tokens||0);},0),'','','']);
+  sumRow.eachCell(function(c){c.font={bold:true};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1A1A24'}};});
+
+  var today=new Date().toISOString().slice(0,10);
+  await _xlsxDownload(wb,'sceneforge_transactions_'+today+'.xlsx');
+}
+
+var FB_DATA=[];
+
+async function loadFeedback(){
+  try{
+    var d=await apiFetch('/feedback');
+    var items=d.feedback||[];
+    FB_DATA=items;
+
+    // Summary stats
+    var total=items.length;
+    var avg=d.avg_rating||0;
+    var five=items.filter(function(i){return i.rating===5;}).length;
+    var improve=items.filter(function(i){return (i.tags||[]).includes('Needs improvement');}).length;
+    function _s(id,v){var el=document.getElementById(id);if(el)el.textContent=v;}
+    _s('fb-total',total);
+    _s('fb-avg',avg.toFixed(1)+' / 5');
+    _s('fb-five',five);
+    _s('fb-improve',improve);
+
+    // Rating distribution
+    var dist={1:0,2:0,3:0,4:0,5:0};
+    items.forEach(function(i){dist[i.rating]=(dist[i.rating]||0)+1;});
+    var maxD=Math.max.apply(null,Object.values(dist).concat([1]));
+    var EMOJIS={1:'😞',2:'😕',3:'😐',4:'😊',5:'🤩'};
+    document.getElementById('fb-distribution').innerHTML=[5,4,3,2,1].map(function(r){
+      var count=dist[r]||0;
+      var pct=Math.round(count/Math.max(total,1)*100);
+      return '<div class="bar-row"><span style="font-size:16px;min-width:24px">'+EMOJIS[r]+'</span>'
+        +'<div class="bar-track"><div class="bar-fill" style="width:'+Math.round(count/maxD*100)+'%;background:'
+        +(['','#f87171','#fb923c','#fbbf24','#34d399','#2dd4bf'][r])+'"></div></div>'
+        +'<span class="bar-count">'+count+' ('+pct+'%)</span></div>';
+    }).join('');
+
+    // Tag frequency
+    var tagMap={};
+    items.forEach(function(i){(i.tags||[]).forEach(function(t){tagMap[t]=(tagMap[t]||0)+1;});});
+    var sortedTags=Object.entries(tagMap).sort(function(a,b){return b[1]-a[1];}).slice(0,8);
+    var maxT=sortedTags.length?sortedTags[0][1]:1;
+    document.getElementById('fb-tags').innerHTML=sortedTags.length
+      ?sortedTags.map(function(e){
+        return '<div class="bar-row"><span class="bar-label" style="min-width:110px;font-size:11px">'+e[0]+'</span>'
+          +'<div class="bar-track"><div class="bar-fill" style="width:'+Math.round(e[1]/maxT*100)+'%;background:var(--violet)"></div></div>'
+          +'<span class="bar-count">'+e[1]+'</span></div>';
+      }).join('')
+      :'<div style="color:var(--text3);font-size:13px">No tags yet</div>';
+
+    renderFeedback();
+  }catch(e){console.error(e);}
+}
+
+function renderFeedback(){
+  var filter=document.getElementById('fb-filter').value;
+  var items=FB_DATA.filter(function(i){
+    if(filter==='all')return true;
+    if(filter==='5')return i.rating===5;
+    if(filter==='4')return i.rating>=4;
+    if(filter==='3')return i.rating===3;
+    if(filter==='1')return i.rating<=2;
+    return true;
+  });
+  var STARS={1:'★☆☆☆☆',2:'★★☆☆☆',3:'★★★☆☆',4:'★★★★☆',5:'★★★★★'};
+  var COLS={1:'#f87171',2:'#fb923c',3:'#fbbf24',4:'#34d399',5:'#2dd4bf'};
+  var EMOJIS={1:'😞',2:'😕',3:'😐',4:'😊',5:'🤩'};
+  document.getElementById('fb-list').innerHTML=items.length
+    ?items.map(function(i){
+      var tags=(i.tags||[]).map(function(t){
+        return '<span style="font-size:10px;padding:2px 8px;border-radius:100px;background:rgba(167,139,250,0.12);color:#C4B5FD;border:1px solid rgba(167,139,250,0.2)">'+t+'</span>';
+      }).join(' ');
+      return '<div style="padding:16px 20px;border-bottom:1px solid var(--border)">'
+        +'<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">'
+        +'<div style="display:flex;align-items:center;gap:10px">'
+        +'<span style="font-size:22px">'+EMOJIS[i.rating]+'</span>'
+        +'<div><div style="font-family:DM Mono,monospace;font-size:13px;font-weight:700;color:'+(COLS[i.rating]||'#fff')+'">'+STARS[i.rating]+' &nbsp;'+i.rating+'/5</div>'
+        +'<div style="font-size:10.5px;color:var(--text3);margin-top:1px">'+(i.trigger==='video_complete'?'After render':'Time on screen')+' &middot; '+ago(i.ts)+'</div></div>'
+        +'</div>'
+        +(function(){var u=USER_CACHE[i.user_id]||{};var name=u.full_name||i.user_name||'';var email=u.email||i.email||'';if(name||email){return '<span style="font-size:10px;color:var(--text3)">'+name+(email?' &middot; '+email:'')+'</span>';}return '';})()
+        +'</div>'
+        +(tags?'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">'+tags+'</div>':'')
+        +(i.comment?'<div style="font-size:13px;color:var(--text2);background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:10px 12px;line-height:1.6">'+i.comment+'</div>':'')
+        +'</div>';
+    }).join('')
+    :'<div class="loading">No responses match this filter</div>';
+}
+
+async function exportFeedbackExcel(){
+  if(!FB_DATA.length){await loadFeedback();await new Promise(function(r){setTimeout(r,500);});}
+  var wb=new ExcelJS.Workbook();wb.creator='SceneForge Admin';wb.created=new Date();
+  var today=new Date().toISOString().slice(0,10);
+
+  var ws=wb.addWorksheet('Feedback');
+  _xlsxHeader(ws,[
+    {header:'Rating',width:10},{header:'Stars',width:14},{header:'Trigger',width:18},
+    {header:'Tags',width:36},{header:'Comment',width:48},
+    {header:'User name',width:22},{header:'Email',width:28},{header:'Date',width:20}
+  ]);
+  var STARS={1:'★☆☆☆☆',2:'★★☆☆☆',3:'★★★☆☆',4:'★★★★☆',5:'★★★★★'};
+  FB_DATA.forEach(function(i){
+    var u=USER_CACHE[i.user_id]||{};
+    ws.addRow([i.rating,STARS[i.rating]||'',i.trigger||'',(i.tags||[]).join(', '),i.comment||'',
+      u.full_name||i.user_name||'—',u.email||i.email||'—',
+      i.ts?new Date(i.ts).toLocaleString():'']);
+  });
+
+  var ws2=wb.addWorksheet('Summary');
+  _xlsxHeader(ws2,[{header:'Metric',width:28},{header:'Value',width:20}]);
+  var dist={1:0,2:0,3:0,4:0,5:0};
+  FB_DATA.forEach(function(i){dist[i.rating]=(dist[i.rating]||0)+1;});
+  var avg=FB_DATA.length?FB_DATA.reduce(function(s,i){return s+i.rating;},0)/FB_DATA.length:0;
+  [
+    ['Report date',today],['Total responses',FB_DATA.length],['Average rating',avg.toFixed(2)],
+    ['5-star responses',dist[5]||0],['4-star responses',dist[4]||0],['3-star responses',dist[3]||0],
+    ['2-star responses',dist[2]||0],['1-star responses',dist[1]||0],
+  ].forEach(function(r){ws2.addRow(r);});
+
+  await _xlsxDownload(wb,'sceneforge_feedback_'+today+'.xlsx');
+}
+
+async function exportFeedbackPdf(){
+  if(!FB_DATA.length){await loadFeedback();await new Promise(function(r){setTimeout(r,500);});}
+  var today=new Date().toISOString().slice(0,10);
+  var avg=FB_DATA.length?FB_DATA.reduce(function(s,i){return s+i.rating;},0)/FB_DATA.length:0;
+  var dist={1:0,2:0,3:0,4:0,5:0};
+  FB_DATA.forEach(function(i){dist[i.rating]=(dist[i.rating]||0)+1;});
+  var STARS={1:'★☆☆☆☆',2:'★★☆☆☆',3:'★★★☆☆',4:'★★★★☆',5:'★★★★★'};
+
+  var html='<!DOCTYPE html><html><head><meta charset="utf-8">'
+    +'<style>body{font-family:Arial,sans-serif;color:#111;padding:32px;max-width:800px;margin:0 auto}'
+    +'h1{font-size:24px;margin:0 0 4px}p.sub{color:#666;font-size:13px;margin:0 0 28px}'
+    +'h2{font-size:16px;margin:24px 0 10px;border-bottom:1px solid #eee;padding-bottom:6px}'
+    +'.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}'
+    +'.stat{background:#f8f8f8;border-radius:8px;padding:14px;text-align:center}'
+    +'.stat-val{font-size:28px;font-weight:800;color:#7C5CFF}'
+    +'.stat-lbl{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.05em}'
+    +'.item{border:1px solid #eee;border-radius:8px;padding:14px;margin-bottom:10px}'
+    +'.rating{font-size:14px;font-weight:700;color:#7C5CFF;margin-bottom:4px}'
+    +'.meta{font-size:11px;color:#999;margin-bottom:8px}'
+    +'.tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}'
+    +'.tag{background:#f0edff;color:#7C5CFF;border-radius:100px;padding:2px 10px;font-size:11px}'
+    +'.comment{background:#f9f9f9;border-radius:6px;padding:10px;font-size:13px;color:#444;line-height:1.6}'
+    +'@media print{body{padding:16px}.item{break-inside:avoid}}'
+    +'</style></head><body>'
+    +'<h1>SceneForge User Feedback</h1>'
+    +'<p class="sub">Report generated '+today+' &nbsp;&middot;&nbsp; '+FB_DATA.length+' responses</p>'
+    +'<div class="stat-grid">'
+    +'<div class="stat"><div class="stat-val">'+FB_DATA.length+'</div><div class="stat-lbl">Responses</div></div>'
+    +'<div class="stat"><div class="stat-val">'+avg.toFixed(1)+'</div><div class="stat-lbl">Avg rating</div></div>'
+    +'<div class="stat"><div class="stat-val">'+(dist[5]||0)+'</div><div class="stat-lbl">5-star</div></div>'
+    +'<div class="stat"><div class="stat-val">'+(dist[1]+dist[2]||0)+'</div><div class="stat-lbl">Low ratings</div></div>'
+    +'</div>'
+    +'<h2>All responses</h2>';
+
+  FB_DATA.forEach(function(i){
+    html+='<div class="item">'
+      +'<div class="rating">'+STARS[i.rating]+' &nbsp;'+i.rating+'/5</div>'
+      +'<div class="meta">'+(i.trigger==='video_complete'?'After video render':'Time on screen')+' &middot; '+new Date(i.ts).toLocaleDateString()+'</div>';
+    if(i.tags&&i.tags.length)html+='<div class="tags">'+i.tags.map(function(t){return '<span class="tag">'+t+'</span>';}).join('')+'</div>';
+    if(i.comment)html+='<div class="comment">'+i.comment+'</div>';
+    html+='</div>';
+  });
+
+  html+='</body></html>';
+  var w=window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  w.onload=function(){w.print();};
+}
+
+async function exportAnalyticsExcel(){
+  if(!ANA_DATA.total_users){await loadAnalytics();await new Promise(function(r){setTimeout(r,500);});}
+  var wb=new ExcelJS.Workbook();
+  wb.creator='SceneForge Admin';wb.created=new Date();
+  var today=new Date().toISOString().slice(0,10);
+
+  // Sheet 1 — Platform summary
+  var ws1=wb.addWorksheet('Platform Summary');
+  _xlsxHeader(ws1,[{header:'Metric',width:30},{header:'Value',width:20}]);
+  [
+    ['Report date', today],
+    ['Total users', ANA_DATA.total_users||0],
+    ['Total videos created', ANA_DATA.total_videos_created||0],
+    ['Total scenes generated', ANA_DATA.total_scenes_generated||0],
+    ['Avg scenes per video', ANA_DATA.avg_scenes_per_video||0],
+    ['Total transactions', ANA_DATA.total_transactions||0],
+    ['Tokens in circulation', ANA_DATA.total_tokens_in_circulation||0],
+  ].forEach(function(r){ws1.addRow(r);});
+
+  // Sheet 2 — Users by plan
+  var ws2=wb.addWorksheet('Users by Plan');
+  _xlsxHeader(ws2,[{header:'Plan',width:16},{header:'Users',width:12},{header:'% of total',width:14}]);
+  var plans=ANA_DATA.users_by_plan||{};
+  var totalUsers=ANA_DATA.total_users||1;
+  Object.entries(plans).forEach(function(e){
+    ws2.addRow([e[0], e[1], parseFloat((e[1]/totalUsers*100).toFixed(1))+'%']);
+  });
+
+  // Sheet 3 — Top niches
+  var ws3=wb.addWorksheet('Top Niches');
+  _xlsxHeader(ws3,[{header:'Niche',width:24},{header:'Videos',width:14}]);
+  var niches=ANA_DATA.top_niches||{};
+  Object.entries(niches).sort(function(a,b){return b[1]-a[1];}).forEach(function(e){
+    ws3.addRow([e[0], e[1]]);
+  });
+
+  await _xlsxDownload(wb,'sceneforge_analytics_'+today+'.xlsx');
+}
 
 
-# ─── Helpers ──────────────────────────────────────────────────────────────────
+// ── Emoji / symbol picker ─────────────────────────────────────────────────
 
-# Cache _all_users for 60 seconds to avoid repeated full Redis scans
-_all_users_cache: dict = {"ts": 0.0, "data": []}
-_ALL_USERS_TTL = 60  # seconds
+var EP_SYMBOLS = [
+  {name:'alert',sym:'🚨'},{name:'warning',sym:'⚠️'},{name:'announce announce',sym:'📢'},
+  {name:'bell notification',sym:'🔔'},{name:'eyes look',sym:'👀'},{name:'point down',sym:'👇'},
+  {name:'point up',sym:'👆'},{name:'right arrow',sym:'➡️'},{name:'important',sym:'‼️'},
+  {name:'exclaim',sym:'❗'},{name:'red dot',sym:'🔴'},{name:'yellow dot',sym:'🟡'},
+  {name:'green dot',sym:'🟢'},{name:'pin',sym:'📌'},{name:'target bullseye',sym:'🎯'},
+  {name:'key point',sym:'🔑'},{name:'check tick',sym:'✅'},{name:'cross x no',sym:'❌'},
+  {name:'video film',sym:'🎬'},{name:'camera',sym:'🎥'},{name:'rocket launch',sym:'🚀'},
+  {name:'idea lightbulb',sym:'💡'},{name:'trophy win',sym:'🏆'},{name:'money cash',sym:'💰'},
+  {name:'gift present',sym:'🎁'},{name:'growth chart',sym:'📈'},{name:'clock time',sym:'⏰'},
+  {name:'fire hot',sym:'🔥'},{name:'diamond premium',sym:'💎'},{name:'star shine',sym:'🌟'},
+  {name:'strong muscle',sym:'💪'},{name:'celebrate party',sym:'🎉'},{name:'sparkles shine',sym:'✨'},
+  {name:'star gold',sym:'⭐'},{name:'rainbow colour',sym:'🌈'},{name:'flash lightning',sym:'💫'},
+  {name:'blossom flower',sym:'🌸'},{name:'butterfly',sym:'🦋'},{name:'heart purple',sym:'💜'},
+  {name:'heart orange',sym:'🧡'},{name:'bullet point',sym:'•'},{name:'diamond shape',sym:'◆'},
+  {name:'arrow right',sym:'▸'},{name:'angle double',sym:'»'},{name:'four point star',sym:'✦'},
+  {name:'black star',sym:'★'},{name:'checkbox tick',sym:'☑️'},{name:'ribbon bow',sym:'🎀'},
+  {name:'lightning bolt',sym:'⚡'},{name:'explosion boom',sym:'💥'},{name:'double exclaim',sym:'‼️'},
+  {name:'exclaim question',sym:'⁉️'},{name:'new',sym:'🆕'},{name:'free',sym:'🆓'},
+  {name:'top',sym:'🔝'},{name:'hundred percent',sym:'💯'},{name:'medal award',sym:'🏅'},
+  {name:'megaphone loud',sym:'📣'},{name:'broadcast megaphone',sym:'📡'},
+];
 
-async def _all_users(redis, force: bool = False) -> list[dict]:
-    import time
-    now = time.time()
-    if not force and now - _all_users_cache["ts"] < _ALL_USERS_TTL:
-        return _all_users_cache["data"]
-    users = []
-    cursor = 0
-    while True:
-        cursor, keys = await redis.scan(cursor, match="user:*", count=200)
-        for key in keys:
-            if key.count(":") == 1:
-                raw = await redis.get(key)
-                if raw:
-                    try:
-                        data = json.loads(raw)
-                        data.pop("password_hash", None)
-                        users.append(data)
-                    except Exception:
-                        pass
-        if cursor == 0:
-            break
-    _all_users_cache["ts"]   = now
-    _all_users_cache["data"] = users
-    return users
+function toggleEmojiPicker(e){
+  e.stopPropagation();
+  var p=document.getElementById('emoji-picker');
+  p.style.display=p.style.display==='none'?'block':'none';
+  if(p.style.display==='block'){
+    // Save cursor position before picker opens
+    var sel=window.getSelection();
+    if(sel&&sel.rangeCount>0) window._epRange=sel.getRangeAt(0).cloneRange();
+    document.getElementById('ep-search').value='';
+    document.getElementById('ep-search-results').style.display='none';
+  }
+}
 
+document.addEventListener('click',function(e){
+  var p=document.getElementById('emoji-picker');
+  if(p&&!p.contains(e.target)&&!e.target.closest('.bc-tb-btn')){
+    p.style.display='none';
+  }
+});
 
-async def _log_action(redis, action: str, **kwargs):
-    log_key = f"admin:log:{datetime.now(timezone.utc).isoformat()}:{uuid.uuid4().hex[:4]}"
-    await redis.set(log_key, json.dumps({
-        "action": action,
-        "ts": datetime.now(timezone.utc).isoformat(),
-        **kwargs,
-    }), ex=60 * 60 * 24 * 90)
+function switchEpTab(id,btn){
+  document.querySelectorAll('.ep-tab').forEach(function(b){b.classList.remove('on');});
+  document.querySelectorAll('.ep-panel').forEach(function(p){p.style.display='none';});
+  btn.classList.add('on');
+  var panel=document.getElementById('ep-'+id);
+  if(panel){panel.style.display='grid';}
+  document.getElementById('ep-search-results').style.display='none';
+  document.getElementById('ep-search').value='';
+}
 
+function insertSymbol(sym){
+  var editor=document.getElementById('bc-editor');
+  editor.focus();
+  // Restore saved cursor position if available
+  if(window._epRange){
+    var sel=window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(window._epRange);
+  }
+  document.execCommand('insertText',false,sym);
+  // Update saved range to after inserted symbol
+  var sel=window.getSelection();
+  if(sel&&sel.rangeCount>0) window._epRange=sel.getRangeAt(0).cloneRange();
+}
 
-# ─── Stats ────────────────────────────────────────────────────────────────────
+function searchSymbols(q){
+  var results=document.getElementById('ep-search-results');
+  if(!q.trim()){results.style.display='none';return;}
+  var matches=EP_SYMBOLS.filter(function(s){return s.name.includes(q.toLowerCase());}).slice(0,16);
+  if(!matches.length){results.style.display='none';return;}
+  results.style.display='grid';
+  results.innerHTML=matches.map(function(s){
+    return '<button class="ep-btn" data-sym="'+encodeURIComponent(s.sym)+'" onclick="insertSymbol(decodeURIComponent(this.dataset.sym))" title="'+s.name+'">'+s.sym+'</button>';
+  }).join('');
+}
 
-@router.get("/stats")
-async def get_stats(redis=Depends(get_redis), _=Depends(_require_admin)):
-    users = await _all_users(redis)
-    plans = {}
-    niches: dict[str, int] = {}
-    total_scenes = 0
-    total_videos = sum(u.get("videos_created", 0) for u in users)
+// ── CSRF token management ─────────────────────────────────────────────────────
+var CSRF_TOKEN = '';
 
-    for u in users:
-        p = u.get("plan", "free")
-        plans[p] = plans.get(p, 0) + 1
-        for niche, count in (u.get("niche_usage") or {}).items():
-            niches[niche] = niches.get(niche, 0) + count
-        total_scenes += u.get("total_scenes_generated", 0)
+async function fetchCsrfToken() {
+  try {
+    var r = await apiFetch('/csrf-token');
+    CSRF_TOKEN = r.csrf_token || '';
+  } catch(e) {
+    console.warn('CSRF fetch failed', e);
+  }
+}
 
-    cursor2 = 0
-    while True:
-        cursor2, jkeys = await redis.scan(cursor2, match="job:*:progress", count=200)
-        for jkey in jkeys:
-            job_id = jkey.split(":")[1]
-            raw_job = await redis.get(f"job:{job_id}:niche")
-            if raw_job:
-                n = raw_job if isinstance(raw_job, str) else raw_job.decode()
-                niches[n] = niches.get(n, 0) + 1
-        if cursor2 == 0:
-            break
+// Wrap apiFetch to auto-attach CSRF header on mutating requests
+// Patch apiFetch to auto-attach CSRF header — runs after apiFetch is defined
+(function() {
+  var _orig = apiFetch;
+  apiFetch = function(path, opts) {
+    opts = opts || {};
+    var method = (opts.method || 'GET').toUpperCase();
+    if (['POST','PUT','DELETE','PATCH'].indexOf(method) >= 0 && CSRF_TOKEN) {
+      // Merge CSRF into existing opts.headers without overwriting
+      opts = Object.assign({}, opts);
+      opts.headers = Object.assign({'x-csrf-token': CSRF_TOKEN}, opts.headers || {});
+    }
+    return _orig(path, opts).then(function(result) {
+      if (['POST','PUT','DELETE','PATCH'].indexOf(method) >= 0) {
+        fetchCsrfToken(); // rotate after mutating call
+      }
+      return result;
+    });
+  };
+})();
 
-    tx_count = 0
-    cursor = 0
-    while True:
-        cursor, keys = await redis.scan(cursor, match="payment:processed:*", count=200)
-        tx_count += len(keys)
-        if cursor == 0:
-            break
+// ── Cost & margin ─────────────────────────────────────────────────────────────
 
-    avg_scenes = round(total_scenes / total_videos, 1) if total_videos > 0 else 0
-    return {
-        "total_users": len(users),
-        "total_tokens_in_circulation": sum(u.get("tokens_remaining", 0) for u in users),
-        "total_videos_created": total_videos,
-        "total_transactions": tx_count,
-        "users_by_plan": plans,
-        "top_niches": dict(sorted(niches.items(), key=lambda x: x[1], reverse=True)[:8]),
-        "avg_scenes_per_video": avg_scenes,
-        "total_scenes_generated": total_scenes,
+var COST_DATA = {};
+
+async function loadCosts() {
+  try {
+    var d = await apiFetch('/costs/summary');
+    COST_DATA = d.plans || {};
+    var rate = d.exchange_rate || 1600;
+
+    // ── Plan margin cards ──────────────────────────────────────────────────
+    var colors = {starter:'violet', pro:'gold', studio:'teal', free:'rose'};
+    var grid = document.getElementById('cost-plan-grid');
+    if (grid) {
+      grid.innerHTML = Object.entries(COST_DATA).map(function(e) {
+        var k = e[0], p = e[1];
+        var cls = colors[k] || 'gold';
+        var marginColor = p.margin_pct >= 50 ? 'var(--teal)' : p.margin_pct >= 20 ? 'var(--gold)' : 'var(--rose)';
+        return '<div class="stat ' + cls + '">'
+          + '<div class="stat-label">' + (p.plan_label || k) + '</div>'
+          + '<div class="stat-val" style="font-size:22px;color:' + marginColor + '">' + p.margin_pct.toFixed(1) + '%</div>'
+          + '<div class="stat-meta" style="display:flex;flex-direction:column;gap:3px;margin-top:6px">'
+          + '<span>Revenue: $' + (p.price_usd || 0).toFixed(4) + ' <span style="color:var(--text3);font-size:10px">(₦' + fmt(p.price_ngn || 0) + ')</span></span>'
+          + '<span>Avg cost: $' + (p.avg_cost_usd || 0).toFixed(4) + '</span>'
+          + '<span>Margin: $' + (p.margin_usd || 0).toFixed(4) + '</span>'
+          + '<span style="color:var(--text3);font-size:11px">' + fmt(p.renders || 0) + ' renders tracked</span>'
+          + '</div></div>';
+      }).join('') || '<div class="loading">No cost data yet — costs are recorded after each render</div>';
     }
 
-
-# ─── Users ────────────────────────────────────────────────────────────────────
-
-@router.get("/users")
-async def list_users(redis=Depends(get_redis), _=Depends(_require_admin)):
-    users = await _all_users(redis)
-    users.sort(key=lambda u: u.get("created_at", ""), reverse=True)
-    return {"users": users, "total": len(users)}
-
-
-@router.get("/users/export/csv")
-async def export_users_csv(redis=Depends(get_redis), _=Depends(_require_admin)):
-    users = await _all_users(redis)
-    users.sort(key=lambda u: u.get("created_at", ""), reverse=True)
-    output = io.StringIO()
-    writer = csv.DictWriter(output, fieldnames=[
-        "id", "full_name", "email", "plan", "tokens_remaining", "tokens_total",
-        "videos_created", "suspended", "created_at",
-    ])
-    writer.writeheader()
-    for u in users:
-        writer.writerow({
-            "id": u.get("id", ""), "full_name": u.get("full_name", ""),
-            "email": u.get("email", ""), "plan": u.get("plan", "free"),
-            "tokens_remaining": u.get("tokens_remaining", 0),
-            "tokens_total": u.get("tokens_total", 0),
-            "videos_created": u.get("videos_created", 0),
-            "suspended": u.get("suspended", False), "created_at": u.get("created_at", ""),
-        })
-    output.seek(0)
-    filename = f"sceneforge_users_{datetime.now().strftime('%Y%m%d_%H%M')}.csv"
-    return StreamingResponse(
-        iter([output.getvalue()]), media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
-
-
-@router.get("/users/{user_id}")
-async def get_user(user_id: str, redis=Depends(get_redis), _=Depends(_require_admin)):
-    raw = await redis.get(f"user:{user_id}")
-    if not raw:
-        raise HTTPException(status_code=404, detail="User not found")
-    data = json.loads(raw)
-    data.pop("password_hash", None)
-    data["charged_jobs_count"] = await redis.scard(f"user:{user_id}:charged_jobs")
-    return data
-
-
-@router.post("/users/top-up")
-async def admin_top_up(req: SetTokensRequest, redis=Depends(get_redis), _=Depends(_require_admin)):
-    try:
-        updated = await auth_service.add_tokens(redis, req.user_id, req.tokens)
-        await _log_action(redis, "top_up", user_id=req.user_id, tokens=req.tokens, reason=req.reason)
-        return {"success": True, "tokens_remaining": updated.tokens_remaining, "user": updated.email}
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
-@router.post("/users/set-tokens")
-async def admin_set_tokens(req: SetTokensRequest, redis=Depends(get_redis), _=Depends(_require_admin)):
-    raw = await redis.get(f"user:{req.user_id}")
-    if not raw:
-        raise HTTPException(status_code=404, detail="User not found")
-    data = json.loads(raw)
-    old = data.get("tokens_remaining", 0)
-    data["tokens_remaining"] = req.tokens
-    await redis.set(f"user:{req.user_id}", json.dumps(data))
-    await _log_action(redis, "set_tokens", user_id=req.user_id, tokens=req.tokens, old=old, reason=req.reason)
-    return {"success": True, "old_balance": old, "new_balance": req.tokens}
-
-
-@router.post("/users/set-plan")
-async def admin_set_plan(req: SetPlanRequest, redis=Depends(get_redis), _=Depends(_require_admin)):
-    await auth_service.update_plan(redis, req.user_id, req.plan)
-    await _log_action(redis, "set_plan", user_id=req.user_id, plan=req.plan)
-    return {"success": True, "plan": req.plan}
-
-
-@router.post("/users/suspend")
-async def suspend_user(req: SuspendUserRequest, redis=Depends(get_redis), _=Depends(_require_admin)):
-    raw = await redis.get(f"user:{req.user_id}")
-    if not raw:
-        raise HTTPException(status_code=404, detail="User not found")
-    data = json.loads(raw)
-    data["suspended"] = req.suspended
-    data["suspend_reason"] = req.reason
-    await redis.set(f"user:{req.user_id}", json.dumps(data))
-    await _log_action(redis, "suspend" if req.suspended else "unsuspend", user_id=req.user_id, reason=req.reason)
-    return {"success": True, "suspended": req.suspended}
-
-
-@router.delete("/users/{user_id}")
-async def delete_user(user_id: str, redis=Depends(get_redis), _=Depends(_require_admin)):
-    raw = await redis.get(f"user:{user_id}")
-    if not raw:
-        raise HTTPException(status_code=404, detail="User not found")
-    data = json.loads(raw)
-    await redis.delete(f"email_index:{data.get('email', '')}")
-    await redis.delete(f"user:{user_id}")
-    await redis.delete(f"user:{user_id}:charged_jobs")
-    await _log_action(redis, "delete_user", user_id=user_id, email=data.get("email"))
-    return {"success": True, "deleted": user_id}
-
-
-# ─── Pricing ──────────────────────────────────────────────────────────────────
-
-@router.get("/pricing")
-async def get_pricing(redis=Depends(get_redis), _=Depends(_require_admin)):
-    plans = await pricing_service.get_plans(redis)
-    return {"plans": plans}
-
-
-@router.put("/pricing/{plan_key}")
-async def update_pricing(plan_key: str, req: UpdatePlanPricingRequest, redis=Depends(get_redis), _=Depends(_require_admin)):
-    try:
-        plans = await pricing_service.update_plan_pricing(redis, plan_key, req.amount, req.tokens, req.label, req.currency)
-        await _log_action(redis, "pricing_update", plan_key=plan_key, amount=req.amount, tokens=req.tokens, reason=f"Updated {plan_key}")
-        return {"success": True, "plans": plans}
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
-@router.post("/pricing")
-async def add_pricing_plan(req: AddPlanRequest, redis=Depends(get_redis), _=Depends(_require_admin)):
-    plans = await pricing_service.add_plan(redis, req.plan_key, req.amount, req.tokens, req.label, req.currency)
-    await _log_action(redis, "plan_added", plan_key=req.plan_key, amount=req.amount, tokens=req.tokens)
-    return {"success": True, "plans": plans}
-
-
-@router.delete("/pricing/{plan_key}")
-async def delete_pricing_plan(plan_key: str, redis=Depends(get_redis), _=Depends(_require_admin)):
-    try:
-        plans = await pricing_service.delete_plan(redis, plan_key)
-        return {"success": True, "plans": plans}
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
-# ─── Transactions ─────────────────────────────────────────────────────────────
-
-@router.get("/transactions")
-async def list_transactions(redis=Depends(get_redis), _=Depends(_require_admin)):
-    txns = []
-    cursor = 0
-    while True:
-        cursor, keys = await redis.scan(cursor, match="payment:processed:*", count=200)
-        for key in keys:
-            tx_id = key.replace("payment:processed:", "")
-            raw = await redis.get(f"payment:record:{tx_id}")
-            if raw:
-                try:
-                    txns.append(json.loads(raw))
-                    continue
-                except Exception:
-                    pass
-            txns.append({"transaction_id": tx_id, "status": "completed"})
-        if cursor == 0:
-            break
-    txns.sort(key=lambda t: t.get("ts", ""), reverse=True)
-    return {"transactions": txns, "total": len(txns)}
-
-
-@router.get("/revenue/chart")
-async def revenue_chart(redis=Depends(get_redis), _=Depends(_require_admin)):
-    txns = []
-    cursor = 0
-    while True:
-        cursor, keys = await redis.scan(cursor, match="payment:record:*", count=200)
-        for key in keys:
-            raw = await redis.get(key)
-            if raw:
-                try:
-                    txns.append(json.loads(raw))
-                except Exception:
-                    pass
-        if cursor == 0:
-            break
-    daily: dict[str, float] = {}
-    total = 0.0
-    for tx in txns:
-        ts = tx.get("ts", "")
-        amount = float(tx.get("amount", 0))
-        if ts:
-            day = ts[:10]
-            daily[day] = daily.get(day, 0) + amount
-            total += amount
-    from datetime import timedelta
-    today = datetime.now(timezone.utc).date()
-    chart = []
-    for i in range(29, -1, -1):
-        day = str(today - timedelta(days=i))
-        chart.append({"date": day, "amount": daily.get(day, 0)})
-    return {"chart": chart, "total_revenue": total, "total_transactions": len(txns)}
-
-
-# ─── Email broadcast ──────────────────────────────────────────────────────────
-
-@router.post("/broadcast")
-async def broadcast_email(
-    req: BroadcastRequest,
-    redis=Depends(get_redis),
-    _=Depends(_require_admin),
-):
-    """
-    Targeted email broadcast.
-    target=all   → every non-suspended user
-    target=plan  → all users on a specific plan (free/starter/pro/studio)
-    target=user  → one specific user by UUID
-    Use {{name}} and {{email}} in subject/message for personalisation.
-    """
-    from app.services.email import _send
-
-    # ── Collect recipients ────────────────────────────────────────────────────
-    recipients: list[dict] = []
-
-    if req.target == "user":
-        if not req.user_id:
-            raise HTTPException(status_code=400, detail="user_id required for target=user")
-        # Support email lookup as well as UUID
-        if "@" in req.user_id:
-            idx_raw = await redis.get(f"email_index:{req.user_id.lower()}")
-            uid = idx_raw.decode() if isinstance(idx_raw, bytes) else (idx_raw or "")
-        else:
-            uid = req.user_id
-        raw = await redis.get(f"user:{uid}")
-        if not raw:
-            raise HTTPException(status_code=404, detail="User not found")
-        user = json.loads(raw)
-        user.pop("password_hash", None)
-        if user.get("email"):
-            recipients.append(user)
-    elif req.target == "upload":
-        if not req.email_list:
-            raise HTTPException(status_code=400, detail="email_list required for target=upload")
-        for email_addr in req.email_list:
-            email_addr = email_addr.strip().lower()
-            if not email_addr:
-                continue
-            # Try to find user record for personalisation
-            idx_raw = await redis.get(f"email_index:{email_addr}")
-            uid = idx_raw.decode() if isinstance(idx_raw, bytes) else (idx_raw or "")
-            if uid:
-                raw = await redis.get(f"user:{uid}")
-                if raw:
-                    user = json.loads(raw)
-                    user.pop("password_hash", None)
-                    recipients.append(user)
-                    continue
-            # Not a registered user — send with email only
-            recipients.append({"email": email_addr, "full_name": "Creator"})
-    else:
-        all_users = await _all_users(redis)
-        for user in all_users:
-            if not user.get("email"):
-                continue
-            if user.get("suspended"):
-                continue
-            if req.target == "plan":
-                if not req.plan:
-                    raise HTTPException(status_code=400, detail="plan required for target=plan")
-                if user.get("plan", "free") != req.plan:
-                    continue
-            recipients.append(user)
-
-    if not recipients:
-        raise HTTPException(status_code=404, detail="No matching users found")
-
-    logger.info("Broadcast | target=%s plan=%s | recipients=%d | subject=%s",
-                req.target, req.plan, len(recipients), req.subject)
-
-    # ── HTML template ─────────────────────────────────────────────────────────
-    def _make_html(name: str, subject: str, body: str) -> str:
-        html_body = body.replace("\n\n", "</p><p style='margin:0 0 14px'>").replace("\n", "<br>")
-        return f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#080810;font-family:Arial,sans-serif;color:#F0F0FF">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#080810;padding:40px 0">
-    <tr><td align="center">
-      <table width="520" cellpadding="0" cellspacing="0"
-        style="background:#111118;border-radius:16px;border:1px solid rgba(255,255,255,0.08);overflow:hidden">
-        <tr><td style="background:linear-gradient(135deg,#1a0d33,#0a1a2e);padding:28px 40px;text-align:center">
-          <h1 style="margin:0;font-size:24px;font-weight:800;color:#fff">
-            Scene<span style="color:#A78BFA">Forge</span>
-          </h1>
-        </td></tr>
-        <tr><td style="padding:32px 40px">
-          <p style="margin:0 0 14px;font-size:15px;color:rgba(255,255,255,0.85)">Hi {name},</p>
-          <p style="margin:0 0 14px;font-size:14px;color:rgba(255,255,255,0.7);line-height:1.7">{html_body}</p>
-          <p style="margin:24px 0 0;font-size:13px;color:rgba(255,255,255,0.35)">— The SceneForge Team</p>
-        </td></tr>
-        <tr><td style="padding:16px 40px;border-top:1px solid rgba(255,255,255,0.06);text-align:center">
-          <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.2)">SceneForge · AI Video Studio</p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body></html>"""
-
-    # ── Send ──────────────────────────────────────────────────────────────────
-    sent = failed = skipped = 0
-
-    for user in recipients:
-        email = user.get("email", "")
-        name  = user.get("full_name", "Creator")
-        if not email:
-            skipped += 1
-            continue
-        body = req.message.replace("{{name}}", name).replace("{{email}}", email)
-        subj = req.subject.replace("{{name}}", name)
-        html = (req.html or _make_html(name, subj, body)).replace("{{name}}", name)
-        try:
-            await _send(email, subj, html, body)
-            sent += 1
-        except Exception as e:
-            logger.error("Broadcast failed → %s: %s", email, e)
-            failed += 1
-
-    # Store record
-    rec = {
-        "id":         uuid.uuid4().hex[:8],
-        "target":     req.target,
-        "plan":       req.plan or "",
-        "user_id":    req.user_id or "",
-        "subject":    req.subject,
-        "message":    req.message[:500] if req.message else "",
-        "html":       req.html[:5000] if req.html else "",
-        "recipients": len(recipients),
-        "sent":       sent,
-        "failed":     failed,
-        "skipped":    skipped,
-        "ts":         datetime.now(timezone.utc).isoformat(),
-    }
-    await redis.lpush(BROADCAST_KEY, json.dumps(rec))
-    await redis.ltrim(BROADCAST_KEY, 0, 49)
-    await _log_action(redis, "broadcast", subject=req.subject, sent=sent,
-                      errors=failed, reason=f"Target: {req.target}")
-
-    return {"success": True, "sent": sent, "failed": failed,
-            "skipped": skipped, "total": len(recipients)}
-
-
-@router.get("/broadcasts")
-async def list_broadcasts(redis=Depends(get_redis), _=Depends(_require_admin)):
-    raw_list = await redis.lrange(BROADCAST_KEY, 0, 49)
-    broadcasts = [json.loads(r) for r in raw_list]
-    return {"broadcasts": broadcasts}
-
-
-# ─── AI Broadcast helpers ─────────────────────────────────────────────────────
-
-class AICampaignRequest(BaseModel):
-    goal: str           # re-engage | upgrade | feature | thankyou | promo | tips
-    tone: str = "friendly"
-    segment: str = "all"
-    context: str = ""   # extra context from admin
-
-class AISubjectRequest(BaseModel):
-    body: str
-    subject: str = ""
-
-class AIAssistRequest(BaseModel):
-    action: str         # shorten | emotional | cta | rewrite | simplify | urgent | custom
-    body: str
-    instruction: str = ""  # for custom action
-
-
-async def _call_ai(prompt: str, max_tokens: int = 600) -> str:
-    """
-    Call OpenAI for broadcast AI features (campaign generator, writing assistant,
-    subject suggestions). Falls back to Groq if OpenAI key is not set.
-    """
-    cfg = get_settings()
-
-    # ── Primary: OpenAI ───────────────────────────────────────────────────
-    if cfg.openai_api_key:
-        try:
-            from openai import AsyncOpenAI
-            client = AsyncOpenAI(api_key=cfg.openai_api_key)
-            resp = await client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=max_tokens,
-                temperature=0.7,
-            )
-            return resp.choices[0].message.content or ""
-        except Exception as e:
-            logger.warning("OpenAI broadcast AI failed, trying Groq: %s", e)
-
-    # ── Fallback: Groq ────────────────────────────────────────────────────
-    if cfg.groq_api_key:
-        try:
-            from groq import AsyncGroq
-            client = AsyncGroq(api_key=cfg.groq_api_key)
-            resp = await client.chat.completions.create(
-                model=cfg.groq_model or "llama-3.3-70b-versatile",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=max_tokens,
-                temperature=0.7,
-            )
-            return resp.choices[0].message.content or ""
-        except Exception as e:
-            logger.warning("Groq broadcast AI fallback also failed: %s", e)
-
-    raise HTTPException(status_code=503, detail="No AI provider configured (set OPENAI_API_KEY)")
-
-
-@router.post("/broadcast/ai/campaign")
-async def ai_generate_campaign(
-    req: AICampaignRequest,
-    redis=Depends(get_redis),
-    _=Depends(_require_admin),
-):
-    """Generate a full email campaign using Claude."""
-    goal_desc = {
-        "re-engage": "Re-engage inactive users who haven't created a video in 14+ days",
-        "upgrade":   "Encourage Free plan users to upgrade to a paid plan",
-        "feature":   "Announce an exciting new product feature",
-        "thankyou":  "Thank paying subscribers with appreciation and an exclusive offer",
-        "promo":     "Offer a limited-time promo code discount",
-        "tips":      "Share useful tips and tutorials to boost platform usage",
-    }.get(req.goal, req.goal)
-
-    prompt = (
-        "You are a world-class email copywriter for SceneForge, an AI video studio "
-        "for content creators in Nigeria. The app URL is https://scenraforge.com.\n\n"
-        f"Campaign goal: {goal_desc}\n"
-        f"Tone: {req.tone}\n"
-        f"Target segment: {req.segment} users\n"
-        + (f"Extra context: {req.context}\n" if req.context else "")
-        + "\nWrite a complete marketing email:\n"
-        "- Subject line: compelling, max 60 chars\n"
-        "- Email body: conversational, 3-5 short paragraphs, ends with a clear CTA. "
-        "Use {{name}} for personalisation. Sign off as 'The SceneForge Team'.\n"
-        "- Use relevant emojis and symbols naturally throughout to boost engagement — attention markers (📢 🔔 👇 ⚠️), visual indicators (✅ 🎯 🔥 🚀), decorative elements (✨ ⭐ 💎 🌟), and emphasis symbols (⚡ 💯 🏆 🎉). Place them at the start of key lines, next to CTAs, and to break up sections. Do not overdo it — 4 to 8 emojis per email is ideal.\n\n"
-        "Respond ONLY with JSON, no markdown:\n"
-        '{"subject":"...","body":"..."}'
-    )
-    text = await _call_ai(prompt, max_tokens=800)
-    import re as _re
-    clean = _re.sub(r"```json|```", "", text).strip()
-    try:
-        result = json.loads(clean)
-        return {"subject": result.get("subject", ""), "body": result.get("body", "")}
-    except Exception:
-        return {"subject": "", "body": text}
-
-
-@router.post("/broadcast/ai/subjects")
-async def ai_subject_suggestions(
-    req: AISubjectRequest,
-    redis=Depends(get_redis),
-    _=Depends(_require_admin),
-):
-    """Generate 3 subject line variants for a broadcast."""
-    prompt = (
-        "You are an email marketing expert for SceneForge, an AI video creation tool "
-        "for content creators in Nigeria.\n\n"
-        f"Email body:\n{req.body or req.subject}\n\n"
-        "Generate exactly 3 subject lines:\n"
-        "1. CURIOSITY: Makes reader curious without being clickbait. May include 1 emoji.\n"
-        "2. DIRECT: Clear and benefit-focused. May include 1 emoji.\n"
-        "3. URGENCY: Creates urgency or FOMO. May include 1 emoji like ⏰ 🔥 ‼️.\n\n"
-        "Respond ONLY with JSON array, no markdown:\n"
-        '[{"type":"curiosity","subject":"..."},{"type":"direct","subject":"..."},{"type":"urgency","subject":"..."}]'
-    )
-    text = await _call_ai(prompt, max_tokens=300)
-    import re as _re
-    clean = _re.sub(r"```json|```", "", text).strip()
-    try:
-        suggestions = json.loads(clean)
-        return {"suggestions": suggestions}
-    except Exception:
-        return {"suggestions": []}
-
-
-@router.post("/broadcast/ai/assist")
-async def ai_writing_assist(
-    req: AIAssistRequest,
-    redis=Depends(get_redis),
-    _=Depends(_require_admin),
-):
-    """AI writing assistant — rewrite, shorten, improve the email body."""
-    _emoji = (
-        "Use relevant emojis and symbols naturally throughout to boost engagement — attention markers (📢 🔔 👇 ⚠️), visual indicators (✅ 🎯 🔥 🚀), decorative elements (✨ ⭐ 💎 🌟), and emphasis symbols (⚡ 💯 🏆 🎉). Place them at the start of key lines, next to CTAs, and to break up sections. Do not overdo it — 4 to 8 emojis per email is ideal. "
-        "Return ONLY the rewritten email body."
-    )
-    action_prompts = {
-        "shorten":   "Shorten this email to under 100 words keeping the core message and CTA. " + _emoji,
-        "emotional": "Rewrite this email to be more emotionally resonant and personal. " + _emoji,
-        "cta":       "Add a strong call-to-action button/link to scenraforge.com. " + _emoji,
-        "rewrite":   "Rewrite this email in a fresher, more engaging way. " + _emoji,
-        "simplify":  "Simplify this email — shorter sentences, simpler words, easier to read. " + _emoji,
-        "urgent":    "Rewrite this email with more urgency and FOMO. " + _emoji,
-        "custom":    req.instruction + " Also: " + _emoji,
-    }
-    task = action_prompts.get(req.action, req.instruction)
-    prompt = (
-        "SceneForge is an AI video studio for Nigerian content creators.\n\n"
-        f"Original email:\n{req.body}\n\n"
-        f"Task: {task}\n\n"
-        "Return ONLY the result, no preamble or explanation."
-    )
-    result = await _call_ai(prompt, max_tokens=700)
-    return {"result": result}
-
-
-# ─── Coupons ──────────────────────────────────────────────────────────────────
-
-@router.get("/coupons")
-async def list_coupons(redis=Depends(get_redis), _=Depends(_require_admin)):
-    coupons = await coupon_service.list_coupons(redis)
-    return {"coupons": coupons}
-
-
-@router.post("/coupons")
-async def create_coupon(req: CreateCouponRequest, redis=Depends(get_redis), _=Depends(_require_admin)):
-    try:
-        coupon = await coupon_service.create_coupon(
-            redis, req.code, req.tokens, req.max_uses, req.expires_at, req.description
-        )
-        return {"success": True, "coupon": coupon}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.delete("/coupons/{code}")
-async def delete_coupon(code: str, redis=Depends(get_redis), _=Depends(_require_admin)):
-    await coupon_service.delete_coupon(redis, code)
-    return {"success": True}
-
-
-@router.post("/coupons/{code}/deactivate")
-async def deactivate_coupon(code: str, redis=Depends(get_redis), _=Depends(_require_admin)):
-    try:
-        coupon = await coupon_service.deactivate_coupon(redis, code)
-        return {"success": True, "coupon": coupon}
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
-# ─── Analytics ────────────────────────────────────────────────────────────────
-
-@router.get("/analytics/revenue")
-async def analytics_revenue(days: int = 30, redis=Depends(get_redis), _=Depends(_require_admin)):
-    data = await analytics_service.get_revenue_chart(redis, days)
-    return {"data": data, "days": days}
-
-
-@router.get("/analytics/usage")
-async def analytics_usage(redis=Depends(get_redis), _=Depends(_require_admin)):
-    stats = await analytics_service.get_usage_stats(redis)
-    return stats
-
-
-# ─── Render queue ─────────────────────────────────────────────────────────────
-
-@router.get("/queue")
-async def get_render_queue(redis=Depends(get_redis), _=Depends(_require_admin)):
-    jobs = []
-    cursor = 0
-    while True:
-        cursor, keys = await redis.scan(cursor, match="job:*:progress", count=500)
-        for key in keys:
-            raw = await redis.get(key)
-            if raw:
-                try:
-                    data = json.loads(raw)
-                    job_id = key.replace("job:", "").replace(":progress", "")
-                    user_id_raw = await redis.get(f"job:{job_id}:user_id")
-                    user_id = user_id_raw.decode() if isinstance(user_id_raw, bytes) else (user_id_raw or "")
-                    jobs.append({
-                        "job_id":  job_id,
-                        "status":  data.get("status", "unknown"),
-                        "stage":   data.get("stage", ""),
-                        "pct":     data.get("pct", 0),
-                        "user_id": user_id[:8] + "…" if user_id else "—",
-                        "error":   data.get("error", ""),
-                    })
-                except Exception:
-                    pass
-        if cursor == 0:
-            break
-    order = {"processing": 0, "queued": 1, "complete": 2, "failed": 3}
-    jobs.sort(key=lambda j: order.get(j["status"], 9))
-    return {"jobs": jobs, "total": len(jobs)}
-
-
-# ─── Activity logs ────────────────────────────────────────────────────────────
-
-@router.get("/logs")
-async def get_admin_logs(redis=Depends(get_redis), _=Depends(_require_admin)):
-    logs = []
-    cursor = 0
-    while True:
-        cursor, keys = await redis.scan(cursor, match="admin:log:*", count=200)
-        for key in keys:
-            raw = await redis.get(key)
-            if raw:
-                try:
-                    logs.append(json.loads(raw))
-                except Exception:
-                    pass
-        if cursor == 0:
-            break
-    logs.sort(key=lambda l: l.get("ts", ""), reverse=True)
-    return {"logs": logs[:50]}
-
-
-# ─── User feedback ────────────────────────────────────────────────────────────
-
-@router.get("/feedback")
-async def list_feedback(redis=Depends(get_redis), _=Depends(_require_admin)):
-    """Return last 100 feedback entries with user name/email resolved."""
-    raw_list = await redis.lrange("sceneforge:feedback", 0, 99)
-    items = []
-    for r in raw_list:
-        try:
-            item = json.loads(r)
-            # Resolve user name + email from Redis
-            uid = item.get("user_id", "")
-            if uid and uid != "anonymous":
-                user_raw = await redis.get(f"user:{uid}")
-                if user_raw:
-                    try:
-                        u = json.loads(user_raw)
-                        item["user_name"] = u.get("full_name", "")
-                        item["email"]     = u.get("email", "")
-                    except Exception:
-                        pass
-            items.append(item)
-        except Exception:
-            pass
-    avg = sum(i.get("rating", 0) for i in items) / len(items) if items else 0
-    return {
-        "feedback": items,
-        "total": len(items),
-        "avg_rating": round(avg, 2),
+    // ── Breakdown table ────────────────────────────────────────────────────
+    var tbody = document.getElementById('cost-breakdown-tbody');
+    if (tbody) {
+      tbody.innerHTML = Object.entries(COST_DATA).map(function(e) {
+        var k = e[0], p = e[1];
+        var bd = p.cost_breakdown || {};
+        var marginColor = p.margin_pct >= 50 ? 'var(--teal)' : p.margin_pct >= 20 ? 'var(--gold)' : 'var(--rose)';
+        var marginBg = p.margin_pct >= 50 ? 'rgba(45,212,191,0.08)' : p.margin_pct >= 20 ? 'rgba(201,168,76,0.08)' : 'rgba(248,113,113,0.08)';
+        return '<tr style="background:' + marginBg + '">'
+          + '<td><span class="tag tag-' + (k === 'pro' ? 'pro' : k === 'studio' ? 'studio' : k === 'starter' ? 'starter' : 'free') + '">' + (p.plan_label || k) + '</span></td>'
+          + '<td style="font-family:DM Mono,monospace;color:var(--teal)">$' + (p.price_usd || 0).toFixed(4) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:11px">$' + (bd.voice || 0).toFixed(5) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:11px">$' + (bd.visual || 0).toFixed(5) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:11px">$' + (bd.ai || 0).toFixed(5) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:11px">$' + (bd.compute || 0).toFixed(5) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:11px">$' + (bd.storage || 0).toFixed(5) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;color:var(--rose)">$' + (p.avg_cost_usd || 0).toFixed(5) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;color:' + marginColor + '">$' + (p.margin_usd || 0).toFixed(4) + '</td>'
+          + '<td><span style="font-weight:700;color:' + marginColor + '">' + (p.margin_pct || 0).toFixed(1) + '%</span></td>'
+          + '</tr>';
+      }).join('') || '<tr><td colspan="10" class="loading">No data yet</td></tr>';
     }
 
+    // ── Recent costs ───────────────────────────────────────────────────────
+    var recent = await apiFetch('/costs/recent');
+    var records = recent.records || [];
+    var rtbody = document.getElementById('cost-recent-tbody');
+    if (rtbody) {
+      rtbody.innerHTML = records.length ? records.map(function(r) {
+        var mc = r.margin_pct >= 50 ? 'var(--teal)' : r.margin_pct >= 20 ? 'var(--gold)' : 'var(--rose)';
+        return '<tr>'
+          + '<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text3)">' + r.job_id.slice(0,8) + '…</td>'
+          + '<td>' + planTag(r.plan || 'free') + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:12px;color:var(--rose)">$' + (r.total_cost_usd || 0).toFixed(5) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:12px;color:' + mc + '">' + (r.margin_pct || 0).toFixed(1) + '%</td>'
+          + '<td style="color:var(--text3);font-size:11px">' + ago(r.ts) + '</td>'
+          + '</tr>';
+      }).join('') : '<tr><td colspan="5" class="loading">No renders tracked yet</td></tr>';
+    }
 
-# ─── Backfill utilities ───────────────────────────────────────────────────────
+  } catch(e) {
+    console.error('loadCosts error:', e);
+    var g = document.getElementById('cost-plan-grid');
+    if (g) g.innerHTML = '<div class="loading">Failed to load cost data</div>';
+  }
+}
 
-@router.post("/transactions/backfill")
-async def backfill_transactions(redis=Depends(get_redis), _=Depends(_require_admin)):
-    import httpx
-    filled = skipped = 0
-    cursor = 0
-    tx_ids = []
-    while True:
-        cursor, keys = await redis.scan(cursor, match="payment:processed:*", count=200)
-        for key in keys:
-            tx_id = key.replace("payment:processed:", "")
-            existing = await redis.get(f"payment:record:{tx_id}")
-            if not existing:
-                tx_ids.append(tx_id)
-            else:
-                skipped += 1
-        if cursor == 0:
-            break
-    FLW_BASE = "https://api.flutterwave.com/v3"
-    async with httpx.AsyncClient() as client:
-        for tx_id in tx_ids:
-            try:
-                resp = await client.get(
-                    f"{FLW_BASE}/transactions/{tx_id}/verify",
-                    headers={"Authorization": f"Bearer {settings.flutterwave_secret_key}"},
-                    timeout=10,
-                )
-                if resp.status_code != 200:
-                    continue
-                data = resp.json().get("data", {})
-                if data.get("status") != "successful":
-                    continue
-                meta = data.get("meta", {}) or {}
-                record = {
-                    "transaction_id": tx_id,
-                    "tx_ref": data.get("tx_ref", ""),
-                    "user_id": meta.get("user_id", ""),
-                    "email": data.get("customer", {}).get("email", ""),
-                    "plan": meta.get("plan_key", "unknown"),
-                    "tokens": int(meta.get("tokens", 0)),
-                    "amount": float(data.get("amount", 0)),
-                    "currency": data.get("currency", "NGN"),
-                    "status": "completed",
-                    "ts": data.get("created_at", ""),
-                }
-                await redis.set(f"payment:record:{tx_id}", json.dumps(record), ex=60*60*24*90)
-                filled += 1
-            except Exception as e:
-                logger.warning("Backfill failed for tx %s: %s", tx_id, e)
-    return {"filled": filled, "skipped_already_rich": skipped, "total": len(tx_ids) + skipped}
+// ── Audit trail ───────────────────────────────────────────────────────────────
 
+var AUDIT_ENTRIES = [];
 
-@router.post("/analytics/backfill-scenes")
-async def backfill_scene_stats(redis=Depends(get_redis), _=Depends(_require_admin)):
-    filled = 0
-    cursor = 0
-    user_scene_counts: dict[str, int] = {}
-    while True:
-        cursor, keys = await redis.scan(cursor, match="job:*:progress", count=200)
-        for key in keys:
-            job_id = key.split(":")[1]
-            raw = await redis.get(key)
-            if not raw:
-                continue
-            try:
-                data = json.loads(raw)
-                if data.get("status") != "complete":
-                    continue
-                scene_count = data.get("scene_count", 0)
-                if not scene_count:
-                    continue
-                uid_raw = await redis.get(f"job:{job_id}:user_id")
-                uid = uid_raw.decode() if isinstance(uid_raw, bytes) else (uid_raw or "")
-                if uid:
-                    user_scene_counts[uid] = user_scene_counts.get(uid, 0) + scene_count
-            except Exception:
-                pass
-        if cursor == 0:
-            break
-    for uid, total in user_scene_counts.items():
-        raw_user = await redis.get(f"user:{uid}")
-        if raw_user:
-            try:
-                data = json.loads(raw_user)
-                if data.get("total_scenes_generated", 0) == 0:
-                    data["total_scenes_generated"] = total
-                    await redis.set(f"user:{uid}", json.dumps(data))
-                    filled += 1
-            except Exception:
-                pass
-    return {"filled_users": filled, "user_scene_counts": user_scene_counts}
+var AUDIT_ACTION_ICONS = {
+  top_up:         {i:'↑', c:'var(--teal)',   bg:'rgba(45,212,191,0.12)'},
+  set_tokens:     {i:'✏', c:'var(--violet)', bg:'rgba(167,139,250,0.12)'},
+  set_plan:       {i:'◈', c:'var(--violet)', bg:'rgba(167,139,250,0.12)'},
+  pricing_update: {i:'₦', c:'var(--gold)',   bg:'rgba(201,168,76,0.12)'},
+  plan_added:     {i:'+', c:'var(--teal)',   bg:'rgba(45,212,191,0.12)'},
+  suspend:        {i:'⊘', c:'var(--rose)',   bg:'rgba(248,113,113,0.12)'},
+  unsuspend:      {i:'✓', c:'var(--teal)',   bg:'rgba(45,212,191,0.12)'},
+  broadcast:      {i:'✉', c:'#60a5fa',       bg:'rgba(96,165,250,0.12)'},
+  delete_user:    {i:'✗', c:'var(--rose)',   bg:'rgba(248,113,113,0.12)'},
+  coupon_created: {i:'◆', c:'var(--teal)',   bg:'rgba(45,212,191,0.12)'},
+  coupon_deleted: {i:'◇', c:'var(--rose)',   bg:'rgba(248,113,113,0.12)'},
+};
+
+function auditDetails(e) {
+  var parts = [];
+  if (e.user_id)    parts.push('User: ' + e.user_id.slice(0,8) + '…');
+  if (e.tokens)     parts.push(fmt(e.tokens) + ' tokens');
+  if (e.plan)       parts.push('Plan: ' + e.plan);
+  if (e.plan_key)   parts.push('Plan key: ' + e.plan_key);
+  if (e.amount)     parts.push('₦' + fmt(e.amount));
+  if (e.subject)    parts.push('"' + e.subject.slice(0,40) + '"');
+  if (e.sent)       parts.push(fmt(e.sent) + ' sent');
+  if (e.reason)     parts.push(e.reason.slice(0,50));
+  if (e.email)      parts.push(e.email);
+  if (e.old !== undefined) parts.push(fmt(e.old) + ' → ' + fmt(e.tokens));
+  return parts.join(' · ') || '—';
+}
+
+function renderAuditTable(entries) {
+  var tbody = document.getElementById('audit-tbody');
+  if (!tbody) return;
+  if (!entries.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="loading">No audit events yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = entries.map(function(e) {
+    var ic = AUDIT_ACTION_ICONS[e.action] || {i:'•', c:'var(--text3)', bg:'rgba(255,255,255,0.06)'};
+    var roleColor = {superadmin:'var(--rose)', admin:'var(--violet)', analytics:'var(--teal)', support:'var(--gold)'}[e.performed_by_role] || 'var(--text3)';
+    return '<tr>'
+      + '<td style="font-size:11px;color:var(--text3);white-space:nowrap">' + ago(e.ts) + '<div style="font-size:10px;color:var(--text3);margin-top:1px">' + (e.ts || '').slice(11,19) + ' UTC</div></td>'
+      + '<td><span style="display:inline-flex;align-items:center;gap:5px;background:' + ic.bg + ';color:' + ic.c + ';border-radius:6px;padding:3px 8px;font-size:11.5px;font-weight:600">'
+      + '<span>' + ic.i + '</span>' + (e.action || '').replace(/_/g,' ') + '</span></td>'
+      + '<td><div style="font-size:12.5px;font-weight:600;color:var(--text)">' + (e.performed_by_name || e.performed_by_email || 'unknown') + '</div>'
+      + '<div style="font-size:11px;color:var(--text3)">' + (e.performed_by_email || '') + '</div></td>'
+      + '<td><span style="font-size:11px;font-weight:600;color:' + roleColor + ';text-transform:capitalize">' + (e.performed_by_role || '—') + '</span></td>'
+      + '<td style="font-size:12px;color:var(--text2)">' + auditDetails(e) + '</td>'
+      + '</tr>';
+  }).join('');
+  var countEl = document.getElementById('audit-count');
+  if (countEl) countEl.textContent = entries.length + ' events';
+}
+
+function filterAuditLocal() {
+  var q = (document.getElementById('audit-search').value || '').toLowerCase();
+  if (!q) { renderAuditTable(AUDIT_ENTRIES); return; }
+  renderAuditTable(AUDIT_ENTRIES.filter(function(e) {
+    return JSON.stringify(e).toLowerCase().includes(q);
+  }));
+}
+
+async function loadAudit() {
+  var actionFilter  = (document.getElementById('audit-filter-action') || {}).value || '';
+  var adminFilter   = (document.getElementById('audit-filter-admin')  || {}).value || '';
+  var tbody = document.getElementById('audit-tbody');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="5"><div class="loading"></div></td></tr>';
+
+  try {
+    // Load filter options on first run
+    var actionSel = document.getElementById('audit-filter-action');
+    if (actionSel && actionSel.options.length <= 1) {
+      try {
+        var meta = await apiFetch('/audit/actions');
+        (meta.actions || []).forEach(function(a) {
+          var opt = document.createElement('option');
+          opt.value = a; opt.textContent = a.replace(/_/g,' ');
+          actionSel.appendChild(opt);
+        });
+        var adminSel = document.getElementById('audit-filter-admin');
+        (meta.admins || []).forEach(function(a) {
+          var opt = document.createElement('option');
+          opt.value = a; opt.textContent = a;
+          adminSel.appendChild(opt);
+        });
+      } catch(e) {}
+    }
+
+    var qs = '';
+    if (actionFilter) qs += '?action=' + actionFilter;
+    if (adminFilter)  qs += (qs ? '&' : '?') + 'performed_by=' + encodeURIComponent(adminFilter);
+    var d = await apiFetch('/audit' + qs);
+    AUDIT_ENTRIES = d.entries || [];
+
+    // Summary stats
+    function _s(id, v) { var el = document.getElementById(id); if(el) el.textContent = v; }
+    _s('audit-total',      fmt(AUDIT_ENTRIES.length));
+    _s('audit-deletes',    fmt(AUDIT_ENTRIES.filter(function(e){ return e.action === 'delete_user'; }).length));
+    _s('audit-broadcasts', fmt(AUDIT_ENTRIES.filter(function(e){ return e.action === 'broadcast'; }).length));
+    _s('audit-tokens',     fmt(AUDIT_ENTRIES.filter(function(e){ return ['top_up','set_tokens'].indexOf(e.action) >= 0; }).length));
+
+    filterAuditLocal();
+  } catch(e) {
+    if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--rose);padding:20px">Failed to load audit log</td></tr>';
+    console.error('loadAudit error:', e);
+  }
+}
+</script>
+</body>
+</html>
