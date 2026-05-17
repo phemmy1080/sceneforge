@@ -25,6 +25,7 @@ SMTP_USER     = os.environ.get("SMTP_USER", "")
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
 
 
+
 async def _send(to: str, subject: str, html: str, text: str) -> None:
     from_email = getattr(settings, "email_from", None) or SMTP_USER or "hello.sceneforge@gmail.com"
     from_name  = getattr(settings, "email_from_name", None) or "SceneForge"
@@ -135,6 +136,18 @@ def _log_otp_fallback(to: str, subject: str) -> None:
         logger.warning("=" * 50)
         logger.warning("EMAIL FAILED — OTP for %s is: %s", to, match.group(1))
         logger.warning("=" * 50)
+
+
+async def send_invite_email(to_email: str, inviter_name: str, workspace_name: str, invite_url: str):
+    subject = f"{inviter_name} invited you to {workspace_name} on SceneForge"
+    html = f"""
+    <p>Hi,</p>
+    <p><strong>{inviter_name}</strong> has invited you to join <strong>{workspace_name}</strong> on SceneForge.</p>
+    <p><a href="{invite_url}" style="background:#c9a84c;color:#000;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Accept invite</a></p>
+    <p>This link expires in 7 days.</p>
+    """
+    await send_email(to_email, subject, html)
+
 
 
 # ── Email templates ───────────────────────────────────────────────────────────
@@ -356,3 +369,5 @@ async def send_render_complete(
         f"— SceneForge"
     )
     await _send(to_email, subject, html, text)
+
+
