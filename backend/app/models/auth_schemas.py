@@ -29,7 +29,6 @@ class UserOut(BaseModel):
     email_verified: bool = False
     workspace_id: Optional[str] = None
     workspace_role: Optional[str] = None
-    
 
 
 class TokenResponse(BaseModel):
