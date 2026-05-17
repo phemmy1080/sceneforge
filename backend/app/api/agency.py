@@ -647,14 +647,35 @@ async def get_review_public(token: str, redis=Depends(get_redis)):
         raise HTTPException(404, "Project not found")
     comments = await svc.list_comments(redis, review["proj_id"])
     client_comments = [c for c in comments if c.get("is_client")]
+    # Try to resolve the video URL from the latest completed render job
+    video_url = ""
+    job_ids = project.get("render_job_ids", [])
+    for job_id in reversed(job_ids):
+        try:
+            raw_job = await redis.get(f"job:{job_id}:progress")
+            if raw_job:
+                import json as _jj
+                job_data = _jj.loads(raw_job)
+                if job_data.get("status") == "complete":
+                    video_url = (
+                        job_data.get("video_url") or
+                        job_data.get("r2_urls", {}).get("final_video_music.mp4") or
+                        job_data.get("r2_urls", {}).get("final_video.mp4") or ""
+                    )
+                    if video_url:
+                        break
+        except Exception:
+            pass
+
     return {
         "review":   review,
         "project":  {
-            "id":          project["id"],
-            "title":       project["title"],
-            "client_name": project["client_name"],
-            "platform":    project["platform"],
-            "render_job_ids": project.get("render_job_ids", []),
+            "id":             project["id"],
+            "title":          project["title"],
+            "client_name":    project["client_name"],
+            "platform":       project["platform"],
+            "render_job_ids": job_ids,
+            "video_url":      video_url,
         },
         "comments": client_comments,
     }
