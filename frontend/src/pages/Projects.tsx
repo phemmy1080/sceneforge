@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useStore } from '../store'
+import { useAuthStore } from '../authStore'
 import { Button, Badge, PageHeader, EmptyState } from '../components/ui'
 
 type FilterStatus = 'all' | 'active' | 'draft' | 'exported'
@@ -11,13 +12,35 @@ const STATUS_LABELS = {
 }
 
 export default function Projects() {
-  const projects        = useStore((s) => s.projects)
-  const openProject     = useStore((s) => s.openProject)
-  const deleteProject   = useStore((s) => s.deleteProject)
+  const projects         = useStore((s) => s.projects)
+  const openProject      = useStore((s) => s.openProject)
+  const deleteProject    = useStore((s) => s.deleteProject)
   const duplicateProject = useStore((s) => s.duplicateProject)
-  const setStep         = useStore((s) => s.setStep)
+  const setStep          = useStore((s) => s.setStep)
+  const user             = useAuthStore((s) => s.user)
 
   const [filter, setFilter] = useState<FilterStatus>('all')
+
+  // Workspace members (non-owners) should work in the agency flow, not here.
+  // Redirect them to the agency dashboard automatically.
+  useEffect(() => {
+    const role = user?.workspace_role
+    if (role && role !== 'owner') {
+      setStep('agency' as any)
+    }
+  }, [user?.workspace_role])
+
+  // Non-owners in a workspace see this redirect message briefly
+  if (user?.workspace_role && user.workspace_role !== 'owner') {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center space-y-2">
+          <div className="text-2xl">🏢</div>
+          <p className="text-white/50 text-sm">Redirecting to your agency workspace…</p>
+        </div>
+      </div>
+    )
+  }
 
   const filtered = filter === 'all' ? projects : projects.filter((p) => p.status === filter)
 
