@@ -34,6 +34,7 @@ import AgencyDashboard from "./pages/AgencyDashboard";
 import { AgencyProjects, NewProject, ProjectDetail } from "./pages/AgencyProjects";
 import { AgencyTeam, AgencyBrandKits } from "./pages/AgencyTeamAndKits";
 import ClientReview from "./pages/ClientReview";
+import JoinWorkspace from "./pages/JoinWorkspace";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -238,6 +239,24 @@ function Root() {
     const token = pathname.replace('/review/', '').replace(/\/+$/, '')
     return <ClientReview token={token} />
   }
+  if (pathname === '/join') {
+  const params = new URLSearchParams(window.location.search)
+  const token  = params.get('token') || ''
+  if (token) {
+    return (
+      <JoinWorkspace
+        token={token}
+        onJoined={() => {
+          window.history.replaceState({}, '', '/')
+          setScreen('app')
+          setTimeout(() => {
+            useStore.getState().setStep('agency' as any)
+          }, 100)
+        }}
+      />
+    )
+  }
+}
   if (window.location.pathname === '/reset-password') {
     return <ResetPassword onSuccess={() => {
       window.history.replaceState({}, '', '/')
