@@ -305,6 +305,12 @@ export default function Layout({ children, onLogout, onNewProject }: LayoutProps
     setup: 'Setup', ideas: 'Ideas', script: 'Script',
     scenes: 'Scenes', voice: 'Voice & Visuals', export: 'Export',
     plans: 'Plans', upgrade: 'Upgrade',
+    agency:          'Agency',
+    'agency-projects': 'Projects',
+    'agency-new':    'New project',
+    'agency-detail': 'Project',
+    'agency-team':   'Team',
+    'agency-kits':   'Brand kits',
   }
 
   return (
