@@ -8,6 +8,7 @@ const PLAN_STYLE: Record<string, {
   starter:    { color: '#A78BFA', bg: 'rgba(124,92,255,0.10)', border: 'rgba(124,92,255,0.25)', btnText: '#26215C', description: 'Perfect for creators just getting started' },
   pro:        { color: '#2DD4BF', bg: 'rgba(45,212,191,0.10)',  border: 'rgba(45,212,191,0.40)',  btnText: '#04342C', popular: true, description: 'For creators publishing weekly content' },
   studio:     { color: '#F59E0B', bg: 'rgba(245,158,11,0.08)',  border: 'rgba(245,158,11,0.25)',  btnText: '#412402', description: 'For agencies and high-volume creators' },
+  agency:     { color: '#C9A84C', bg: 'rgba(201,168,76,0.10)',  border: 'rgba(201,168,76,0.35)',  btnText: '#412402', description: 'Full agency workspace — team collaboration & client review' },
 }
 
 // Fallback style for any new plans created in admin
@@ -27,7 +28,15 @@ function getPlanFeatures(key: string, tokens: number, videos: number): string[] 
   ]
   if (key === 'pro' || key === 'studio') base.push('Priority render queue')
   if (key === 'studio') base.push('No watermarks on exports')
-  if (!['starter','pro','studio'].includes(key)) {
+  if (key === 'agency') {
+    base.push('No watermarks on exports')
+    base.push('Agency workspace (5 seats)')
+    base.push('Client review links')
+    base.push('Brand kits per client')
+    base.push('Shared token pool')
+    base.push('Team activity timeline')
+  }
+  if (!['starter','pro','studio','agency'].includes(key)) {
     // Custom plan from admin
     base.splice(2, 0, 'Up to unlimited scenes')
   }
@@ -37,6 +46,7 @@ function getPlanFeatures(key: string, tokens: number, videos: number): string[] 
 function getLockedFeatures(key: string): string[] {
   if (key === 'starter') return ['Priority render queue', 'No watermarks']
   if (key === 'pro') return ['No watermarks']
+  if (key === 'agency') return []
   return []
 }
 
@@ -129,7 +139,7 @@ export default function Plans({ onBack }: Props) {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(plans.length, 3)}, 1fr)`, gap: 12, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(plans.length, 3)}, 1fr)`, gap: 12, marginBottom: 16, maxWidth: plans.length >= 4 ? '900px' : undefined, margin: plans.length >= 4 ? '0 auto 16px' : undefined }}>
         {plans.map((plan) => {
           const style = PLAN_STYLE[plan.key] ?? DEFAULT_STYLE
           const isLoading = loading === plan.key
