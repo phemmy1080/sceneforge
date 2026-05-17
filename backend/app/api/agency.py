@@ -193,9 +193,21 @@ async def invite_member(
 
     # Send invite email
     try:
-        from app.services.email import send_invite_email
+        from app.services.email import _send
         invite_url = f"https://sceneraforge.com/join?token={token}"
-        await send_invite_email(req.email, user.full_name, ws["name"], invite_url)
+        html = f"""
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#0a0a0f;color:#f0f0ff;padding:32px;border-radius:16px">
+          <div style="font-size:22px;font-weight:800;margin-bottom:8px">Scene<span style="color:#c9a84c">Forge</span></div>
+          <h2 style="font-size:18px;font-weight:700;margin:24px 0 8px">You've been invited</h2>
+          <p style="color:rgba(255,255,255,0.6);font-size:14px;line-height:1.6;margin:0 0 24px">
+            <strong style="color:#f0f0ff">{user.full_name}</strong> has invited you to join
+            <strong style="color:#f0f0ff">{ws["name"]}</strong> on SceneForge as a <strong style="color:#c9a84c">{req.role}</strong>.
+          </p>
+          <a href="{invite_url}" style="display:inline-block;background:#c9a84c;color:#000;font-weight:700;font-size:14px;padding:12px 28px;border-radius:10px;text-decoration:none">Accept invite</a>
+          <p style="color:rgba(255,255,255,0.3);font-size:12px;margin-top:24px">This link expires in 7 days.</p>
+        </div>"""
+        text = f"{user.full_name} invited you to join {ws['name']} on SceneForge. Accept here: {invite_url}"
+        await _send(req.email, f"You're invited to {ws['name']} on SceneForge", html, text)
     except Exception as e:
         logger.warning("Invite email failed: %s", e)
 
