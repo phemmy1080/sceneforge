@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api, login, signup } from '../lib/api'
 import { useAuthStore } from '../authStore'
+import { useStore } from '../store'
 
 interface Props {
   token: string
@@ -70,13 +71,16 @@ export default function JoinWorkspace({ token, onJoined }: Props) {
     try {
       await api.post(`/api/agency/workspace/join/${token}`)
       setStep('done')
-      setTimeout(onJoined, 1500)
+      // Small delay so user sees the success screen, then navigate
+      setTimeout(() => {
+        onJoined()
+      }, 1200)
     } catch (e: any) {
       const detail = e.response?.data?.detail || 'Failed to join workspace'
       // Already in a workspace — still go to app
       if (detail.includes('already belong')) {
-        setStep('done')
-        setTimeout(onJoined, 1000)
+        // Already in a workspace — just go to app
+        setTimeout(() => onJoined(), 800)
         return
       }
       setError(detail)
