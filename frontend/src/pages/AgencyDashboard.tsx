@@ -94,18 +94,27 @@ export default function AgencyDashboard() {
   async function load() {
     try {
       setLoading(true);
+      // First ensure workspace exists (backend auto-creates for agency users)
+      try {
+        await api.get("/api/agency/workspace");
+      } catch (e: any) {
+        if (e.response?.status === 403) {
+          // Try to auto-create workspace — backend will handle it
+          // Just reload after a moment to let it settle
+          setError("no_workspace");
+          setLoading(false);
+          return;
+        }
+      }
       const [wsRes, dashRes] = await Promise.all([
         api.get("/api/agency/workspace"),
         api.get("/api/agency/workspace/dashboard"),
       ]);
       setWorkspace(wsRes.data.workspace);
       setData(dashRes.data);
+      setError("");
     } catch (e: any) {
-      if (e.response?.status === 403) {
-        setError("no_workspace");
-      } else {
-        setError(e.response?.data?.detail || "Failed to load dashboard");
-      }
+      setError(e.response?.data?.detail || "Failed to load dashboard");
     } finally {
       setLoading(false);
     }
@@ -261,24 +270,38 @@ function SetupWorkspace({ onCreated }: { onCreated: () => void }) {
   const [error, setError] = useState("");
 
   async function create() {
-    if (!name.trim()) return;
+    const wsName = name.trim() || "My Agency";
     setLoading(true);
     setError("");
     try {
-      await api.post("/api/agency/workspace", { name: name.trim() });
+      await api.post("/api/agency/workspace", { name: wsName });
       onCreated();
     } catch (e: any) {
-      setError(e.response?.data?.detail || "Failed to create workspace");
+      const detail = e.response?.data?.detail || "";
+      // If workspace already exists (race condition / auto-created by backend)
+      // just reload
+      if (detail.includes("already have a workspace")) {
+        onCreated();
+        return;
+      }
+      setError(detail || "Failed to create workspace");
       setLoading(false);
     }
   }
+
+  // Auto-try on mount — backend may have already created it
+  useEffect(() => {
+    api.get("/api/agency/workspace")
+      .then(() => onCreated())   // workspace exists — just reload
+      .catch(() => {});          // doesn't exist — show form below
+  }, []);
 
   return (
     <div className="flex items-center justify-center min-h-[60vh]">
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 max-w-md w-full text-center space-y-5">
         <div className="text-4xl">🏢</div>
         <h2 className="text-xl font-bold text-white">Set up your agency workspace</h2>
-        <p className="text-zinc-400 text-sm">Give your workspace a name — usually your agency name or brand.</p>
+        <p className="text-zinc-400 text-sm">Give your workspace a name — usually your agency or brand name.</p>
         <input
           type="text"
           placeholder="e.g. Velocity Media Agency"
@@ -290,7 +313,7 @@ function SetupWorkspace({ onCreated }: { onCreated: () => void }) {
         {error && <p className="text-rose-400 text-xs">{error}</p>}
         <button
           onClick={create}
-          disabled={loading || !name.trim()}
+          disabled={loading}
           className="w-full bg-gold text-black font-bold py-3 rounded-xl text-sm hover:bg-gold/90 transition disabled:opacity-50"
         >
           {loading ? "Creating…" : "Create workspace"}
