@@ -32,7 +32,7 @@ const TRANSITION_OPTIONS = [
 export default function VoiceVisuals() {
   const user              = useAuthStore((s) => s.user)
   const userPlan          = user?.plan || 'free'
-  const canUseDalle       = userPlan === 'pro' || userPlan === 'studio'
+  const canUseDalle       = userPlan === 'pro' || userPlan === 'studio' || userPlan === 'agency'
   const voiceConfig       = useStore((s) => s.voiceConfig)
   const setVoiceConfig    = useStore((s) => s.setVoiceConfig)
   const getRenderRequest  = useStore((s) => s.getRenderRequest)
