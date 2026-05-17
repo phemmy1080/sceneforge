@@ -15,13 +15,7 @@ from app.services.security import (
     register_active_job, track_render_abuse, track_ip_request,
     check_ip_blocked, validate_job_id,
 )
-from app.services.agency_service import get_workspace_id_for_user, deduct_pool_tokens
-
-ws_id = await get_workspace_id_for_user(redis, user_id)
-if ws_id:
-    await deduct_pool_tokens(redis, ws_id, token_cost)
-else:
-    await auth_service.deduct_tokens(redis, user_id, job_id)
+from app.services.agency_service import get_workspace_id_for_user
 
 settings = get_settings()
 router = APIRouter()
@@ -167,6 +161,13 @@ async def start_render(
     # Store user_id alongside the job so the worker can deduct after success
     if user_id:
         await redis.set(f"job:{job_id}:user_id", user_id, ex=86400)
+        # Store workspace_id so worker can deduct from shared pool
+        try:
+            ws_id = await get_workspace_id_for_user(redis, user_id)
+            if ws_id:
+                await redis.set(f"job:{job_id}:ws_id", ws_id, ex=86400)
+        except Exception:
+            pass
     if prev_job_id:
         await redis.set(f"job:{job_id}:prev_job_id", prev_job_id, ex=86400)
     # Store niche for analytics
