@@ -100,7 +100,7 @@ export default function VoiceDropdown({ selectedVoiceId, onChange }: Props) {
 
   const voices    = getAvailableVoices(plan)
   const freeCount = voices.filter(v => v.free).length
-  const isPaid    = !['free'].includes(plan?.toLowerCase())
+  const isPaid    = !['free'].includes(plan?.toLowerCase()) || plan === 'agency'
 
   const [open,   setOpen]   = useState(false)
   const [search, setSearch] = useState('')
