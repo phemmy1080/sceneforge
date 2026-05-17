@@ -64,6 +64,10 @@ async def _require_role(ws_id: str, user_id: str, redis,
     role = await svc.get_member_role(redis, ws_id, user_id)
     if role not in allowed:
         raise HTTPException(403, "Insufficient permissions")
+    # Block suspended members from all mutating actions
+    suspended = await redis.get(f"workspace:suspended:{ws_id}:{user_id}")
+    if suspended and role != "owner":
+        raise HTTPException(403, "Your workspace access has been suspended. Contact the workspace owner.")
     return role
 
 
@@ -115,6 +119,15 @@ class AddCommentRequest(BaseModel):
 class ReviewDecisionRequest(BaseModel):
     decision: str   # "approved" | "changes_requested"
     message: Optional[str] = ""
+
+class RenameWorkspaceRequest(BaseModel):
+    name: str = Field(..., min_length=2, max_length=100)
+
+class SuspendMemberRequest(BaseModel):
+    suspended: bool
+
+class TransferProjectsRequest(BaseModel):
+    to_user_id: str
 
 class ClientCommentRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=2000)
@@ -491,6 +504,85 @@ async def resolve_comment(
     return {"message": "Comment resolved"}
 
 
+# ── Workspace rename ─────────────────────────────────────────────────────────
+
+@router.patch("/workspace/rename")
+async def rename_workspace(
+    req: RenameWorkspaceRequest,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    await _require_role(ws["id"], user.id, redis, ("owner",))
+    updated = await svc.rename_workspace(redis, ws["id"], user.id, req.name)
+    return {"workspace": updated}
+
+
+# ── Member suspend ────────────────────────────────────────────────────────────
+
+@router.patch("/workspace/members/{member_id}/suspend")
+async def suspend_member(
+    member_id: str,
+    req: SuspendMemberRequest,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    await _require_role(ws["id"], user.id, redis, ("owner", "admin"))
+    if member_id == ws["owner_id"]:
+        raise HTTPException(400, "Cannot suspend workspace owner")
+    await svc.suspend_member(redis, ws["id"], member_id, req.suspended)
+    action = "suspended" if req.suspended else "unsuspended"
+    return {"message": f"Member {action}"}
+
+
+# ── Transfer projects ────────────────────────────────────────────────────────
+
+@router.post("/workspace/members/{member_id}/transfer-projects")
+async def transfer_projects(
+    member_id: str,
+    req: TransferProjectsRequest,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    await _require_role(ws["id"], user.id, redis, ("owner", "admin"))
+    count = await svc.transfer_projects(redis, ws["id"], member_id, req.to_user_id)
+    return {"transferred": count, "message": f"{count} project(s) transferred"}
+
+
+# ── Invite management ─────────────────────────────────────────────────────────
+
+@router.get("/workspace/invites")
+async def list_invites(
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    await _require_role(ws["id"], user.id, redis, ("owner", "admin"))
+    invites = await svc.list_all_invites(redis, ws["id"])
+    return {"invites": invites}
+
+
+@router.delete("/workspace/invites/{token}")
+async def revoke_invite(
+    token: str,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    await _require_role(ws["id"], user.id, redis, ("owner", "admin"))
+    ok = await svc.revoke_invite(redis, ws["id"], token)
+    if not ok:
+        raise HTTPException(404, "Invite not found")
+    return {"message": "Invite revoked"}
+
+
 # ── Client review links ───────────────────────────────────────────────────────
 
 @router.post("/projects/{proj_id}/review-link")
@@ -578,6 +670,22 @@ async def submit_review_decision(
 
 
 # ── Activity ──────────────────────────────────────────────────────────────────
+
+@router.delete("/workspace/invite/{token}")
+async def cancel_invite(
+    token: str,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    """Cancel (revoke) a pending invite — owner/admin only."""
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    await _require_role(ws["id"], user.id, redis, ("owner", "admin"))
+    ok = await svc.revoke_invite(redis, ws["id"], token)
+    if not ok:
+        raise HTTPException(404, "Invite not found or already used")
+    return {"message": "Invite cancelled"}
+
 
 @router.get("/workspace/activity")
 async def get_activity(
