@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useStore, type AppStep } from '../store'
+import { useAuthStore } from '../authStore'
 import StepNav from './StepNav'
 import UserMenu from './UserMenu'
 
@@ -67,6 +68,40 @@ function TokenGateBar({ onUpgrade }: { onUpgrade: () => void }) {
         Top up tokens →
       </button>
     </div>
+  )
+}
+
+
+function AgencyNav({ currentStep, onStep }: { currentStep: string; onStep: (s: AppStep) => void }) {
+  const user = useAuthStore((s: any) => s.user)
+  if (!user?.plan || user.plan !== 'agency') return null
+
+  const links = [
+    { id: 'agency',          label: 'Dashboard'  },
+    { id: 'agency-projects', label: 'Projects'   },
+    { id: 'agency-team',     label: 'Team'       },
+    { id: 'agency-kits',     label: 'Brand kits' },
+  ]
+
+  return (
+    <>
+      <p className="text-[9.5px] font-bold text-white/25 uppercase tracking-widest px-2 pt-3 pb-1">Agency</p>
+      {links.map(link => {
+        const isActive = currentStep === link.id
+        return (
+          <button
+            key={link.id}
+            onClick={() => onStep(link.id as AppStep)}
+            className={`w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-lg text-[13px] font-medium transition-all mb-0.5 text-left border
+              ${isActive
+                ? 'bg-amber-500/15 text-amber-300 border-amber-500/20'
+                : 'text-white/45 border-transparent hover:bg-white/4 hover:text-white/75'}`}
+          >
+            {link.label}
+          </button>
+        )
+      })}
+    </>
   )
 }
 
