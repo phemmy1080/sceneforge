@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-//import { api } from "./api";
-import { api } from "../lib/api";
+import { useStore } from '../store';
+import { api } from '../lib/api';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Project {
@@ -62,7 +61,8 @@ function timeAgo(iso: string): string {
 // Projects list
 // ═══════════════════════════════════════════════════════════════════════════════
 export function AgencyProjects() {
-  const navigate = useNavigate();
+  const setStep = useStore((s) => s.setStep);
+  const setAgencyProjectId = useStore((s: any) => s.setAgencyProjectId);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
@@ -86,7 +86,7 @@ export function AgencyProjects() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-bold text-white">Projects</h1>
         <button
-          onClick={() => navigate("/agency/projects/new")}
+          onClick={() => setStep('agency-new' as any)}
           className="flex items-center gap-2 bg-gold text-black font-semibold px-4 py-2 rounded-xl text-sm hover:bg-gold/90 transition"
         >
           + New project
@@ -117,7 +117,7 @@ export function AgencyProjects() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-20 text-zinc-500 text-sm">
           No projects found.{" "}
-          <button onClick={() => navigate("/agency/projects/new")} className="text-gold hover:underline">
+          <button onClick={() => setStep('agency-new' as any)} className="text-gold hover:underline">
             Create your first project
           </button>
         </div>
@@ -127,7 +127,7 @@ export function AgencyProjects() {
             {filtered.map(p => (
               <div
                 key={p.id}
-                onClick={() => navigate(`/agency/projects/${p.id}`)}
+                onClick={() => { setAgencyProjectId(p.id); setStep('agency-detail' as any); }}
                 className="flex items-center gap-4 px-5 py-4 hover:bg-zinc-800/40 cursor-pointer transition"
               >
                 <div className="flex-1 min-w-0">
@@ -156,7 +156,8 @@ export function AgencyProjects() {
 // New project form
 // ═══════════════════════════════════════════════════════════════════════════════
 export function NewProject() {
-  const navigate = useNavigate();
+  const setStep = useStore((s) => s.setStep);
+  const setAgencyProjectId = useStore((s: any) => s.setAgencyProjectId);
   const [kits, setKits] = useState<BrandKit[]>([]);
   const [form, setForm] = useState({
     title: "", client_name: "", brand_kit_id: "", platform: "TikTok", notes: ""
@@ -174,7 +175,7 @@ export function NewProject() {
     setError("");
     try {
       const res = await api.post("/agency/projects", form);
-      navigate(`/agency/projects/${res.data.project.id}`);
+setAgencyProjectId(res.data.project.id); setStep('agency-detail' as any);
     } catch (e: any) {
       setError(e.response?.data?.detail || "Failed to create project");
       setLoading(false);
@@ -188,7 +189,7 @@ export function NewProject() {
 
   return (
     <div className="max-w-xl mx-auto px-4 py-8">
-      <button onClick={() => navigate("/agency/projects")} className="text-zinc-500 text-sm mb-6 hover:text-white transition">
+      <button onClick={() => setStep('agency-projects' as any)} className="text-zinc-500 text-sm mb-6 hover:text-white transition">
         ← Back to projects
       </button>
       <h1 className="text-xl font-bold text-white mb-6">New project</h1>
@@ -237,8 +238,8 @@ export function NewProject() {
 // Project detail
 // ═══════════════════════════════════════════════════════════════════════════════
 export function ProjectDetail() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+  const setStep = useStore((s) => s.setStep);
+  const id = useStore((s: any) => s.agencyProjectId);
   const [project, setProject] = useState<Project | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -317,7 +318,7 @@ export function ProjectDetail() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <button onClick={() => navigate("/agency/projects")} className="text-zinc-500 text-sm hover:text-white transition mb-2 block">
+          <button onClick={() => setStep('agency-projects' as any)} className="text-zinc-500 text-sm hover:text-white transition mb-2 block">
             ← Projects
           </button>
           <h1 className="text-xl font-bold text-white">{project.title}</h1>
@@ -360,7 +361,7 @@ export function ProjectDetail() {
 
           {/* Start render */}
           <button
-            onClick={() => navigate(`/?project_id=${project.id}`)}
+            onClick={() => useStore.getState().setStep('setup' as any)}
             className="flex items-center gap-2 text-xs bg-gold text-black font-semibold px-3 py-1.5 rounded-full hover:bg-gold/90 transition"
           >
             ▶ Create video
