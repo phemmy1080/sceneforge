@@ -30,6 +30,10 @@ import AuthorPage from './pages/AuthorPage'
 import FeedbackModal from './components/FeedbackModal'
 import ErrorToast from './components/ErrorToast'
 import ChatBot from './components/ChatBot'
+import AgencyDashboard from "./pages/AgencyDashboard";
+import { AgencyProjects, NewProject, ProjectDetail } from "./pages/AgencyProjects";
+import { AgencyTeam, AgencyBrandKits } from "./pages/AgencyTeamAndKits";
+import ClientReview from "./pages/ClientReview";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -152,6 +156,12 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
         {currentStep === 'upload'   && <UploadScript />}
         {currentStep === 'upgrade'  && <Plans onBack={() => setStep('setup')} />}
         {currentStep === 'plans'    && <Plans onBack={() => setStep('setup')} />}
+        {currentStep === 'agency'          && <AgencyDashboard />}
+        {currentStep === 'agency-projects' && <AgencyProjects />}
+        {currentStep === 'agency-new'      && <NewProject />}
+        {currentStep === 'agency-detail'   && <ProjectDetail />}
+        {currentStep === 'agency-team'     && <AgencyTeam />}
+        {currentStep === 'agency-kits'     && <AgencyBrandKits />}
       </Layout>
 
       {/* Feedback modal — always mounted so it catches renderStatus from any step */}
@@ -223,6 +233,10 @@ function Root() {
 
   if (pathname === '/payment/callback') {
     return <PaymentCallback />
+  }
+  if (pathname.startsWith('/review/')) {
+    const token = pathname.replace('/review/', '').replace(/\/+$/, '')
+    return <ClientReview token={token} />
   }
   if (window.location.pathname === '/reset-password') {
     return <ResetPassword onSuccess={() => {
