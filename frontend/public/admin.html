@@ -1822,6 +1822,9 @@ async function doLogin(){
     applyRoleRestrictions();
     fetchCsrfToken();
     loadDash();
+    // Pre-populate PLANS_CACHE at startup so all dropdowns reflect live plans
+    // immediately — without needing to visit the Pricing page first
+    _bootstrapPlansCache();
   }catch(e){err.classList.add('on');}
 }
 document.getElementById('admin-email').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
@@ -1860,7 +1863,22 @@ function nav(id,btn){
 
 function fmt(n){return Number(n||0).toLocaleString();}
 function ago(ts){if(!ts)return'—';var s=Math.floor((new Date()-new Date(ts))/1000);if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
-function planTag(p){var known={free:'tag-free',starter:'tag-starter',pro:'tag-pro',studio:'tag-studio',agency:'tag-agency'};var cls=known[p]||'tag-starter';return '<span class="tag '+cls+'" style="'+( known[p]?'':'background:rgba(167,139,250,0.1);color:var(--violet)')+'">'+( p||'free')+'</span>';}
+function planTag(p){
+  // Built-in plans use CSS classes; any admin-added custom plan gets
+  // a generated colour from a hash so it always renders correctly.
+  var BUILTIN={free:'tag-free',starter:'tag-starter',pro:'tag-pro',studio:'tag-studio',agency:'tag-agency'};
+  if(!p||p==='free')return '<span class="tag tag-free">free</span>';
+  if(BUILTIN[p])return '<span class="tag '+BUILTIN[p]+'">' +p+'</span>';
+  // Custom plan — pick a colour from PLANS_CACHE label or generate one
+  var cached=PLANS_CACHE.find(function(x){return x.key===p;});
+  var label=cached?cached.label:p;
+  // Deterministic pastel from key string
+  var hash=p.split('').reduce(function(a,c){return a+c.charCodeAt(0);},0);
+  var hue=(hash*47)%360;
+  var bg='hsla('+hue+',60%,55%,0.12)';
+  var col='hsla('+hue+',70%,70%,1)';
+  return '<span class="tag" style="background:'+bg+';color:'+col+'">'+label+'</span>';
+}
 function showAlert(page,msg,type){var el=document.getElementById('alert-'+page);if(!el)return;el.className='alert alert-'+(type==='success'?'ok':'err')+' on';el.textContent=msg;setTimeout(function(){el.classList.remove('on');},6000);}
 
 async function loadDash(){
@@ -2352,6 +2370,27 @@ async function loadTx(){
   catch(e){document.getElementById('tx-tbody').innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--rose);padding:20px">Failed to load</td></tr>';}
 }
 
+async function _bootstrapPlansCache(){
+  // Fetch plans from API and populate PLANS_CACHE + refresh all dropdowns.
+  // Called at login and after any plan add/delete so dropdowns are always live.
+  try{
+    var d=await apiFetch('/pricing');
+    var plans=d.plans||{};
+    var ORDER=['starter','pro','studio','agency'];
+    var keys=Object.keys(plans);
+    var ordered=ORDER.filter(function(k){return keys.includes(k);});
+    keys.forEach(function(k){if(!ordered.includes(k))ordered.push(k);});
+    PLANS_CACHE=ordered.map(function(k){return {key:k,label:plans[k].label||k};});
+    _refreshPlanDropdowns();
+  }catch(e){
+    // Non-fatal — fallback: populate from existing hardcoded options
+    if(!PLANS_CACHE.length){
+      PLANS_CACHE=[{key:'starter',label:'Starter'},{key:'pro',label:'Pro'},{key:'studio',label:'Studio'},{key:'agency',label:'Agency'}];
+      _refreshPlanDropdowns();
+    }
+  }
+}
+
 async function _refreshPlanDropdowns(){
   // Build option HTML from live PLANS_CACHE — always includes every plan
   var baseOpts='<option value="free">Free</option>';
@@ -2392,8 +2431,8 @@ async function loadPricing(){
   }catch(e){document.getElementById('plan-grid').innerHTML='<div class="loading">Failed to load</div>';}
 }
 async function savePlan(k){var label=document.getElementById('lbl-'+k).value.trim(),amount=parseInt(document.getElementById('amt-'+k).value),tokens=parseInt(document.getElementById('tok-'+k).value);if(!label||!amount||!tokens)return;try{await apiFetch('/pricing/'+k,{method:'PUT',body:JSON.stringify({plan_key:k,label:label,amount:amount,tokens:tokens,currency:'NGN'})});showAlert('pricing',label+' updated successfully','success');loadPricing();}catch(e){showAlert('pricing',e.detail||'Failed','error');}}
-async function deletePlan(k){if(!confirm('Delete plan "'+k+'"?'))return;try{await apiFetch('/pricing/'+k,{method:'DELETE'});showAlert('pricing','Plan removed','success');loadPricing();}catch(e){showAlert('pricing',e.detail||'Failed','error');}}
-async function addPlan(){var k=document.getElementById('new-key').value.trim().toLowerCase(),label=document.getElementById('new-label').value.trim(),amount=parseInt(document.getElementById('new-amount').value),tokens=parseInt(document.getElementById('new-tokens').value);if(!k||!label||!amount||!tokens)return;try{await apiFetch('/pricing',{method:'POST',body:JSON.stringify({plan_key:k,label:label,amount:amount,tokens:tokens,currency:'NGN'})});showAlert('pricing','Plan added','success');['new-key','new-label','new-amount','new-tokens'].forEach(function(id){document.getElementById(id).value='';});loadPricing();}catch(e){showAlert('pricing',e.detail||'Failed','error');}}
+async function deletePlan(k){if(!confirm('Delete plan "'+k+'"?'))return;try{await apiFetch('/pricing/'+k,{method:'DELETE'});showAlert('pricing','Plan removed','success');loadPricing();_bootstrapPlansCache();}catch(e){showAlert('pricing',e.detail||'Failed','error');}}
+async function addPlan(){var k=document.getElementById('new-key').value.trim().toLowerCase(),label=document.getElementById('new-label').value.trim(),amount=parseInt(document.getElementById('new-amount').value),tokens=parseInt(document.getElementById('new-tokens').value);if(!k||!label||!amount||!tokens)return;try{await apiFetch('/pricing',{method:'POST',body:JSON.stringify({plan_key:k,label:label,amount:amount,tokens:tokens,currency:'NGN'})});showAlert('pricing','Plan added','success');['new-key','new-label','new-amount','new-tokens'].forEach(function(id){document.getElementById(id).value='';});loadPricing();_bootstrapPlansCache();}catch(e){showAlert('pricing',e.detail||'Failed','error');}}
 
 async function loadNiches(){
   var list = document.getElementById('niches-list');
