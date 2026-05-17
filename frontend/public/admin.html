@@ -160,6 +160,7 @@ tr:hover td{background:rgba(255,255,255,0.018)}
 .tag-starter{background:rgba(167,139,250,0.1);color:var(--violet)}
 .tag-pro{background:rgba(201,168,76,0.12);color:var(--gold)}
 .tag-studio{background:rgba(45,212,191,0.1);color:var(--teal)}
+.tag-agency{background:rgba(201,168,76,0.12);color:#c9a84c}
 .tag-red{background:rgba(248,113,113,0.1);color:var(--rose)}
 .tag-green{background:rgba(74,222,128,0.1);color:#4ade80}
 
@@ -727,7 +728,7 @@ tr:hover td{background:rgba(255,255,255,0.018)}
                 <div class="field" style="margin:0"><label>Plan</label>
                   <select id="bc-plan">
                     <option value="free">Free</option><option value="starter">Starter</option>
-                    <option value="pro">Pro</option><option value="studio">Studio</option>
+                    <option value="pro">Pro</option><option value="studio">Studio</option><option value="agency">Agency</option>
                   </select>
                 </div>
               </div>
@@ -965,10 +966,11 @@ tr:hover td{background:rgba(255,255,255,0.018)}
                   <label>Target segment</label>
                   <select id="camp-segment">
                     <option value="all">All users</option>
-                    <option value="free">Free plan only</option>
+                    <option value="all">All plans</option><option value="free">Free plan only</option>
                     <option value="starter">Starter plan only</option>
                     <option value="pro">Pro plan only</option>
                     <option value="studio">Studio plan only</option>
+                    <option value="agency">Agency plan only</option>
                   </select>
                 </div>
               </div>
@@ -1773,6 +1775,7 @@ var USER_CACHE={};
 var AAPI='https://sceneforge-production-8d19.up.railway.app/api/admin-auth';
 var NAPI='https://sceneforge-production-8d19.up.railway.app/api/niches';
 var KEY='',ROLE='',ALL_USERS=[],MODAL_USER=null,revChart=null;
+var PLANS_CACHE=[];
 var CACHED_RATE=0,REV_CHART_DATA=[],REV_TOTAL=0,REV_TX=0,REV_RATE=1600;
 var TX_DATA=[],ANA_DATA={};
 
@@ -1857,7 +1860,7 @@ function nav(id,btn){
 
 function fmt(n){return Number(n||0).toLocaleString();}
 function ago(ts){if(!ts)return'—';var s=Math.floor((new Date()-new Date(ts))/1000);if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
-function planTag(p){var cls={free:'tag-free',starter:'tag-starter',pro:'tag-pro',studio:'tag-studio'}[p]||'tag-free';return '<span class="tag '+cls+'">'+(p||'free')+'</span>';}
+function planTag(p){var known={free:'tag-free',starter:'tag-starter',pro:'tag-pro',studio:'tag-studio',agency:'tag-agency'};var cls=known[p]||'tag-starter';return '<span class="tag '+cls+'" style="'+( known[p]?'':'background:rgba(167,139,250,0.1);color:var(--violet)')+'">'+( p||'free')+'</span>';}
 function showAlert(page,msg,type){var el=document.getElementById('alert-'+page);if(!el)return;el.className='alert alert-'+(type==='success'?'ok':'err')+' on';el.textContent=msg;setTimeout(function(){el.classList.remove('on');},6000);}
 
 async function loadDash(){
@@ -1895,7 +1898,7 @@ async function loadAnalytics(){
     var niches=s.top_niches||{},maxN=Math.max.apply(null,Object.values(niches).concat([1]));
     document.getElementById('niches-analytics').innerHTML=Object.keys(niches).length?Object.entries(niches).sort(function(a,b){return b[1]-a[1];}).map(function(e){return '<div class="bar-row"><span class="bar-label">'+e[0]+'</span><div class="bar-track"><div class="bar-fill" style="width:'+Math.round(e[1]/maxN*100)+'%;background:var(--gold)"></div></div><span class="bar-count">'+e[1]+'</span></div>';}).join(''):'<div style="color:var(--text3);font-size:13px">No niche data yet</div>';
     var plans=s.users_by_plan||{},total=Math.max(Object.values(plans).reduce(function(a,b){return a+b;},0),1);
-    var pc={free:'rgba(255,255,255,0.3)',starter:'var(--violet)',pro:'var(--gold)',studio:'var(--teal)'};
+    var pc={free:'rgba(255,255,255,0.3)',starter:'var(--violet)',pro:'var(--gold)',studio:'var(--teal)',agency:'#c9a84c'};
     document.getElementById('plans-analytics').innerHTML=Object.entries(plans).map(function(e){return '<div class="bar-row"><span class="bar-label" style="text-transform:capitalize">'+e[0]+'</span><div class="bar-track"><div class="bar-fill" style="width:'+Math.round(e[1]/total*100)+'%;background:'+(pc[e[0]]||'var(--violet)')+'"></div></div><span class="bar-count">'+e[1]+'</span></div>';}).join('');
   }catch(e){console.error(e);}
 }
@@ -1942,7 +1945,7 @@ function openModal(uid){
   document.getElementById('modal-title').textContent=user.full_name||user.email;
   document.getElementById('modal-sub').textContent=user.email;
   document.getElementById('modal-metas').innerHTML='<div class="modal-meta"><div class="modal-meta-val" style="color:'+(user.tokens_remaining<100?'var(--rose)':'var(--teal)')+'">'+fmt(user.tokens_remaining)+'</div><div class="modal-meta-lbl">Tokens remaining</div></div><div class="modal-meta"><div class="modal-meta-val" style="color:var(--gold)">'+(user.videos_created||0)+'</div><div class="modal-meta-lbl">Videos created</div></div>';
-  document.getElementById('modal-body').innerHTML='<div class="modal-row"><input type="number" id="mt" value="'+user.tokens_remaining+'" placeholder="Token amount"><button class="btn btn-teal btn-sm" onclick="mAdd()">Add tokens</button><button class="btn btn-ghost btn-sm" onclick="mSet()">Set exact</button></div><div class="modal-row"><select id="mp"><option value="free"'+(user.plan==='free'?' selected':'')+'>Free</option><option value="starter"'+(user.plan==='starter'?' selected':'')+'>Starter</option><option value="pro"'+(user.plan==='pro'?' selected':'')+'>Pro</option><option value="studio"'+(user.plan==='studio'?' selected':'')+'>Studio</option></select><button class="btn btn-ghost btn-sm" onclick="mPlan()">Set plan</button></div><div class="modal-row"><button class="btn btn-danger btn-sm" style="flex:1" onclick="mSuspend()">'+(user.suspended?'Unsuspend':'Suspend')+' account</button><button class="btn btn-xs" style="background:rgba(248,113,113,0.12);color:var(--rose);border:1px solid rgba(248,113,113,0.2)" onclick="mDelete()">Delete</button></div>';
+  document.getElementById('modal-body').innerHTML='<div class="modal-row"><input type="number" id="mt" value="'+user.tokens_remaining+'" placeholder="Token amount"><button class="btn btn-teal btn-sm" onclick="mAdd()">Add tokens</button><button class="btn btn-ghost btn-sm" onclick="mSet()">Set exact</button></div><div class="modal-row"><select id="mp"><option value="free"'+(user.plan==='free'?' selected':'')+'>Free</option>'+PLANS_CACHE.map(function(p){return '<option value="'+p.key+'"'+(user.plan===p.key?' selected':'')+'>'+p.label+'</option>';}).join('')+'</select><button class="btn btn-ghost btn-sm" onclick="mPlan()">Set plan</button></div><div class="modal-row"><button class="btn btn-danger btn-sm" style="flex:1" onclick="mSuspend()">'+(user.suspended?'Unsuspend':'Suspend')+' account</button><button class="btn btn-xs" style="background:rgba(248,113,113,0.12);color:var(--rose);border:1px solid rgba(248,113,113,0.2)" onclick="mDelete()">Delete</button></div>';
   document.getElementById('modal-alert').className='alert';
   document.getElementById('user-modal').classList.add('on');
 }
@@ -2349,10 +2352,39 @@ async function loadTx(){
   catch(e){document.getElementById('tx-tbody').innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--rose);padding:20px">Failed to load</td></tr>';}
 }
 
+async function _refreshPlanDropdowns(){
+  // Build option HTML from live PLANS_CACHE — always includes every plan
+  var baseOpts='<option value="free">Free</option>';
+  var filterOpts='<option value="all">All plans</option><option value="free">Free plan only</option>';
+  var segOpts='<option value="all">All users</option><option value="free">Free plan only</option>';
+  PLANS_CACHE.forEach(function(p){
+    baseOpts+='<option value="'+p.key+'">'+p.label+'</option>';
+    filterOpts+='<option value="'+p.key+'">'+p.label+' plan only</option>';
+    segOpts+='<option value="'+p.key+'">'+p.label+' plan only</option>';
+  });
+  // User filter dropdown
+  var uf=document.getElementById('user-plan-filter');
+  if(uf){ var cur=uf.value; uf.innerHTML=filterOpts; uf.value=cur||'all'; }
+  // Broadcast segment dropdown
+  var bs=document.getElementById('camp-segment');
+  if(bs){ var cur2=bs.value; bs.innerHTML=segOpts; bs.value=cur2||'all'; }
+  // Broadcast by-plan button dropdown
+  var bp=document.getElementById('bc-plan-select');
+  if(bp){ var cur3=bp.value; bp.innerHTML=baseOpts; bp.value=cur3||'free'; }
+}
+
 async function loadPricing(){
   try{
     var d=await apiFetch('/pricing'),plans=d.plans||{};
-    var colors={starter:'var(--violet)',pro:'var(--gold)',studio:'var(--teal)'};
+    // ── Populate PLANS_CACHE so all dropdowns stay in sync ──────────────────
+    var ORDER=['starter','pro','studio','agency'];
+    var keys=Object.keys(plans);
+    var ordered=ORDER.filter(function(k){return keys.includes(k);});
+    keys.forEach(function(k){if(!ordered.includes(k))ordered.push(k);});
+    PLANS_CACHE=ordered.map(function(k){return {key:k,label:plans[k].label||k};});
+    _refreshPlanDropdowns();
+    // ────────────────────────────────────────────────────────────────────────
+    var colors={starter:'var(--violet)',pro:'var(--gold)',studio:'var(--teal)',agency:'#c9a84c'};
     document.getElementById('plan-grid').innerHTML=Object.keys(plans).map(function(k){
       var p=plans[k];
       return '<div class="plan-card"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px"><div style="font-family:Syne,sans-serif;font-size:15px;font-weight:800;color:'+(colors[k]||'var(--gold)')+'">'+p.label+'</div><button class="btn btn-danger btn-xs" onclick="deletePlan(\''+k+'\')">Remove</button></div><div class="field" style="margin-bottom:8px"><label>Label</label><input type="text" id="lbl-'+k+'" value="'+p.label+'"></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px"><div class="field" style="margin:0"><label>Price (NGN)</label><input type="number" id="amt-'+k+'" value="'+p.amount+'"></div><div class="field" style="margin:0"><label>Tokens</label><input type="number" id="tok-'+k+'" value="'+p.tokens+'"></div></div><div style="font-size:11px;color:var(--text3);margin-bottom:12px">'+Math.floor(p.tokens/100)+' videos &middot; key: <code style="font-family:DM Mono,monospace;background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px">'+k+'</code></div><button class="btn btn-teal btn-sm" style="width:100%;justify-content:center" onclick="savePlan(\''+k+'\')">Save changes</button></div>';
@@ -3089,7 +3121,7 @@ async function loadCosts() {
     var rate = d.exchange_rate || 1600;
 
     // ── Plan margin cards ──────────────────────────────────────────────────
-    var colors = {starter:'violet', pro:'gold', studio:'teal', free:'rose'};
+    var colors = {starter:'violet', pro:'gold', studio:'teal', agency:'amber', free:'rose'};
     var grid = document.getElementById('cost-plan-grid');
     if (grid) {
       grid.innerHTML = Object.entries(COST_DATA).map(function(e) {
@@ -3117,7 +3149,7 @@ async function loadCosts() {
         var marginColor = p.margin_pct >= 50 ? 'var(--teal)' : p.margin_pct >= 20 ? 'var(--gold)' : 'var(--rose)';
         var marginBg = p.margin_pct >= 50 ? 'rgba(45,212,191,0.08)' : p.margin_pct >= 20 ? 'rgba(201,168,76,0.08)' : 'rgba(248,113,113,0.08)';
         return '<tr style="background:' + marginBg + '">'
-          + '<td><span class="tag tag-' + (k === 'pro' ? 'pro' : k === 'studio' ? 'studio' : k === 'starter' ? 'starter' : 'free') + '">' + (p.plan_label || k) + '</span></td>'
+          + '<td><span class="tag tag-' + (k === 'pro' ? 'pro' : k === 'studio' ? 'studio' : k === 'starter' ? 'starter' : k === 'agency' ? 'agency' : 'free') + '">' + (p.plan_label || k) + '</span></td>'
           + '<td style="font-family:DM Mono,monospace;color:var(--teal)">$' + (p.price_usd || 0).toFixed(4) + '</td>'
           + '<td style="font-family:DM Mono,monospace;font-size:11px">$' + (bd.voice || 0).toFixed(5) + '</td>'
           + '<td style="font-family:DM Mono,monospace;font-size:11px">$' + (bd.visual || 0).toFixed(5) + '</td>'
