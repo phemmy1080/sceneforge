@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useStore, type AppStep } from '../store'
 import StepNav from './StepNav'
 import UserMenu from './UserMenu'
-import { useAuthStore } from '../authStore' 
 
 const STEPS: { id: AppStep; label: string }[] = [
   { id: 'setup',  label: 'Setup' },
@@ -71,44 +70,11 @@ function TokenGateBar({ onUpgrade }: { onUpgrade: () => void }) {
   )
 }
 
-function AgencyNav({ currentStep, onStep }: { currentStep: string; onStep: (s: AppStep) => void }) {
-  const user = useAuthStore((s: any) => s.user)
-  if (user?.plan !== 'agency') return null
-
-  const links = [
-    { id: 'agency',          label: 'Dashboard',  icon: '⬛' },
-    { id: 'agency-projects', label: 'Projects',   icon: '📁' },
-    { id: 'agency-team',     label: 'Team',       icon: '👥' },
-    { id: 'agency-kits',     label: 'Brand kits', icon: '🎨' },
-  ]
-
-  return (
-    <>
-      <p className="text-[9.5px] font-bold text-white/25 uppercase tracking-widest px-2 pt-3 pb-1">Agency</p>
-      {links.map(link => {
-        const isActive = currentStep === link.id
-        return (
-          <button
-            key={link.id}
-            onClick={() => onStep(link.id as AppStep)}
-            className={`w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-lg text-[13px] font-medium transition-all mb-0.5 text-left border
-              ${isActive
-                ? 'bg-amber-500/15 text-amber-300 border-amber-500/20'
-                : 'text-white/45 border-transparent hover:bg-white/4 hover:text-white/75'}`}
-          >
-            <span className="text-[12px]">{link.icon}</span>
-            {link.label}
-          </button>
-        )
-      })}
-    </>
-  )
-}
-
 function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => void; onNewProject: () => void; onClose?: () => void }) {
   const currentStep    = useStore((s) => s.currentStep)
   const completedSteps = useStore((s) => s.completedSteps)
   const setStep        = useStore((s) => s.setStep)
+  const user           = useAuthStore((s: any) => s.user)
   const scenes         = useStore((s) => s.scenes)
   const renderStatus   = useStore((s) => s.renderStatus)
   const projects       = useStore((s) => s.projects)
@@ -175,6 +141,9 @@ function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => v
 
       {/* Scrollable nav */}
       <div className="flex-1 overflow-y-auto p-2 scrollbar-thin">
+        {/* Hide personal workflow steps for workspace members who aren't owners */}
+        {(!user?.workspace_role || user.workspace_role === 'owner') && (
+          <>
         <p className="text-[9.5px] font-bold text-white/25 uppercase tracking-widest px-2 pt-2 pb-1">Workflow</p>
         {STEPS.map((step) => {
           const isActive = currentStep === step.id
@@ -199,10 +168,8 @@ function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => v
           )
         })}
 
-        {/* ── Agency (only shown on agency plan) ── */}
-        <AgencyNav currentStep={currentStep} onStep={handleSetStep} />
-
-        <div className="flex items-center justify-between px-2 pt-3 pb-1">
+        {(!user?.workspace_role || user.workspace_role === 'owner') && (
+        <><div className="flex items-center justify-between px-2 pt-3 pb-1">
           <p className="text-[9.5px] font-bold text-white/25 uppercase tracking-widest">Projects</p>
           <button onClick={() => { onNewProject(); onClose?.() }} className="text-white/25 hover:text-white/55 text-[14px] leading-none px-1 transition-colors">+</button>
         </div>
@@ -251,10 +218,12 @@ function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => v
             </div>
           )
         })}
+        </>
+        )}
       </div>
 
       {/* Active project status */}
-      {activeProject && (
+      {(!user?.workspace_role || user.workspace_role === 'owner') && activeProject && (
         <div className="mx-2 mb-2 bg-violet-500/10 border border-violet-500/20 rounded-xl p-2.5 flex-shrink-0">
           <p className="text-[9.5px] font-semibold text-violet-400 uppercase tracking-widest mb-1">Active</p>
           <p className="text-[11.5px] text-white/75 font-medium leading-snug truncate">{activeProject.name}</p>
@@ -305,12 +274,6 @@ export default function Layout({ children, onLogout, onNewProject }: LayoutProps
     setup: 'Setup', ideas: 'Ideas', script: 'Script',
     scenes: 'Scenes', voice: 'Voice & Visuals', export: 'Export',
     plans: 'Plans', upgrade: 'Upgrade',
-    agency:          'Agency',
-    'agency-projects': 'Projects',
-    'agency-new':    'New project',
-    'agency-detail': 'Project',
-    'agency-team':   'Team',
-    'agency-kits':   'Brand kits',
   }
 
   return (
