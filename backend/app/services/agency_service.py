@@ -52,6 +52,9 @@ def _review_key(token)               -> str: return f"agency:review:{token}"
 def _comments_key(proj_id)           -> str: return f"agency:comments:{proj_id}"
 def _activity_key(ws_id)             -> str: return f"agency:activity:{ws_id}"
 def _pool_key(ws_id)                 -> str: return f"agency:tokens:{ws_id}"
+def _suspended_key(ws_id, uid)       -> str: return f"workspace:suspended:{ws_id}:{uid}"
+def _session_revoke_key(uid)         -> str: return f"workspace:revoked:{uid}"
+def _invite_status_key(token)        -> str: return f"workspace:invite_status:{token}" 
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -122,14 +125,16 @@ async def get_workspace_members(redis: aioredis.Redis, ws_id: str) -> list[dict]
         uid = uid if isinstance(uid, str) else uid.decode()
         role = await get_member_role(redis, ws_id, uid)
         raw_user = await redis.get(f"user:{uid}")
+        suspended_raw = await redis.get(_suspended_key(ws_id, uid))
         if raw_user:
             u = json.loads(raw_user)
             members.append({
-                "user_id":  uid,
-                "role":     role or "editor",
-                "name":     u.get("full_name", ""),
-                "email":    u.get("email", ""),
-                "initials": u.get("avatar_initials", "?"),
+                "user_id":   uid,
+                "role":      role or "editor",
+                "name":      u.get("full_name", ""),
+                "email":     u.get("email", ""),
+                "initials":  u.get("avatar_initials", "?"),
+                "suspended": bool(suspended_raw),
             })
     return sorted(members, key=lambda m: 0 if m["role"] == "owner" else 1)
 
@@ -145,7 +150,16 @@ async def remove_member(redis: aioredis.Redis, ws_id: str, user_id: str):
     pipe.srem(_members_key(ws_id), user_id)
     pipe.delete(_member_key(ws_id, user_id))
     pipe.delete(_user_ws_key(user_id))
+    pipe.delete(_suspended_key(ws_id, user_id))
+    # Revoke all active sessions immediately
+    pipe.set(_session_revoke_key(user_id), _now(), ex=60 * 60 * 24 * 30)
     await pipe.execute()
+    await _log_activity(redis, ws_id, user_id, "member_removed", {"user_id": user_id})
+
+
+async def is_session_revoked(redis: aioredis.Redis, user_id: str) -> bool:
+    """Check if a user's workspace access has been revoked (used in auth middleware)."""
+    return bool(await redis.get(_session_revoke_key(user_id)))
 
 
 # ── Invites ───────────────────────────────────────────────────────────────────
@@ -165,6 +179,7 @@ async def create_invite(redis: aioredis.Redis, ws_id: str, inviter_id: str,
     }
     pipe = redis.pipeline()
     pipe.set(_invite_key(token), json.dumps(invite), ex=INVITE_TTL)
+    pipe.set(_invite_status_key(token), "pending", ex=INVITE_TTL)
     pipe.sadd(_invites_key(ws_id), token)
     await pipe.execute()
     return token
@@ -190,6 +205,7 @@ async def accept_invite(redis: aioredis.Redis, token: str, user_id: str) -> dict
     pipe.set(_member_key(ws_id, user_id), invite["role"])
     pipe.sadd(_members_key(ws_id), user_id)
     pipe.delete(_invite_key(token))
+    pipe.set(_invite_status_key(token), "accepted", ex=INVITE_TTL)
     pipe.srem(_invites_key(ws_id), token)
     await pipe.execute()
 
@@ -207,6 +223,103 @@ async def list_pending_invites(redis: aioredis.Redis, ws_id: str) -> list[dict]:
         if inv:
             invites.append(inv)
     return invites
+
+
+async def revoke_invite(redis: aioredis.Redis, ws_id: str, token: str) -> bool:
+    """Cancel a pending invite — sets status to revoked and removes from active set."""
+    invite = await get_invite(redis, token)
+    if not invite or invite["ws_id"] != ws_id:
+        return False
+    pipe = redis.pipeline()
+    pipe.delete(_invite_key(token))
+    pipe.set(_invite_status_key(token), "revoked", ex=INVITE_TTL)
+    pipe.srem(_invites_key(ws_id), token)
+    await pipe.execute()
+    await _log_activity(redis, ws_id, ws_id, "invite_revoked",
+                        {"email": invite.get("email", ""), "token": token})
+    return True
+
+
+async def list_all_invites(redis: aioredis.Redis, ws_id: str) -> list[dict]:
+    """Return all invites for the workspace, each with a resolved status field."""
+    tokens = await redis.smembers(_invites_key(ws_id))
+    invites = []
+    for t in tokens:
+        t = t if isinstance(t, str) else t.decode()
+        inv = await get_invite(redis, t)
+        if inv:
+            status_raw = await redis.get(_invite_status_key(t))
+            status = (status_raw if isinstance(status_raw, str)
+                      else status_raw.decode() if status_raw else "pending")
+            inv["status"] = status
+            invites.append(inv)
+    return sorted(invites, key=lambda i: i.get("created_at", ""), reverse=True)
+
+
+async def suspend_member(redis: aioredis.Redis, ws_id: str, user_id: str,
+                          suspended: bool) -> bool:
+    """Suspend or unsuspend a workspace member.
+
+    Suspended members: cannot access projects, render, or export.
+    Session revocation is set so the check fires on next API call.
+    """
+    if suspended:
+        pipe = redis.pipeline()
+        pipe.set(_suspended_key(ws_id, user_id), _now())
+        # Soft session revoke — expires when suspension is lifted
+        pipe.set(_session_revoke_key(user_id), _now(), ex=60 * 60 * 24 * 30)
+        await pipe.execute()
+        action = "member_suspended"
+    else:
+        pipe = redis.pipeline()
+        pipe.delete(_suspended_key(ws_id, user_id))
+        pipe.delete(_session_revoke_key(user_id))
+        await pipe.execute()
+        action = "member_unsuspended"
+    await _log_activity(redis, ws_id, user_id, action, {"user_id": user_id})
+    return True
+
+
+async def is_member_suspended(redis: aioredis.Redis, ws_id: str,
+                                user_id: str) -> bool:
+    return bool(await redis.get(_suspended_key(ws_id, user_id)))
+
+
+async def transfer_projects(redis: aioredis.Redis, ws_id: str,
+                             from_user_id: str, to_user_id: str) -> int:
+    """Reassign all projects owned by from_user to to_user. Returns count."""
+    from app.services.agency_service import list_projects, update_project
+    projects = await list_projects(redis, ws_id)
+    count = 0
+    for proj in projects:
+        assigned = proj.get("assigned_to", [])
+        if from_user_id in assigned:
+            new_assigned = [to_user_id if u == from_user_id else u
+                            for u in assigned]
+            if to_user_id not in new_assigned:
+                new_assigned.append(to_user_id)
+            await update_project(redis, proj["id"],
+                                 {"assigned_to": new_assigned})
+            count += 1
+    if count:
+        await _log_activity(redis, ws_id, from_user_id, "projects_transferred",
+                            {"from": from_user_id, "to": to_user_id,
+                             "count": count})
+    return count
+
+
+async def rename_workspace(redis: aioredis.Redis, ws_id: str,
+                            owner_id: str, new_name: str) -> dict:
+    """Update workspace display name."""
+    ws = await get_workspace(redis, ws_id)
+    if not ws:
+        raise ValueError("Workspace not found")
+    ws["name"] = new_name.strip()
+    ws["updated_at"] = _now()
+    await redis.set(_ws_key(ws_id), json.dumps(ws))
+    await _log_activity(redis, ws_id, owner_id, "workspace_renamed",
+                        {"name": new_name})
+    return ws
 
 
 # ── Shared token pool ─────────────────────────────────────────────────────────
