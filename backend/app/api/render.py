@@ -15,6 +15,13 @@ from app.services.security import (
     register_active_job, track_render_abuse, track_ip_request,
     check_ip_blocked, validate_job_id,
 )
+from app.services.agency_service import get_workspace_id_for_user, deduct_pool_tokens
+
+ws_id = await get_workspace_id_for_user(redis, user_id)
+if ws_id:
+    await deduct_pool_tokens(redis, ws_id, token_cost)
+else:
+    await auth_service.deduct_tokens(redis, user_id, job_id)
 
 settings = get_settings()
 router = APIRouter()
