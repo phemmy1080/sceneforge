@@ -249,9 +249,7 @@ function Root() {
         onJoined={() => {
           window.history.replaceState({}, '', '/')
           setScreen('app')
-          setTimeout(() => {
-            useStore.getState().setStep('agency' as any)
-          }, 100)
+          useStore.getState().setStep('agency' as any)
         }}
       />
     )
