@@ -38,15 +38,15 @@ PLAN_LIMITS = {
         "label": "Studio",
     },
     "agency": {
-    "max_scenes": -1,
-    "max_renders_per_day": -1,
-    "max_resolution": "1080p",
-    "ai_voices": True,
-    "upload_footage": True,
-    "workspace": True,
-    "team_seats": 5,
-    "label": "Agency",
-},
+        "max_scenes": -1,
+        "max_renders_per_day": -1,
+        "max_resolution": "1080p",
+        "ai_voices": True,
+        "upload_footage": True,
+        "workspace": True,
+        "team_seats": 5,
+        "label": "Agency",
+    },
 }
 
 
@@ -56,7 +56,7 @@ def get_limits(plan: str) -> dict:
 
 
 def is_paid(plan: str) -> bool:
-    return plan in ("starter", "pro", "studio")
+    return plan in ("starter", "pro", "studio", "agency")
 
 
 def check_scene_limit(plan: str, scene_count: int) -> tuple[bool, int]:
