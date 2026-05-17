@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "./api";
+
+import { api } from "../lib/api";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Project {
