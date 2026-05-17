@@ -227,6 +227,31 @@ async def invite_member(
     return {"message": f"Invite sent to {req.email}", "token": token}
 
 
+@router.get("/workspace/invite/preview/{token}")
+async def preview_invite(token: str, redis=Depends(get_redis)):
+    """Public — lets the invitee see workspace name & role before logging in."""
+    invite = await svc.get_invite(redis, token)
+    if not invite:
+        raise HTTPException(404, "Invite not found or expired")
+    # Get workspace name
+    ws = await svc.get_workspace(redis, invite["ws_id"])
+    # Get inviter name
+    inviter_name = "Your team"
+    try:
+        raw = await redis.get(f"user:{invite['inviter_id']}")
+        if raw:
+            import json as _j
+            inviter_name = _j.loads(raw).get("full_name", "Your team")
+    except Exception:
+        pass
+    return {
+        "workspace_name": ws["name"] if ws else "Agency workspace",
+        "inviter_name":   inviter_name,
+        "role":           invite["role"],
+        "email":          invite["email"],
+    }
+
+
 @router.post("/workspace/join/{token}")
 async def accept_invite(
     token: str,
