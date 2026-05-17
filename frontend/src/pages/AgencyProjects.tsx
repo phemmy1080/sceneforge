@@ -71,7 +71,7 @@ export function AgencyProjects() {
 
   async function load() {
     try {
-      const res = await api.get("/agency/projects");
+      const res = await api.get("/api/agency/projects");
       setProjects(res.data.projects);
     } finally {
       setLoading(false);
@@ -166,7 +166,7 @@ export function NewProject() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    api.get("/agency/brand-kits").then(r => setKits(r.data.brand_kits)).catch(() => {});
+    api.get("/api/agency/brand-kits").then(r => setKits(r.data.brand_kits)).catch(() => {});
   }, []);
 
   async function submit() {
@@ -174,7 +174,7 @@ export function NewProject() {
     setLoading(true);
     setError("");
     try {
-      const res = await api.post("/agency/projects", form);
+      const res = await api.post("/api/agency/projects", form);
 setAgencyProjectId(res.data.project.id); setStep('agency-detail' as any);
     } catch (e: any) {
       setError(e.response?.data?.detail || "Failed to create project");
@@ -253,7 +253,7 @@ export function ProjectDetail() {
 
   async function load() {
     try {
-      const res = await api.get(`/agency/projects/${id}`);
+      const res = await api.get(`/api/agency/projects/${id}`);
       setProject(res.data.project);
       setComments(res.data.comments);
     } finally {
@@ -266,7 +266,7 @@ export function ProjectDetail() {
     setActionLoading("status");
     setStatusDropdown(false);
     try {
-      const res = await api.patch(`/agency/projects/${id}/status`, { status: newStatus });
+      const res = await api.patch(`/api/agency/projects/${id}/status`, { status: newStatus });
       setProject(res.data.project);
     } finally {
       setActionLoading("");
@@ -276,7 +276,7 @@ export function ProjectDetail() {
   async function generateReviewLink() {
     setActionLoading("review");
     try {
-      const res = await api.post(`/agency/projects/${id}/review-link`);
+      const res = await api.post(`/api/agency/projects/${id}/review-link`);
       setReviewUrl(res.data.review_url);
       setProject(p => p ? { ...p, status: "client_review" } : p);
     } finally {
@@ -287,14 +287,14 @@ export function ProjectDetail() {
   async function addComment() {
     if (!commentText.trim()) return;
     try {
-      const res = await api.post(`/agency/projects/${id}/comments`, { text: commentText });
+      const res = await api.post(`/api/agency/projects/${id}/comments`, { text: commentText });
       setComments(c => [...c, res.data.comment]);
       setCommentText("");
     } catch {}
   }
 
   async function resolveComment(cid: string) {
-    await api.patch(`/agency/projects/${id}/comments/${cid}/resolve`);
+    await api.patch(`/api/agency/projects/${id}/comments/${cid}/resolve`);
     setComments(cs => cs.map(c => c.id === cid ? { ...c, resolved: true } : c));
   }
 
