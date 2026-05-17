@@ -1,0 +1,561 @@
+from __future__ import annotations
+"""
+agency.py  →  backend/app/api/agency.py
+
+Mount in main.py:
+    from app.api.agency import router as agency_router
+    app.include_router(agency_router, prefix="/api/agency", tags=["Agency"])
+"""
+
+import logging
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Header
+from pydantic import BaseModel, Field, EmailStr
+
+from app.dependencies import get_redis
+from app.services import auth as auth_service
+from app.services import agency_service as svc
+
+logger = logging.getLogger(__name__)
+router = APIRouter()
+
+
+# ── Auth helper ───────────────────────────────────────────────────────────────
+
+async def _get_user(authorization: Optional[str], redis):
+    token = (authorization or "").removeprefix("Bearer ").strip()
+    if not token:
+        raise HTTPException(401, "Missing token")
+    user_id = auth_service.verify_token(token)
+    if not user_id:
+        raise HTTPException(401, "Invalid or expired token")
+    user = await auth_service.get_user_by_id(redis, user_id)
+    if not user:
+        raise HTTPException(404, "User not found")
+    return user
+
+
+async def _require_workspace(user_id: str, redis) -> dict:
+    ws = await svc.get_user_workspace(redis, user_id)
+    if not ws:
+        raise HTTPException(403, "No agency workspace. Upgrade to Agency plan first.")
+    return ws
+
+
+async def _require_role(ws_id: str, user_id: str, redis,
+                         allowed: tuple = ("owner", "admin", "editor")):
+    role = await svc.get_member_role(redis, ws_id, user_id)
+    if role not in allowed:
+        raise HTTPException(403, "Insufficient permissions")
+    return role
+
+
+# ── Schemas ───────────────────────────────────────────────────────────────────
+
+class CreateWorkspaceRequest(BaseModel):
+    name: str = Field(..., min_length=2, max_length=100)
+
+class InviteMemberRequest(BaseModel):
+    email: EmailStr
+    role: str = Field(default="editor")
+
+class UpdateRoleRequest(BaseModel):
+    role: str
+
+class BrandKitRequest(BaseModel):
+    client_name: str = Field(..., min_length=1, max_length=100)
+    logo_url: Optional[str] = ""
+    colors: list[str] = Field(default_factory=list)
+    subtitle_style: Optional[str] = "viral"
+    ai_tone: Optional[str] = ""
+    default_cta: Optional[str] = ""
+    font: Optional[str] = ""
+
+class CreateProjectRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    client_name: Optional[str] = ""
+    brand_kit_id: Optional[str] = ""
+    platform: Optional[str] = "TikTok"
+    notes: Optional[str] = ""
+    assigned_to: list[str] = Field(default_factory=list)
+
+class UpdateProjectRequest(BaseModel):
+    title: Optional[str] = None
+    client_name: Optional[str] = None
+    brand_kit_id: Optional[str] = None
+    platform: Optional[str] = None
+    notes: Optional[str] = None
+    assigned_to: Optional[list[str]] = None
+    render_job_ids: Optional[list[str]] = None
+
+class UpdateStatusRequest(BaseModel):
+    status: str
+
+class AddCommentRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=2000)
+    scene_index: Optional[int] = None
+
+class ReviewDecisionRequest(BaseModel):
+    decision: str   # "approved" | "changes_requested"
+    message: Optional[str] = ""
+
+class ClientCommentRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=2000)
+    scene_index: Optional[int] = None
+    author_name: Optional[str] = "Client"
+
+
+# ── Workspace endpoints ───────────────────────────────────────────────────────
+
+@router.post("/workspace")
+async def create_workspace(
+    req: CreateWorkspaceRequest,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    if user.plan != "agency":
+        raise HTTPException(403, "Agency plan required. Upgrade on the billing page.")
+    existing = await svc.get_user_workspace(redis, user.id)
+    if existing:
+        raise HTTPException(400, "You already have a workspace")
+    ws = await svc.create_workspace(redis, user.id, req.name)
+    return {"workspace": ws}
+
+
+@router.get("/workspace")
+async def get_my_workspace(
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    return {"workspace": ws}
+
+
+@router.get("/workspace/dashboard")
+async def get_dashboard(
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    data = await svc.get_dashboard(redis, ws["id"])
+    return data
+
+
+# ── Member endpoints ──────────────────────────────────────────────────────────
+
+@router.get("/workspace/members")
+async def list_members(
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    members = await svc.get_workspace_members(redis, ws["id"])
+    pending = await svc.list_pending_invites(redis, ws["id"])
+    return {"members": members, "pending_invites": pending}
+
+
+@router.post("/workspace/invite")
+async def invite_member(
+    req: InviteMemberRequest,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    await _require_role(ws["id"], user.id, redis, ("owner", "admin"))
+
+    members = await svc.get_workspace_members(redis, ws["id"])
+    if len(members) >= ws.get("seat_limit", 5):
+        raise HTTPException(400, "Seat limit reached. Contact support to add more seats.")
+
+    token = await svc.create_invite(redis, ws["id"], user.id, req.email, req.role)
+
+    # Send invite email
+    try:
+        from app.services.email import send_invite_email
+        invite_url = f"https://scenraforge.com/join?token={token}"
+        await send_invite_email(req.email, user.full_name, ws["name"], invite_url)
+    except Exception as e:
+        logger.warning("Invite email failed: %s", e)
+
+    return {"message": f"Invite sent to {req.email}", "token": token}
+
+
+@router.post("/workspace/join/{token}")
+async def accept_invite(
+    token: str,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    try:
+        invite = await svc.accept_invite(redis, token, user.id)
+        return {"message": "Joined workspace", "workspace_id": invite["ws_id"]}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.patch("/workspace/members/{member_id}/role")
+async def update_member_role(
+    member_id: str,
+    req: UpdateRoleRequest,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    await _require_role(ws["id"], user.id, redis, ("owner", "admin"))
+    if member_id == ws["owner_id"] and req.role != "owner":
+        raise HTTPException(400, "Cannot change owner role")
+    await svc.update_member_role(redis, ws["id"], member_id, req.role)
+    return {"message": "Role updated"}
+
+
+@router.delete("/workspace/members/{member_id}")
+async def remove_member(
+    member_id: str,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    await _require_role(ws["id"], user.id, redis, ("owner", "admin"))
+    if member_id == ws["owner_id"]:
+        raise HTTPException(400, "Cannot remove workspace owner")
+    await svc.remove_member(redis, ws["id"], member_id)
+    return {"message": "Member removed"}
+
+
+# ── Token pool ────────────────────────────────────────────────────────────────
+
+@router.get("/workspace/tokens")
+async def get_pool_balance(
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    balance = await svc.get_pool_balance(redis, ws["id"])
+    return {"pool_tokens": balance, "ws_id": ws["id"]}
+
+
+# ── Brand kit endpoints ───────────────────────────────────────────────────────
+
+@router.get("/brand-kits")
+async def list_brand_kits(
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    kits = await svc.list_brand_kits(redis, ws["id"])
+    return {"brand_kits": kits}
+
+
+@router.post("/brand-kits")
+async def create_brand_kit(
+    req: BrandKitRequest,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    await _require_role(ws["id"], user.id, redis, ("owner", "admin", "editor"))
+    kit = await svc.create_brand_kit(redis, ws["id"], user.id, req.model_dump())
+    return {"brand_kit": kit}
+
+
+@router.get("/brand-kits/{kit_id}")
+async def get_brand_kit(
+    kit_id: str,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    kit = await svc.get_brand_kit(redis, kit_id)
+    if not kit or kit["ws_id"] != ws["id"]:
+        raise HTTPException(404, "Brand kit not found")
+    return {"brand_kit": kit}
+
+
+@router.put("/brand-kits/{kit_id}")
+async def update_brand_kit(
+    kit_id: str,
+    req: BrandKitRequest,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    kit = await svc.get_brand_kit(redis, kit_id)
+    if not kit or kit["ws_id"] != ws["id"]:
+        raise HTTPException(404, "Brand kit not found")
+    updated = await svc.update_brand_kit(redis, kit_id, req.model_dump())
+    return {"brand_kit": updated}
+
+
+@router.delete("/brand-kits/{kit_id}")
+async def delete_brand_kit(
+    kit_id: str,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    await _require_role(ws["id"], user.id, redis, ("owner", "admin"))
+    kit = await svc.get_brand_kit(redis, kit_id)
+    if not kit or kit["ws_id"] != ws["id"]:
+        raise HTTPException(404, "Brand kit not found")
+    await svc.delete_brand_kit(redis, ws["id"], kit_id)
+    return {"message": "Brand kit deleted"}
+
+
+# ── Project endpoints ─────────────────────────────────────────────────────────
+
+@router.get("/projects")
+async def list_projects(
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    role = await svc.get_member_role(redis, ws["id"], user.id)
+    projects = await svc.list_projects(redis, ws["id"])
+
+    # Clients only see projects they are assigned to
+    if role == "client":
+        projects = [p for p in projects if user.id in p.get("assigned_to", [])]
+
+    return {"projects": projects}
+
+
+@router.post("/projects")
+async def create_project(
+    req: CreateProjectRequest,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    await _require_role(ws["id"], user.id, redis, ("owner", "admin", "editor"))
+    data = req.model_dump()
+    if not data["assigned_to"]:
+        data["assigned_to"] = [user.id]
+    project = await svc.create_project(redis, ws["id"], user.id, data)
+    return {"project": project}
+
+
+@router.get("/projects/{proj_id}")
+async def get_project(
+    proj_id: str,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    project = await svc.get_project(redis, proj_id)
+    if not project or project["ws_id"] != ws["id"]:
+        raise HTTPException(404, "Project not found")
+    comments = await svc.list_comments(redis, proj_id)
+    return {"project": project, "comments": comments}
+
+
+@router.put("/projects/{proj_id}")
+async def update_project(
+    proj_id: str,
+    req: UpdateProjectRequest,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    project = await svc.get_project(redis, proj_id)
+    if not project or project["ws_id"] != ws["id"]:
+        raise HTTPException(404, "Project not found")
+    await _require_role(ws["id"], user.id, redis, ("owner", "admin", "editor"))
+    data = {k: v for k, v in req.model_dump().items() if v is not None}
+    updated = await svc.update_project(redis, proj_id, data)
+    return {"project": updated}
+
+
+@router.patch("/projects/{proj_id}/status")
+async def update_project_status(
+    proj_id: str,
+    req: UpdateStatusRequest,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    project = await svc.get_project(redis, proj_id)
+    if not project or project["ws_id"] != ws["id"]:
+        raise HTTPException(404, "Project not found")
+    await _require_role(ws["id"], user.id, redis, ("owner", "admin", "editor"))
+    try:
+        updated = await svc.update_project_status(
+            redis, ws["id"], proj_id, user.id, req.status
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"project": updated}
+
+
+@router.delete("/projects/{proj_id}")
+async def delete_project(
+    proj_id: str,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    await _require_role(ws["id"], user.id, redis, ("owner", "admin"))
+    project = await svc.get_project(redis, proj_id)
+    if not project or project["ws_id"] != ws["id"]:
+        raise HTTPException(404, "Project not found")
+    await svc.delete_project(redis, ws["id"], proj_id)
+    return {"message": "Project deleted"}
+
+
+# ── Comments ──────────────────────────────────────────────────────────────────
+
+@router.post("/projects/{proj_id}/comments")
+async def add_comment(
+    proj_id: str,
+    req: AddCommentRequest,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    project = await svc.get_project(redis, proj_id)
+    if not project or project["ws_id"] != ws["id"]:
+        raise HTTPException(404, "Project not found")
+    role = await svc.get_member_role(redis, ws["id"], user.id)
+    comment = await svc.add_comment(
+        redis, proj_id, user.id, user.full_name,
+        req.scene_index, req.text, is_client=(role == "client")
+    )
+    await svc._log_activity(redis, ws["id"], user.id, "comment_added", {
+        "proj_id": proj_id, "scene": req.scene_index
+    })
+    return {"comment": comment}
+
+
+@router.patch("/projects/{proj_id}/comments/{comment_id}/resolve")
+async def resolve_comment(
+    proj_id: str,
+    comment_id: str,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    await _require_role(ws["id"], user.id, redis, ("owner", "admin", "editor"))
+    ok = await svc.resolve_comment(redis, proj_id, comment_id)
+    if not ok:
+        raise HTTPException(404, "Comment not found")
+    return {"message": "Comment resolved"}
+
+
+# ── Client review links ───────────────────────────────────────────────────────
+
+@router.post("/projects/{proj_id}/review-link")
+async def create_review_link(
+    proj_id: str,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    project = await svc.get_project(redis, proj_id)
+    if not project or project["ws_id"] != ws["id"]:
+        raise HTTPException(404, "Project not found")
+    await _require_role(ws["id"], user.id, redis, ("owner", "admin", "editor"))
+
+    review = await svc.create_review_link(redis, ws["id"], proj_id, user.id)
+    review_url = f"https://scenraforge.com/review/{review['token']}"
+
+    # bump project to client_review status
+    await svc.update_project_status(redis, ws["id"], proj_id, user.id, "client_review")
+
+    return {
+        "review_url": review_url,
+        "token":      review["token"],
+        "expires_at": review["expires_at"],
+    }
+
+
+@router.get("/review/{token}")
+async def get_review_public(token: str, redis=Depends(get_redis)):
+    """Public endpoint — no auth required. Used by the client review page."""
+    review = await svc.get_review_link(redis, token)
+    if not review:
+        raise HTTPException(404, "Review link not found or expired")
+    project = await svc.get_project(redis, review["proj_id"])
+    if not project:
+        raise HTTPException(404, "Project not found")
+    comments = await svc.list_comments(redis, review["proj_id"])
+    client_comments = [c for c in comments if c.get("is_client")]
+    return {
+        "review":   review,
+        "project":  {
+            "id":          project["id"],
+            "title":       project["title"],
+            "client_name": project["client_name"],
+            "platform":    project["platform"],
+            "render_job_ids": project.get("render_job_ids", []),
+        },
+        "comments": client_comments,
+    }
+
+
+@router.post("/review/{token}/comment")
+async def add_client_comment(
+    token: str,
+    req: ClientCommentRequest,
+    redis=Depends(get_redis),
+):
+    """Public endpoint — client leaves a comment without logging in."""
+    review = await svc.get_review_link(redis, token)
+    if not review:
+        raise HTTPException(404, "Review link not found or expired")
+    comment = await svc.add_comment(
+        redis, review["proj_id"],
+        "client", req.author_name or "Client",
+        req.scene_index, req.text, is_client=True
+    )
+    return {"comment": comment}
+
+
+@router.post("/review/{token}/decide")
+async def submit_review_decision(
+    token: str,
+    req: ReviewDecisionRequest,
+    redis=Depends(get_redis),
+):
+    """Public endpoint — client approves or requests changes."""
+    try:
+        review = await svc.submit_review_decision(
+            redis, token, req.decision, req.message or ""
+        )
+        return {"review": review, "message": f"Decision recorded: {req.decision}"}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+# ── Activity ──────────────────────────────────────────────────────────────────
+
+@router.get("/workspace/activity")
+async def get_activity(
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    activity = await svc.get_activity(redis, ws["id"], 50)
+    return {"activity": activity}
