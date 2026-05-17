@@ -11,6 +11,8 @@ export interface User {
   tokens_remaining: number
   tokens_total: number
   created_at: string
+  workspace_id?: string | null
+  workspace_role?: string | null
 }
 
 interface AuthState {
