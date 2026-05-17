@@ -234,13 +234,6 @@ async def get_user_by_id(redis: aioredis.Redis, user_id: str) -> Optional[UserOu
         data["tokens_remaining"] = TOKENS_ON_SIGNUP
         data["tokens_total"] = TOKENS_ON_SIGNUP
         await redis.set(_user_key(user_id), json.dumps(data))
-
-    ws_id = await redis.get(f"workspace:user:{user_id}")
-    if ws_id:
-        ws_id = ws_id if isinstance(ws_id, str) else ws_id.decode()
-        data["workspace_id"] = ws_id
-        role = await redis.get(f"workspace:member:{ws_id}:{user_id}")
-        data["workspace_role"] = role.decode() if role else None
     return _user_out(data)
 
 
@@ -347,8 +340,24 @@ async def add_tokens(
     data["tokens_remaining"] = data.get("tokens_remaining", 0) + amount
     data["tokens_total"] = data.get("tokens_total", TOKENS_ON_SIGNUP) + amount
     # Upgrade plan — only move up, never downgrade
-    plan_rank = {"free": 0, "starter": 1, "pro": 2, "studio": 3}
-    if plan and plan_rank.get(plan, 0) > plan_rank.get(data.get("plan", "free"), 0):
+    # Build rank dynamically from Redis so any admin-added plan is included.
+    # Base order: free < starter < pro < studio < agency < any custom plan.
+    # Custom plans added by admin get a rank of 10 (above all built-ins).
+    _BASE_RANK = {"free": 0, "starter": 1, "pro": 2, "studio": 3, "agency": 4}
+    try:
+        _raw_plans = await redis.get("sceneforge:pricing:plans")
+        if _raw_plans:
+            _all_keys = list(json.loads(_raw_plans).keys())
+            _dynamic_rank = dict(_BASE_RANK)
+            for _k in _all_keys:
+                if _k not in _dynamic_rank:
+                    _dynamic_rank[_k] = 10   # custom admin plans rank above built-ins
+            plan_rank = _dynamic_rank
+        else:
+            plan_rank = _BASE_RANK
+    except Exception:
+        plan_rank = _BASE_RANK
+    if plan and plan_rank.get(plan, 10) > plan_rank.get(data.get("plan", "free"), 0):
         data["plan"] = plan
     await redis.set(_user_key(user_id), json.dumps(data))
     return _user_out(data)
@@ -364,7 +373,7 @@ def verify_token(token: str) -> Optional[str]:
     return _decode_token(token)
 
 async def update_plan(redis: aioredis.Redis, user_id: str, plan: str) -> None:
-    """Update the user's plan label (free / starter / pro / studio)."""
+    """Update the user's plan label (free / starter / pro / studio / agency)."""
     raw = await redis.get(_user_key(user_id))
     if not raw:
         return
