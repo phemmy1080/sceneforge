@@ -46,7 +46,7 @@ export const VOICES: VoiceOption[] = [
 export const FREE_VOICE_IDS = VOICES.filter(v => v.free).map(v => v.id)
 
 export function getAvailableVoices(plan: string): VoiceOption[] {
-  const isPaid = ['starter', 'pro', 'studio'].includes(plan?.toLowerCase())
+  const isPaid = ['starter', 'pro', 'studio', 'agency'].includes(plan?.toLowerCase())
   return isPaid ? VOICES : VOICES.filter(v => v.free)
 }
 
