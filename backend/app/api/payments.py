@@ -236,6 +236,25 @@ async def flutterwave_webhook(request: Request, redis=Depends(get_redis)):
         )
         logger.info("Tokens topped up | user=%s | +%d | balance=%d",
                     user_id, tokens, updated_user.tokens_remaining)
+
+        # Auto-create agency workspace on first agency purchase
+        if pending.get("plan_key") == "agency":
+            try:
+                from app.services.agency_service import (
+                    get_workspace_id_for_user, create_workspace, add_pool_tokens
+                )
+                existing_ws = await get_workspace_id_for_user(auth_redis, user_id)
+                if not existing_ws:
+                    ws_name = f"{updated_user.full_name}'s Agency"
+                    await create_workspace(auth_redis, user_id, ws_name, initial_tokens=tokens)
+                    logger.info("Agency workspace auto-created | user=%s", user_id)
+                else:
+                    # Top up existing workspace pool with new tokens
+                    await add_pool_tokens(auth_redis, existing_ws, tokens)
+                    logger.info("Agency pool topped up | ws=%s | +%d", existing_ws, tokens)
+            except Exception as ws_err:
+                logger.error("Workspace auto-create failed (non-fatal): %s", ws_err)
+
         await redis.set(f"payment:processed:{tx_id}", "1", ex=60 * 60 * 24 * 90)
         await redis.delete(f"payment:pending:{tx_ref}")
         await send_token_confirmation(
