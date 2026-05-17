@@ -158,8 +158,8 @@ export default function AgencyDashboard() {
                   <div key={p.id}
                     onClick={() => { setAgencyProjectId(p.id); setStep('agency-detail' as any); }}
                     className="flex items-center gap-4 px-5 py-3.5 hover:bg-white/[0.03] cursor-pointer transition group">
-                    <div className="w-2 h-2 rounded-full flex-shrink-0 ring-2 ring-offset-1 ring-offset-[#0A0A0F]"
-                      style={{ background: s.dot, ringColor: s.dot + "40" }} />
+                    <div className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ background: s.dot }} />
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-semibold text-white/80 group-hover:text-amber-300 transition truncate">{p.title}</div>
                       <div className="text-xs text-white/30 mt-0.5">{p.client_name || "No client"} · {p.platform}</div>
