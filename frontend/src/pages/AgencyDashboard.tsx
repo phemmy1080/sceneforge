@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-
-import { api } from "../lib/api";
+import { useStore } from '../store';
+import { api } from '../lib/api';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Project {
@@ -81,7 +80,8 @@ function timeAgo(iso: string): string {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function AgencyDashboard() {
-  const navigate = useNavigate();
+  const setStep = useStore((s) => s.setStep);
+  const setAgencyProjectId = useStore((s: any) => s.setAgencyProjectId);
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -135,7 +135,7 @@ export default function AgencyDashboard() {
           <p className="text-zinc-400 text-sm mt-1">Agency workspace</p>
         </div>
         <button
-          onClick={() => navigate("/agency/projects/new")}
+          onClick={() => setStep('agency-new' as any)}
           className="flex items-center gap-2 bg-gold text-black font-semibold px-4 py-2 rounded-xl text-sm hover:bg-gold/90 transition"
         >
           <span className="text-lg leading-none">+</span> New project
@@ -164,7 +164,7 @@ export default function AgencyDashboard() {
           <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
             <span className="font-semibold text-white text-sm">Recent projects</span>
             <button
-              onClick={() => navigate("/agency/projects")}
+              onClick={() => setStep('agency-projects' as any)}
               className="text-xs text-zinc-400 hover:text-white transition"
             >
               View all →
@@ -174,7 +174,7 @@ export default function AgencyDashboard() {
             {data.recent_projects.length === 0 && (
               <div className="px-5 py-10 text-center text-zinc-500 text-sm">
                 No projects yet —{" "}
-                <button onClick={() => navigate("/agency/projects/new")} className="text-gold hover:underline">
+                <button onClick={() => setStep('agency-new' as any)} className="text-gold hover:underline">
                   create one
                 </button>
               </div>
@@ -182,7 +182,7 @@ export default function AgencyDashboard() {
             {data.recent_projects.map(p => (
               <div
                 key={p.id}
-                onClick={() => navigate(`/agency/projects/${p.id}`)}
+                onClick={() => (() => { setAgencyProjectId(p.id); setStep('agency-detail' as any); })()}
                 className="flex items-center gap-3 px-5 py-3.5 hover:bg-zinc-800/50 cursor-pointer transition"
               >
                 <div className="flex-1 min-w-0">
@@ -205,7 +205,7 @@ export default function AgencyDashboard() {
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3.5 border-b border-zinc-800">
               <span className="font-semibold text-white text-sm">Team</span>
-              <button onClick={() => navigate("/agency/team")} className="text-xs text-zinc-400 hover:text-white transition">
+              <button onClick={() => setStep('agency-team' as any)} className="text-xs text-zinc-400 hover:text-white transition">
                 Manage →
               </button>
             </div>
