@@ -151,7 +151,26 @@ def _make_initials(name: str) -> str:
 
 
 def _user_out(data: dict) -> UserOut:
-    return UserOut(**{k: v for k, v in data.items() if k != "password_hash"})
+    allowed = set(UserOut.model_fields.keys())
+    filtered = {k: v for k, v in data.items() if k in allowed}
+    return UserOut(**filtered)
+
+
+async def get_user_out_with_workspace(redis: aioredis.Redis, user_id: str,
+                                       data: dict) -> UserOut:
+    """Build UserOut enriched with workspace_id and workspace_role."""
+    user_out = _user_out(data)
+    try:
+        ws_id_raw = await redis.get(f"workspace:user:{user_id}")
+        if ws_id_raw:
+            ws_id = ws_id_raw if isinstance(ws_id_raw, str) else ws_id_raw.decode()
+            role_raw = await redis.get(f"workspace:member:{ws_id}:{user_id}")
+            role = (role_raw if isinstance(role_raw, str) else role_raw.decode()) if role_raw else None
+            user_out.workspace_id   = ws_id
+            user_out.workspace_role = role
+    except Exception:
+        pass
+    return user_out
 
 
 # ─── CRUD ─────────────────────────────────────────────────────────────────────
