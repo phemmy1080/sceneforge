@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useStore, type AppStep } from '../store'
 import StepNav from './StepNav'
 import UserMenu from './UserMenu'
+import { useAuthStore } from '../authStore' 
 
 const STEPS: { id: AppStep; label: string }[] = [
   { id: 'setup',  label: 'Setup' },
@@ -71,7 +72,6 @@ function TokenGateBar({ onUpgrade }: { onUpgrade: () => void }) {
 }
 
 function AgencyNav({ currentStep, onStep }: { currentStep: string; onStep: (s: AppStep) => void }) {
-  const { useAuthStore } = require('../authStore')
   const user = useAuthStore((s: any) => s.user)
   if (user?.plan !== 'agency') return null
 
