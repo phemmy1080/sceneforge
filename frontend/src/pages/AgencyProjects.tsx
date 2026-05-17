@@ -356,8 +356,7 @@ export function ProjectDetail() {
                   <div className={`w-2.5 h-2.5 rounded-full transition-all ${active ? "ring-4 ring-offset-1 ring-offset-[#0A0A0F] shadow-lg" : ""}`}
                     style={{
                       background: active ? s.dot : done ? "#2dd4bf" : "#374151",
-                      boxShadow: active ? `0 0 10px ${s.dot}80` : undefined,
-                      ringColor: active ? s.dot + "40" : undefined,
+                      boxShadow: active ? `0 0 0 3px ${s.dot}30, 0 0 10px ${s.dot}60` : undefined,
                     }} />
                   <div className={`text-[9.5px] text-center leading-tight font-medium ${active ? "text-white" : done ? "text-teal-400/70" : "text-white/20"}`}>
                     {s.label}
