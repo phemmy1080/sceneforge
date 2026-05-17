@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
 import axios from "axios";
 
-const BASE = import.meta.env.VITE_API_URL || "https://sceneforge-production-8d19.up.railway.app";
+const BASE = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_URL) || "https://sceneforge-production-8d19.up.railway.app";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface ReviewData {
@@ -40,8 +39,7 @@ function timeAgo(iso: string): string {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function ClientReview() {
-  const { token } = useParams<{ token: string }>();
+export default function ClientReview({ token }: { token: string }) {
   const [data, setData] = useState<ReviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
