@@ -65,7 +65,12 @@ export function AgencyTeam() {
   const [newName, setNewName] = useState("");
   const [renaming, setRenaming] = useState(false);
 
-  const isOwner = ws?.owner_id === currentUser?.id;
+  // Use workspace_role from auth token — most reliable source
+  // owner = full control, admin = manage team, editor = create only
+  const wsRole  = currentUser?.workspace_role || 'editor'
+  const isOwner = wsRole === 'owner'
+  const isAdmin = wsRole === 'owner' || wsRole === 'admin'
+  // For backward compat keep isOwner name for owner-only gates;
 
   useEffect(() => { load(); }, []);
 
@@ -274,7 +279,7 @@ export function AgencyTeam() {
               {/* Role */}
               {m.role === "owner" ? (
                 <span className={`text-[11px] px-2.5 py-1 rounded-full font-semibold ${ROLE_STYLE.owner}`}>Owner</span>
-              ) : isOwner ? (
+              ) : isAdmin ? (
                 <select value={m.role} onChange={e => changeRole(m.user_id, e.target.value)}
                   className="bg-white/[0.06] border border-white/[0.1] rounded-lg px-2.5 py-1 text-xs text-white/70 outline-none hover:border-white/[0.2] transition">
                   <option value="admin">Admin</option>
@@ -325,7 +330,7 @@ export function AgencyTeam() {
                   </div>
                 </div>
                 <span className={`text-[11px] px-2.5 py-1 rounded-full font-semibold ${ROLE_STYLE[inv.role] || ROLE_STYLE.editor}`}>{inv.role}</span>
-                {isOwner && (
+                {isAdmin && (
                   <button onClick={() => cancelInvite(inv.token, inv.email)}
                     className="w-7 h-7 flex items-center justify-center rounded-lg text-white/20 hover:text-rose-400 hover:bg-rose-400/10 transition text-base leading-none flex-shrink-0"
                     title="Cancel invite">
