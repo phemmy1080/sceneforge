@@ -1,465 +1,353 @@
-from __future__ import annotations
-
-"""
-Auth service — Redis-backed user store with token/credit system.
-Each new user gets 1000 tokens. Each new video render costs 100 tokens.
-Re-rendering an already-completed job is free (job_id is checked).
-"""
-import uuid
+import asyncio
 import json
-import hashlib
-import logging
-
-logger = logging.getLogger(__name__)
-import hmac
-import base64
-from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-import redis.asyncio as aioredis
+from fastapi import APIRouter, Depends, HTTPException, Header, Request
 
-from app.config import get_settings
-from app.models.auth_schemas import UserOut, SignupRequest
+import logging
+from app.dependencies import get_redis
+from app.middleware.rate_limit import limiter
+logger = logging.getLogger(__name__)
+from app.models.auth_schemas import (
+    SignupRequest, LoginRequest,
+    TokenResponse, UserOut, UpdateProfileRequest, TokenBalanceResponse,
+)
+from app.services import auth as auth_service
+from app.services import coupons as coupon_service
 
-settings = get_settings()
-
-import random
-import string
-
-OTP_TTL_SECONDS = 900       # 15 minutes
-OTP_RESEND_COOLDOWN = 60    # 60 seconds before resend allowed
-
-
-def _otp_key(email: str) -> str:
-    return f"otp:{email.lower()}"
-
-def _otp_cooldown_key(email: str) -> str:
-    return f"otp:cooldown:{email.lower()}"
+router = APIRouter()
 
 
-def generate_otp() -> str:
-    """Generate a 6-digit numeric OTP."""
-    return "".join(random.choices(string.digits, k=6))
+class SignupWithCouponRequest(SignupRequest):
+    coupon_code: Optional[str] = None
 
 
-async def store_otp(redis: aioredis.Redis, email: str, otp: str) -> None:
-    """Store OTP with 15-minute TTL and set resend cooldown."""
-    await redis.set(_otp_key(email), otp, ex=OTP_TTL_SECONDS)
-    await redis.set(_otp_cooldown_key(email), "1", ex=OTP_RESEND_COOLDOWN)
-
-
-async def verify_otp(redis: aioredis.Redis, email: str, otp: str) -> bool:
-    """Verify OTP. Returns True and deletes it if correct, False otherwise."""
-    stored = await redis.get(_otp_key(email))
-    if not stored:
-        return False
-    if stored != otp.strip():
-        return False
-    # Valid — delete OTP so it can't be reused
-    await redis.delete(_otp_key(email))
-    await redis.delete(_otp_cooldown_key(email))
-    return True
-
-
-async def can_resend_otp(redis: aioredis.Redis, email: str) -> tuple[bool, int]:
-    """Returns (can_resend, seconds_remaining)."""
-    ttl = await redis.ttl(_otp_cooldown_key(email))
-    if ttl <= 0:
-        return True, 0
-    return False, ttl
-
-
-async def mark_email_verified(redis: aioredis.Redis, user_id: str) -> None:
-    """Mark user's email as verified."""
-    raw = await redis.get(_user_key(user_id))
-    if not raw:
-        return
-    data = json.loads(raw)
-    data["email_verified"] = True
-    await redis.set(_user_key(user_id), json.dumps(data))
-
-
-SECRET = (settings.anthropic_api_key or settings.groq_api_key or "dev-secret-key")[:32].encode()
-TOKEN_TTL_HOURS = 72
-
-TOKENS_ON_SIGNUP = 1000   # credits given to every new user
-TOKENS_PER_VIDEO = 100    # cost of each new video render
-
-
-# ─── Password hashing ─────────────────────────────────────────────────────────
-
-def _hash_password(password: str) -> str:
-    salt = uuid.uuid4().hex
-    h = hashlib.sha256((salt + password).encode()).hexdigest()
-    return f"{salt}:{h}"
-
-
-def _verify_password(password: str, stored: str) -> bool:
+@router.post("/signup", response_model=TokenResponse)
+async def signup(req: SignupWithCouponRequest, redis=Depends(get_redis)):
     try:
-        salt, h = stored.split(":", 1)
-        return hmac.compare_digest(
-            hashlib.sha256((salt + password).encode()).hexdigest(), h
-        )
-    except Exception:
-        return False
+        user = await auth_service.create_user(redis, req)
+        # Apply coupon if provided
+        if req.coupon_code:
+            try:
+                coupon = await coupon_service.redeem_coupon(redis, req.coupon_code, user.id)
+                user = await auth_service.add_tokens(redis, user.id, coupon["tokens"])
+                logger.info("Coupon applied at signup | user=%s | code=%s | +%d tokens",
+                            user.id, req.coupon_code, coupon["tokens"])
+            except ValueError as ce:
+                logger.warning("Invalid coupon at signup | code=%s | %s", req.coupon_code, ce)
+
+        # Send verification OTP
+        try:
+            from app.services.email import send_verification_otp
+            otp = auth_service.generate_otp()
+            await auth_service.store_otp(redis, user.email, otp)
+            asyncio.create_task(send_verification_otp(user.email, user.full_name, otp))
+            logger.info("Verification OTP sent to %s", user.email)
+        except Exception as email_err:
+            logger.error("Failed to send verification OTP at signup: %s", email_err)
+
+        token = auth_service.issue_token(user.id)
+        return TokenResponse(access_token=token, user=user)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Signup failed: {e}")
 
 
-# ─── Auth tokens ──────────────────────────────────────────────────────────────
-
-def _make_token(user_id: str) -> str:
-    payload = f"{user_id}:{datetime.now(timezone.utc).isoformat()}"
-    sig = hmac.new(SECRET, payload.encode(), hashlib.sha256).hexdigest()
-    return base64.urlsafe_b64encode(f"{payload}|{sig}".encode()).decode()
-
-
-def _decode_token(token: str) -> Optional[str]:
-    try:
-        raw = base64.urlsafe_b64decode(token.encode()).decode()
-        payload, sig = raw.rsplit("|", 1)
-        expected = hmac.new(SECRET, payload.encode(), hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(expected, sig):
-            return None
-        user_id, ts = payload.split(":", 1)
-        issued = datetime.fromisoformat(ts)
-        if datetime.now(timezone.utc) - issued > timedelta(hours=TOKEN_TTL_HOURS):
-            return None
-        return user_id
-    except Exception:
-        return None
+@router.post("/login", response_model=TokenResponse)
+async def login(req: LoginRequest, redis=Depends(get_redis)):
+    user = await auth_service.authenticate_user(redis, req.email, req.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Incorrect email or password.")
+    if not user.email_verified:
+        raise HTTPException(status_code=403, detail="Please verify your email before logging in. Check your inbox or request a new code.")
+    token = auth_service.issue_token(user.id)
+    return TokenResponse(access_token=token, user=user)
 
 
-# ─── Redis keys ───────────────────────────────────────────────────────────────
-
-def _user_key(user_id: str) -> str:
-    return f"user:{user_id}"
-
-def _email_index_key(email: str) -> str:
-    return f"email_index:{email.lower()}"
-
-def _user_jobs_key(user_id: str) -> str:
-    """Set of job_ids the user has already been charged for."""
-    return f"user:{user_id}:charged_jobs"
-
-
-# ─── Helpers ──────────────────────────────────────────────────────────────────
-
-def _make_initials(name: str) -> str:
-    parts = name.strip().split()
-    if len(parts) >= 2:
-        return (parts[0][0] + parts[-1][0]).upper()
-    return name[:2].upper()
-
-
-def _user_out(data: dict) -> UserOut:
-    allowed = set(UserOut.model_fields.keys())
-    filtered = {k: v for k, v in data.items() if k in allowed}
-    return UserOut(**filtered)
-
-
-async def get_user_out_with_workspace(redis: aioredis.Redis, user_id: str,
-                                       data: dict) -> UserOut:
-    """Build UserOut enriched with workspace_id and workspace_role."""
-    user_out = _user_out(data)
-    try:
-        ws_id_raw = await redis.get(f"workspace:user:{user_id}")
-        if ws_id_raw:
-            ws_id = ws_id_raw if isinstance(ws_id_raw, str) else ws_id_raw.decode()
-            role_raw = await redis.get(f"workspace:member:{ws_id}:{user_id}")
-            role = (role_raw if isinstance(role_raw, str) else role_raw.decode()) if role_raw else None
-            user_out.workspace_id   = ws_id
-            user_out.workspace_role = role
-    except Exception:
-        pass
-    return user_out
-
-
-# ─── CRUD ─────────────────────────────────────────────────────────────────────
-
-async def create_user(redis: aioredis.Redis, req: SignupRequest) -> UserOut:
-    existing = await redis.get(_email_index_key(req.email))
-    if existing:
-        raise ValueError("An account with this email already exists.")
-
-    user_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc).isoformat()
-
-    # Check coupon code if provided
-    bonus_tokens = 0
-    coupon_used = None
-    if hasattr(req, "coupon_code") and req.coupon_code:
-        code = req.coupon_code.upper().strip()
-        raw_coupon = await redis.get(f"coupon:{code}")
-        if raw_coupon:
-            coupon = json.loads(raw_coupon)
-            max_uses = coupon.get("max_uses", 0)
-            uses = coupon.get("uses", 0)
-            if coupon.get("active") and (max_uses == 0 or uses < max_uses):
-                bonus_tokens = coupon.get("tokens", 0)
-                coupon_used = code
-                coupon["uses"] = uses + 1
-                if max_uses > 0 and coupon["uses"] >= max_uses:
-                    coupon["active"] = False
-                await redis.set(f"coupon:{code}", json.dumps(coupon))
-
-    total_tokens = TOKENS_ON_SIGNUP + bonus_tokens
-
-    user_data = {
-        "id": user_id,
-        "full_name": req.full_name,
-        "email": req.email.lower(),
-        "password_hash": _hash_password(req.password),
-        "avatar_initials": _make_initials(req.full_name),
-        "plan": "free",
-        "videos_created": 0,
-        "tokens_remaining": total_tokens,
-        "tokens_total": total_tokens,
-        "coupon_used": coupon_used,
-        "email_verified": False,
-        "created_at": now,
-    }
-
-    await redis.set(_user_key(user_id), json.dumps(user_data))
-    await redis.set(_email_index_key(req.email), user_id)
-
-    return _user_out(user_data)
-
-
-async def authenticate_user(
-    redis: aioredis.Redis, email: str, password: str
-) -> Optional[UserOut]:
-    user_id = await redis.get(_email_index_key(email.lower()))
+@router.get("/me", response_model=UserOut)
+async def get_me(
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    token = (authorization or "").removeprefix("Bearer ").strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing token")
+    user_id = auth_service.verify_token(token)
     if not user_id:
-        return None
-    raw = await redis.get(_user_key(user_id))
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    raw = await redis.get(f"user:{user_id}")
     if not raw:
-        return None
-    data = json.loads(raw)
-    # Back-fill token fields for existing users created before this feature
-    if "tokens_remaining" not in data:
-        data["tokens_remaining"] = TOKENS_ON_SIGNUP
-        data["tokens_total"] = TOKENS_ON_SIGNUP
-        await redis.set(_user_key(user_id), json.dumps(data))
-    if not _verify_password(password, data["password_hash"]):
-        return None
-    return _user_out(data)
+        raise HTTPException(status_code=404, detail="User not found")
+    import json as _j
+    data = _j.loads(raw)
+    user = await auth_service.get_user_out_with_workspace(redis, user_id, data)
+    return user
 
 
-async def get_user_by_id(redis: aioredis.Redis, user_id: str) -> Optional[UserOut]:
-    raw = await redis.get(_user_key(user_id))
+@router.patch("/me", response_model=UserOut)
+async def update_profile(
+    req: UpdateProfileRequest,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    token = (authorization or "").removeprefix("Bearer ").strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing token")
+    user_id = auth_service.verify_token(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    user = await auth_service.update_user(redis, user_id,
+                                          full_name=req.full_name, email=req.email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
+@router.get("/tokens", response_model=TokenBalanceResponse)
+async def get_tokens(
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    """Get the current user's token balance."""
+    token = (authorization or "").removeprefix("Bearer ").strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing token")
+    user_id = auth_service.verify_token(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    bal = await auth_service.get_token_balance(redis, user_id)
+    return TokenBalanceResponse(
+        tokens_remaining=bal["tokens_remaining"],
+        tokens_total=bal["tokens_total"],
+        videos_created=bal["videos_created"],
+        can_render=bal["tokens_remaining"] >= 100,
+    )
+
+
+@router.post("/validate-coupon")
+async def validate_coupon(
+    body: dict,
+    redis=Depends(get_redis),
+):
+    """Check if a coupon code is valid before signup."""
+    code = (body.get("code") or "").upper().strip()
+    if not code:
+        return {"valid": False, "tokens": 0, "message": "No code provided"}
+
+    raw = await redis.get(f"coupon:{code}")
     if not raw:
-        return None
-    data = json.loads(raw)
-    if "tokens_remaining" not in data:
-        data["tokens_remaining"] = TOKENS_ON_SIGNUP
-        data["tokens_total"] = TOKENS_ON_SIGNUP
-        await redis.set(_user_key(user_id), json.dumps(data))
-    return _user_out(data)
+        return {"valid": False, "tokens": 0, "message": "Invalid coupon code"}
+
+    coupon = json.loads(raw)
+    if not coupon.get("active"):
+        return {"valid": False, "tokens": 0, "message": "This coupon has expired"}
+
+    max_uses = coupon.get("max_uses", 0)
+    uses = coupon.get("uses", 0)
+    if max_uses > 0 and uses >= max_uses:
+        return {"valid": False, "tokens": 0, "message": "This coupon has reached its usage limit"}
+
+    tokens = coupon.get("tokens", 0)
+    return {"valid": True, "tokens": tokens, "message": f"✓ {tokens:,} bonus tokens will be added to your account"}
 
 
-async def update_user(
-    redis: aioredis.Redis,
-    user_id: str,
-    full_name: str = None,
-    email: str = None,
-) -> Optional[UserOut]:
-    raw = await redis.get(_user_key(user_id))
+@router.post("/verify-email")
+async def verify_email(
+    body: dict,
+    redis=Depends(get_redis),
+    authorization: Optional[str] = Header(None),
+):
+    """Verify email with OTP. Returns updated user on success."""
+    otp = (body.get("otp") or "").strip()
+    token = (authorization or "").removeprefix("Bearer ").strip()
+
+    user_id = auth_service.verify_token(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    # Get user email
+    raw = await redis.get(f"user:{user_id}")
     if not raw:
-        return None
+        raise HTTPException(status_code=404, detail="User not found")
     data = json.loads(raw)
-    if full_name:
-        data["full_name"] = full_name
-        data["avatar_initials"] = _make_initials(full_name)
-    if email:
-        await redis.delete(_email_index_key(data["email"]))
-        data["email"] = email.lower()
-        await redis.set(_email_index_key(email), user_id)
-    await redis.set(_user_key(user_id), json.dumps(data))
-    return _user_out(data)
+    email = data.get("email", "")
+
+    valid = await auth_service.verify_otp(redis, email, otp)
+    if not valid:
+        raise HTTPException(status_code=400, detail="Invalid or expired code. Please try again.")
+
+    await auth_service.mark_email_verified(redis, user_id)
+    data["email_verified"] = True
+    return {"success": True, "email_verified": True}
 
 
-# ─── Token / credit system ────────────────────────────────────────────────────
+@router.post("/resend-otp")
+async def resend_otp(
+    redis=Depends(get_redis),
+    authorization: Optional[str] = Header(None),
+):
+    """Resend verification OTP. Rate limited to once per 60 seconds."""
+    token = (authorization or "").removeprefix("Bearer ").strip()
+    user_id = auth_service.verify_token(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
-async def get_token_balance(redis: aioredis.Redis, user_id: str) -> dict:
-    """Return the user's current token balance."""
-    raw = await redis.get(_user_key(user_id))
+    raw = await redis.get(f"user:{user_id}")
     if not raw:
-        return {"tokens_remaining": 0, "tokens_total": 0, "videos_created": 0}
+        raise HTTPException(status_code=404, detail="User not found")
     data = json.loads(raw)
-    return {
-        "tokens_remaining": data.get("tokens_remaining", TOKENS_ON_SIGNUP),
-        "tokens_total":     data.get("tokens_total", TOKENS_ON_SIGNUP),
-        "videos_created":   data.get("videos_created", 0),
-    }
+
+    if data.get("email_verified"):
+        return {"success": True, "message": "Email already verified"}
+
+    email = data.get("email", "")
+    full_name = data.get("full_name", "")
+
+    can_send, wait_secs = await auth_service.can_resend_otp(redis, email)
+    if not can_send:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Please wait {wait_secs} seconds before requesting a new code."
+        )
+
+    otp = auth_service.generate_otp()
+    await auth_service.store_otp(redis, email, otp)
+
+    from app.config import get_settings as _gs
+    _settings = _gs()
+
+    if _settings.smtp_user and _settings.smtp_password:
+        from app.services.email import send_verification_otp
+        import asyncio
+        asyncio.create_task(send_verification_otp(email, full_name, otp))
+        logger.info("OTP resent to %s", email)
+    else:
+        logger.warning("=" * 60)
+        logger.warning("SMTP NOT CONFIGURED — OTP for %s: %s", email, otp)
+        logger.warning("=" * 60)
+
+    return {"success": True, "message": "Verification code sent"}
 
 
-async def check_can_render(redis: aioredis.Redis, user_id: str, job_id: str) -> dict:
+@router.post("/forgot-password")
+@limiter.limit("3/minute")
+async def forgot_password(
+    request: Request,
+    body: dict,
+    redis=Depends(get_redis),
+):
     """
-    Check if the user can render.
-    Returns dict with: can_render, reason, tokens_remaining, is_re_render.
-    A re-render (same job_id already charged) is always free.
+    Send a password reset link to the user's email.
+    Always returns 200 even if email not found (security best practice).
     """
-    # Check if this job_id was already charged — free re-render
-    already_charged = await redis.sismember(_user_jobs_key(user_id), job_id)
-    if already_charged:
-        return {
-            "can_render": True,
-            "is_re_render": True,
-            "reason": "Re-render of existing video — no tokens deducted",
-            "tokens_remaining": (await get_token_balance(redis, user_id))["tokens_remaining"],
-        }
+    email = (body.get("email") or "").strip().lower()
+    if not email:
+        return {"success": True, "message": "If that email exists, a reset link has been sent."}
 
-    bal = await get_token_balance(redis, user_id)
-    can = bal["tokens_remaining"] >= TOKENS_PER_VIDEO
-    return {
-        "can_render": can,
-        "is_re_render": False,
-        "reason": "" if can else f"Insufficient tokens. Need {TOKENS_PER_VIDEO}, have {bal['tokens_remaining']}.",
-        "tokens_remaining": bal["tokens_remaining"],
-    }
-
-
-async def deduct_tokens(redis: aioredis.Redis, user_id: str, job_id: str) -> UserOut:
-    """
-    Deduct TOKENS_PER_VIDEO from the user's balance and record the job_id
-    so the same job is never charged twice.
-    Call this ONLY after the render completes successfully.
-    """
-    raw = await redis.get(_user_key(user_id))
-    if not raw:
-        raise ValueError("User not found")
-
-    data = json.loads(raw)
-
-    # Idempotency — never charge twice for the same job
-    already_charged = await redis.sismember(_user_jobs_key(user_id), job_id)
-    if not already_charged:
-        current = data.get("tokens_remaining", TOKENS_ON_SIGNUP)
-        data["tokens_remaining"] = max(0, current - TOKENS_PER_VIDEO)
-        data["videos_created"] = data.get("videos_created", 0) + 1
-        await redis.set(_user_key(user_id), json.dumps(data))
-        # Note: total_scenes_generated is updated separately via update_scene_stats()
-        # Mark this job as charged — TTL 90 days
-        await redis.sadd(_user_jobs_key(user_id), job_id)
-        await redis.expire(_user_jobs_key(user_id), 60 * 60 * 24 * 90)
-
-    return _user_out(data)
-
-
-async def add_tokens(
-    redis: aioredis.Redis,
-    user_id: str,
-    amount: int,
-    plan: str = "",
-) -> UserOut:
-    """Add tokens to a user and optionally upgrade their plan."""
-    raw = await redis.get(_user_key(user_id))
-    if not raw:
-        raise ValueError("User not found")
-    data = json.loads(raw)
-    data["tokens_remaining"] = data.get("tokens_remaining", 0) + amount
-    data["tokens_total"] = data.get("tokens_total", TOKENS_ON_SIGNUP) + amount
-    # Upgrade plan — only move up, never downgrade
-    # Build rank dynamically from Redis so any admin-added plan is included.
-    # Base order: free < starter < pro < studio < agency < any custom plan.
-    # Custom plans added by admin get a rank of 10 (above all built-ins).
-    _BASE_RANK = {"free": 0, "starter": 1, "pro": 2, "studio": 3, "agency": 4}
-    try:
-        _raw_plans = await redis.get("sceneforge:pricing:plans")
-        if _raw_plans:
-            _all_keys = list(json.loads(_raw_plans).keys())
-            _dynamic_rank = dict(_BASE_RANK)
-            for _k in _all_keys:
-                if _k not in _dynamic_rank:
-                    _dynamic_rank[_k] = 10   # custom admin plans rank above built-ins
-            plan_rank = _dynamic_rank
-        else:
-            plan_rank = _BASE_RANK
-    except Exception:
-        plan_rank = _BASE_RANK
-    if plan and plan_rank.get(plan, 10) > plan_rank.get(data.get("plan", "free"), 0):
-        data["plan"] = plan
-    await redis.set(_user_key(user_id), json.dumps(data))
-    return _user_out(data)
-
-
-# ─── Token helpers (API layer) ────────────────────────────────────────────────
-
-def issue_token(user_id: str) -> str:
-    return _make_token(user_id)
-
-
-def verify_token(token: str) -> Optional[str]:
-    return _decode_token(token)
-
-async def update_plan(redis: aioredis.Redis, user_id: str, plan: str) -> None:
-    """Update the user's plan label (free / starter / pro / studio / agency)."""
-    raw = await redis.get(_user_key(user_id))
-    if not raw:
-        return
-    data = json.loads(raw)
-    data["plan"] = plan.lower()
-    await redis.set(_user_key(user_id), json.dumps(data))
-    logger.info("Plan updated | user=%s | plan=%s", user_id, plan)
-
-async def update_scene_stats(
-    redis: aioredis.Redis,
-    user_id: str,
-    scene_count: int,
-) -> None:
-    """
-    Update total_scenes_generated for a user after a successful render.
-    Called by the render worker with the actual scene count.
-    """
-    raw = await redis.get(_user_key(user_id))
-    if not raw:
-        return
-    data = json.loads(raw)
-    data["total_scenes_generated"] = data.get("total_scenes_generated", 0) + scene_count
-    await redis.set(_user_key(user_id), json.dumps(data))
-    logger.info("Scene stats updated | user=%s | +%d scenes | total=%d",
-                user_id, scene_count, data["total_scenes_generated"])
-RESET_TOKEN_TTL = 3600  # 1 hour
-
-
-def _reset_key(token: str) -> str:
-    return f"reset:{token}"
-
-
-def generate_reset_token() -> str:
-    """Generate a secure URL-safe reset token."""
-    import secrets
-    return secrets.token_urlsafe(32)
-
-
-async def store_reset_token(redis: aioredis.Redis, email: str, token: str) -> None:
-    """Store reset token → email mapping with 1-hour TTL."""
-    await redis.set(_reset_key(token), email.lower(), ex=RESET_TOKEN_TTL)
-
-
-async def verify_reset_token(redis: aioredis.Redis, token: str) -> str | None:
-    """Return email if token is valid, None otherwise."""
-    email = await redis.get(_reset_key(token))
-    return email if email else None
-
-
-async def consume_reset_token(redis: aioredis.Redis, token: str) -> str | None:
-    """Return email and delete token (single use)."""
-    email = await redis.get(_reset_key(token))
-    if email:
-        await redis.delete(_reset_key(token))
-    return email if email else None
-
-
-async def reset_password(redis: aioredis.Redis, email: str, new_password: str) -> bool:
-    """Reset a user's password by email. Returns True if user found."""
-    uid = await redis.get(_email_index_key(email.lower()))
+    # Check user exists
+    uid = await redis.get(f"email_index:{email}")
     if not uid:
-        return False
-    raw = await redis.get(_user_key(uid))
+        # Don't reveal whether email exists
+        return {"success": True, "message": "If that email exists, a reset link has been sent."}
+
+    import json as _json
+    raw = await redis.get(f"user:{uid}")
     if not raw:
-        return False
-    data = json.loads(raw)
-    data["password_hash"] = _hash_password(new_password)
-    await redis.set(_user_key(uid), json.dumps(data))
-    logger.info("Password reset for %s", email)
-    return True
+        return {"success": True, "message": "If that email exists, a reset link has been sent."}
+
+    user_data = _json.loads(raw)
+    full_name = user_data.get("full_name", "there")
+
+    # Generate reset token
+    token = auth_service.generate_reset_token()
+    await auth_service.store_reset_token(redis, email, token)
+
+    # Build reset URL
+    from app.config import get_settings as _gs
+    _s = _gs()
+    reset_url = f"{_s.frontend_origin}/reset-password?token={token}"
+
+    # Send email (with console fallback)
+    try:
+        from app.services.email import send_password_reset
+        import asyncio
+        if _s.smtp_user and _s.smtp_password:
+            asyncio.create_task(send_password_reset(email, full_name, reset_url))
+            logger.info("Password reset email queued for %s", email)
+        else:
+            logger.warning("=" * 60)
+            logger.warning("PASSWORD RESET LINK for %s:", email)
+            logger.warning(reset_url)
+            logger.warning("=" * 60)
+    except Exception as e:
+        logger.error("Failed to send reset email: %s", e)
+        logger.warning("RESET URL for %s: %s", email, reset_url)
+
+    return {"success": True, "message": "If that email exists, a reset link has been sent."}
+
+
+@router.post("/reset-password")
+async def reset_password_with_token(body: dict, redis=Depends(get_redis)):
+    """Reset password using a valid token from the email link."""
+    token = (body.get("token") or "").strip()
+    new_password = (body.get("new_password") or "").strip()
+    confirm_password = (body.get("confirm_password") or "").strip()
+
+    if not token:
+        raise HTTPException(status_code=400, detail="Reset token is required")
+    if not new_password:
+        raise HTTPException(status_code=400, detail="New password is required")
+    if new_password != confirm_password:
+        raise HTTPException(status_code=400, detail="Passwords do not match")
+    if len(new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    # Consume token (single use)
+    email = await auth_service.consume_reset_token(redis, token)
+    if not email:
+        raise HTTPException(status_code=400, detail="Reset link has expired or already been used. Please request a new one.")
+
+    # Update password
+    success = await auth_service.reset_password(redis, email, new_password)
+    if not success:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    logger.info("Password successfully reset for %s", email)
+    return {"success": True, "message": "Password updated. You can now log in."}
+
+
+@router.get("/verify-reset-token")
+async def verify_reset_token(token: str, redis=Depends(get_redis)):
+    """Check if a reset token is still valid (used by frontend before showing the form)."""
+    email = await auth_service.verify_reset_token(redis, token)
+    if not email:
+        raise HTTPException(status_code=400, detail="Reset link has expired or is invalid")
+    return {"valid": True, "email": email}
+
+
+@router.get("/plan-features")
+async def get_plan_features(
+    redis=Depends(get_redis),
+    authorization: Optional[str] = Header(None),
+):
+    """Return the current user's plan limits — used by frontend to show/hide features."""
+    from app.services.plans import get_limits, PLAN_LIMITS
+    import json as _json
+
+    token = (authorization or "").removeprefix("Bearer ").strip()
+    user_plan = "free"
+
+    if token:
+        user_id = auth_service.verify_token(token)
+        if user_id:
+            raw = await redis.get(f"user:{user_id}")
+            if raw:
+                user_plan = _json.loads(raw).get("plan", "free")
+
+    limits = get_limits(user_plan)
+    return {
+        "plan": user_plan,
+        "limits": limits,
+        "all_plans": PLAN_LIMITS,
+    }
