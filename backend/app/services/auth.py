@@ -235,8 +235,8 @@ async def get_user_by_id(redis: aioredis.Redis, user_id: str) -> Optional[UserOu
         data["tokens_total"] = TOKENS_ON_SIGNUP
         await redis.set(_user_key(user_id), json.dumps(data))
 
-   ws_id = await redis.get(f"workspace:user:{user_id}")
-   if ws_id:
+    ws_id = await redis.get(f"workspace:user:{user_id}")
+    if ws_id:
         ws_id = ws_id if isinstance(ws_id, str) else ws_id.decode()
         data["workspace_id"] = ws_id
         role = await redis.get(f"workspace:member:{ws_id}:{user_id}")
