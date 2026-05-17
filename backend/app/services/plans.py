@@ -37,6 +37,16 @@ PLAN_LIMITS = {
         "upload_footage": True,
         "label": "Studio",
     },
+    "agency": {
+    "max_scenes": -1,
+    "max_renders_per_day": -1,
+    "max_resolution": "1080p",
+    "ai_voices": True,
+    "upload_footage": True,
+    "workspace": True,
+    "team_seats": 5,
+    "label": "Agency",
+},
 }
 
 
