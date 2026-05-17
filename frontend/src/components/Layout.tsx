@@ -141,35 +141,41 @@ function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => v
 
       {/* Scrollable nav */}
       <div className="flex-1 overflow-y-auto p-2 scrollbar-thin">
-        {/* Hide personal workflow steps for workspace members who aren't owners */}
+        {/* Hide personal workflow for non-owner workspace members */}
         {(!user?.workspace_role || user.workspace_role === 'owner') && (
           <>
-        <p className="text-[9.5px] font-bold text-white/25 uppercase tracking-widest px-2 pt-2 pb-1">Workflow</p>
-        {STEPS.map((step) => {
-          const isActive = currentStep === step.id
-          const isDone   = completedSteps.has(step.id)
-          return (
-            <button
-              key={step.id}
-              onClick={() => handleSetStep(step.id)}
-              className={`w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-lg text-[13px] font-medium transition-all mb-0.5 text-left border
-                ${isActive ? 'bg-violet-500/15 text-violet-300 border-violet-500/20'
-                  : isDone ? 'text-teal-400 border-transparent hover:bg-white/4'
-                  : 'text-white/45 border-transparent hover:bg-white/4 hover:text-white/75'}`}
-            >
-              <span className={isActive ? 'text-violet-400' : isDone ? 'text-teal-400' : 'text-white/30'}>
-                {ICONS[step.id]}
-              </span>
-              {step.label}
-              {isDone && !isActive && (
-                <svg className="ml-auto w-3 h-3 text-teal-400" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M2 6l3 3 5-5"/></svg>
-              )}
-            </button>
-          )
-        })}
+            <p className="text-[9.5px] font-bold text-white/25 uppercase tracking-widest px-2 pt-2 pb-1">Workflow</p>
+            {STEPS.map((step) => {
+              const isActive = currentStep === step.id
+              const isDone   = completedSteps.has(step.id)
+              return (
+                <button
+                  key={step.id}
+                  onClick={() => handleSetStep(step.id)}
+                  className={`w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-lg text-[13px] font-medium transition-all mb-0.5 text-left border
+                    ${isActive ? 'bg-violet-500/15 text-violet-300 border-violet-500/20'
+                      : isDone ? 'text-teal-400 border-transparent hover:bg-white/4'
+                      : 'text-white/45 border-transparent hover:bg-white/4 hover:text-white/75'}`}
+                >
+                  <span className={isActive ? 'text-violet-400' : isDone ? 'text-teal-400' : 'text-white/30'}>
+                    {ICONS[step.id]}
+                  </span>
+                  {step.label}
+                  {isDone && !isActive && (
+                    <svg className="ml-auto w-3 h-3 text-teal-400" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M2 6l3 3 5-5"/></svg>
+                  )}
+                </button>
+              )
+            })}
+          </>
+        )}
 
+        {/* ── Agency (only shown on agency plan) ── */}
+        <AgencyNav currentStep={currentStep} onStep={handleSetStep} />
+
+        {/* Personal projects — hidden for non-owner workspace members */}
         {(!user?.workspace_role || user.workspace_role === 'owner') && (
-        <><div className="flex items-center justify-between px-2 pt-3 pb-1">
+          <><div className="flex items-center justify-between px-2 pt-3 pb-1">
           <p className="text-[9.5px] font-bold text-white/25 uppercase tracking-widest">Projects</p>
           <button onClick={() => { onNewProject(); onClose?.() }} className="text-white/25 hover:text-white/55 text-[14px] leading-none px-1 transition-colors">+</button>
         </div>
@@ -274,6 +280,8 @@ export default function Layout({ children, onLogout, onNewProject }: LayoutProps
     setup: 'Setup', ideas: 'Ideas', script: 'Script',
     scenes: 'Scenes', voice: 'Voice & Visuals', export: 'Export',
     plans: 'Plans', upgrade: 'Upgrade',
+    agency: 'Agency', 'agency-projects': 'Projects', 'agency-new': 'New project',
+    'agency-detail': 'Project', 'agency-team': 'Team', 'agency-kits': 'Brand kits',
   }
 
   return (
