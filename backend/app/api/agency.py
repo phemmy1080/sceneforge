@@ -38,6 +38,23 @@ async def _get_user(authorization: Optional[str], redis):
 async def _require_workspace(user_id: str, redis) -> dict:
     ws = await svc.get_user_workspace(redis, user_id)
     if not ws:
+        # Auto-create workspace if user has agency plan but no workspace yet
+        # (handles users who upgraded before auto-create was deployed)
+        try:
+            import json as _json
+            raw_user = await redis.get(f"user:{user_id}")
+            if raw_user:
+                user_data = _json.loads(raw_user)
+                if user_data.get("plan") == "agency":
+                    ws_name = f"{user_data.get('full_name', 'My')}'s Agency"
+                    ws = await svc.create_workspace(
+                        redis, user_id, ws_name,
+                        initial_tokens=user_data.get("tokens_remaining", 50000)
+                    )
+                    logger.info("Auto-created missing workspace for agency user %s", user_id)
+                    return ws
+        except Exception as e:
+            logger.error("Workspace auto-create failed: %s", e)
         raise HTTPException(403, "No agency workspace. Upgrade to Agency plan first.")
     return ws
 
@@ -177,7 +194,7 @@ async def invite_member(
     # Send invite email
     try:
         from app.services.email import send_invite_email
-        invite_url = f"https://scenraforge.com/join?token={token}"
+        invite_url = f"https://sceneraforge.com/join?token={token}"
         await send_invite_email(req.email, user.full_name, ws["name"], invite_url)
     except Exception as e:
         logger.warning("Invite email failed: %s", e)
@@ -478,7 +495,7 @@ async def create_review_link(
     await _require_role(ws["id"], user.id, redis, ("owner", "admin", "editor"))
 
     review = await svc.create_review_link(redis, ws["id"], proj_id, user.id)
-    review_url = f"https://scenraforge.com/review/{review['token']}"
+    review_url = f"https://sceneraforge.com/review/{review['token']}"
 
     # bump project to client_review status
     await svc.update_project_status(redis, ws["id"], proj_id, user.id, "client_review")
