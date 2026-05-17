@@ -20,7 +20,6 @@ import SceneEditor from './pages/SceneEditor'
 import VoiceVisuals from './pages/VoiceVisuals'
 import Export from './pages/Export'
 import UploadScript from './pages/UploadScript'
-import Upgrade from './pages/Upgrade'
 import Plans from './pages/Plans'
 import PaymentCallback from './pages/PaymentCallback'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -30,36 +29,29 @@ import AuthorPage from './pages/AuthorPage'
 import FeedbackModal from './components/FeedbackModal'
 import ErrorToast from './components/ErrorToast'
 import ChatBot from './components/ChatBot'
-import AgencyDashboard from "./pages/AgencyDashboard";
-import { AgencyProjects, NewProject, ProjectDetail } from "./pages/AgencyProjects";
-import { AgencyTeam, AgencyBrandKits } from "./pages/AgencyTeamAndKits";
-import ClientReview from "./pages/ClientReview";
-import JoinWorkspace from "./pages/JoinWorkspace";
+import AgencyDashboard from "./pages/AgencyDashboard"
+import { AgencyProjects, NewProject, ProjectDetail } from "./pages/AgencyProjects"
+import { AgencyTeam, AgencyBrandKits } from "./pages/AgencyTeamAndKits"
+import ClientReview from "./pages/ClientReview"
+import JoinWorkspace from "./pages/JoinWorkspace"
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 })
 
-type Screen = 'landing' | 'login' | 'signup' | 'verify' | 'forgot' | 'app'
+type Screen = 'landing' | 'login' | 'signup' | 'verify' | 'forgot' | 'app' | 'join'
 
-// ── Deep link handler — runs once at startup ──────────────────────────────────
-// Handles links from render complete emails:
-// https://sceneforge.com?job_id=xxx&project_id=proj_xxx&step=export
 function applyDeepLink(): boolean {
   const params    = new URLSearchParams(window.location.search)
   const jobId     = params.get('job_id')
   const projectId = params.get('project_id')
   const step      = params.get('step')
-
   if (!jobId || step !== 'export') return false
-
   const store = useStore.getState()
   if (projectId) store.openProject(projectId)
   store.setJobId(jobId)
   store.setRenderProgress(100, 'Done', 'complete')
   store.setStep('export')
-
-  // Clean URL so refresh doesn't re-apply
   window.history.replaceState({}, '', '/')
   return true
 }
@@ -69,19 +61,15 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
   const setStep       = useStore((s) => s.setStep)
   const [modalOpen, setModalOpen] = useState(false)
 
-  // Feedback modal state
-  const [showFeedback, setShowFeedback]     = useState(false)
+  const [showFeedback, setShowFeedback]       = useState(false)
   const [feedbackTrigger, setFeedbackTrigger] = useState<'video_complete'|'time_on_screen'|'manual'>('video_complete')
-  const feedbackShownRef = useRef(false)
-
+  const feedbackShownRef                      = useRef(false)
   const [feedbackDismissed, setFeedbackDismissed] = useState(false)
 
   function closeFeedback() {
     setShowFeedback(false)
-    // Only show reminder if it wasn't a manual open
     if (feedbackTrigger !== 'manual') {
       setFeedbackDismissed(true)
-      // Auto-hide reminder after 30 seconds
       setTimeout(() => setFeedbackDismissed(false), 30000)
     }
   }
@@ -92,18 +80,13 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
     if (t !== 'manual') {
       if (feedbackShownRef.current) return
       try {
-        const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+        const today = new Date().toISOString().slice(0, 10)
         const key   = 'sceneforge:renders_today'
         const raw   = localStorage.getItem(key)
         const data  = raw ? JSON.parse(raw) : { date: today, count: 0, shown: 0 }
-        // Reset if it's a new day
         if (data.date !== today) { data.date = today; data.count = 0; data.shown = 0 }
         data.count += 1
-        // Show feedback once per 3 renders
-        if (data.count % 2 !== 0) {
-          localStorage.setItem(key, JSON.stringify(data))
-          return
-        }
+        if (data.count % 2 !== 0) { localStorage.setItem(key, JSON.stringify(data)); return }
         data.shown += 1
         localStorage.setItem(key, JSON.stringify(data))
       } catch {}
@@ -113,17 +96,14 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
     setShowFeedback(true)
   }
 
-  // Always keep ref fresh so event listeners don't capture stale closure
   triggerFeedbackRef.current = triggerFeedback
 
-  // Render complete trigger — fired directly by useJobPoller after 10s delay
   useEffect(() => {
     const handler = () => triggerFeedbackRef.current?.('video_complete')
     document.addEventListener('sceneforge:video-complete', handler)
     return () => document.removeEventListener('sceneforge:video-complete', handler)
   }, [])
 
-  // Time on screen trigger (3 minutes on workflow steps)
   const isWorkflowStep = ['setup','ideas','script','scenes','voice','export'].includes(currentStep)
   useEffect(() => {
     if (!isWorkflowStep) return
@@ -147,16 +127,16 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
     <>
       <NewProjectModal open={modalOpen} onClose={() => setModalOpen(false)} />
       <Layout onLogout={onLogout} onNewProject={() => setModalOpen(true)}>
-        {currentStep === 'projects' && <Projects />}
-        {currentStep === 'setup'    && <Setup />}
-        {currentStep === 'ideas'    && <Ideas />}
-        {currentStep === 'script'   && <Script />}
-        {currentStep === 'scenes'   && <SceneEditor />}
-        {currentStep === 'voice'    && <VoiceVisuals />}
-        {currentStep === 'export'   && <Export />}
-        {currentStep === 'upload'   && <UploadScript />}
-        {currentStep === 'upgrade'  && <Plans onBack={() => setStep('setup')} />}
-        {currentStep === 'plans'    && <Plans onBack={() => setStep('setup')} />}
+        {currentStep === 'projects'        && <Projects />}
+        {currentStep === 'setup'           && <Setup />}
+        {currentStep === 'ideas'           && <Ideas />}
+        {currentStep === 'script'          && <Script />}
+        {currentStep === 'scenes'          && <SceneEditor />}
+        {currentStep === 'voice'           && <VoiceVisuals />}
+        {currentStep === 'export'          && <Export />}
+        {currentStep === 'upload'          && <UploadScript />}
+        {currentStep === 'upgrade'         && <Plans onBack={() => setStep('setup')} />}
+        {currentStep === 'plans'           && <Plans onBack={() => setStep('setup')} />}
         {currentStep === 'agency'          && <AgencyDashboard />}
         {currentStep === 'agency-projects' && <AgencyProjects />}
         {currentStep === 'agency-new'      && <NewProject />}
@@ -165,7 +145,6 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
         {currentStep === 'agency-kits'     && <AgencyBrandKits />}
       </Layout>
 
-      {/* Feedback modal — always mounted so it catches renderStatus from any step */}
       {showFeedback && (
         <FeedbackModal trigger={feedbackTrigger} onClose={closeFeedback} />
       )}
@@ -195,22 +174,18 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
           >x</button>
         </div>
       )}
-      {/* Global API error toasts */}
       <ErrorToast />
-      {/* AI Co-pilot */}
       <ChatBot />
     </>
   )
 }
 
 function Root() {
-  // Track pathname as state so URL changes trigger re-render
   const [pathname, setPathname] = useState(window.location.pathname)
 
   useEffect(() => {
     const handler = () => setPathname(window.location.pathname)
     window.addEventListener('popstate', handler)
-    // Patch pushState to also trigger re-render
     const origPush = window.history.pushState.bind(window.history)
     window.history.pushState = (...args) => {
       origPush(...args)
@@ -219,73 +194,31 @@ function Root() {
     return () => window.removeEventListener('popstate', handler)
   }, [])
 
-  // Blog routes — public, no auth required
-  if (pathname === '/blog') {
-    return <Blog />
-  }
-  if (pathname.startsWith('/blog/author/')) {
-    const authorSlug = pathname.replace('/blog/author/', '').replace(/\/+$/, '')
-    return <AuthorPage authorSlug={authorSlug} />
-  }
-  if (pathname.startsWith('/blog/')) {
-    const slug = pathname.replace('/blog/', '').replace(/\/+$/, '')
-    return <BlogPost slug={slug} />
-  }
-
-  if (pathname === '/payment/callback') {
-    return <PaymentCallback />
-  }
-  if (pathname.startsWith('/review/')) {
-    const token = pathname.replace('/review/', '').replace(/\/+$/, '')
-    return <ClientReview token={token} />
-  }
-  if (pathname === '/join') {
-  const params = new URLSearchParams(window.location.search)
-  const token  = params.get('token') || ''
-  if (token) {
-    return (
-      <JoinWorkspace
-        token={token}
-        onJoined={() => {
-          window.history.replaceState({}, '', '/')
-          setScreen('app')
-          useStore.getState().setStep('agency' as any)
-        }}
-      />
-    )
-  }
-}
-  if (window.location.pathname === '/reset-password') {
-    return <ResetPassword onSuccess={() => {
-      window.history.replaceState({}, '', '/')
-      window.location.href = '/'
-    }} />
-  }
-
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const logout          = useAuthStore((s) => s.logout)
-  const [screen, setScreen]             = useState<Screen>(() => {
-    // Apply deep link on first render — determines initial screen
+
+  const [screen, setScreen] = useState<Screen>(() => {
+    // /join link — handle before anything else
+    if (window.location.pathname === '/join') {
+      const p = new URLSearchParams(window.location.search)
+      if (p.get('token')) return 'join'
+    }
     const hasDeepLink = window.location.search.includes('step=export') &&
                         window.location.search.includes('job_id=')
-    if (hasDeepLink && isAuthenticated) {
-      applyDeepLink()
-      return 'app'
-    }
+    if (hasDeepLink && isAuthenticated) { applyDeepLink(); return 'app' }
     if (hasDeepLink && !isAuthenticated) {
-      // Store params so we can restore after login
       sessionStorage.setItem('pending_deep_link', window.location.search)
       window.history.replaceState({}, '', '/')
       return 'login'
     }
     return isAuthenticated ? 'app' : 'landing'
   })
+
   const [pendingEmail, setPendingEmail] = useState('')
 
   function handleLogout() { logout(); setScreen('landing') }
 
   function handleLoginSuccess() {
-    // Check if we have a pending deep link from email
     const pending = sessionStorage.getItem('pending_deep_link')
     if (pending) {
       sessionStorage.removeItem('pending_deep_link')
@@ -303,6 +236,31 @@ function Root() {
     setScreen('app')
   }
 
+  // ── Public routes (no auth state needed) ─────────────────────────────────
+  if (pathname === '/blog')                  return <Blog />
+  if (pathname.startsWith('/blog/author/'))  return <AuthorPage authorSlug={pathname.replace('/blog/author/', '').replace(/\/+$/, '')} />
+  if (pathname.startsWith('/blog/'))         return <BlogPost slug={pathname.replace('/blog/', '').replace(/\/+$/, '')} />
+  if (pathname === '/payment/callback')      return <PaymentCallback />
+  if (pathname === '/reset-password')        return <ResetPassword onSuccess={() => { window.history.replaceState({}, '', '/'); window.location.href = '/' }} />
+  if (pathname.startsWith('/review/'))       return <ClientReview token={pathname.replace('/review/', '').replace(/\/+$/, '')} />
+
+  // ── Join workspace link ───────────────────────────────────────────────────
+  if (screen === 'join' || pathname === '/join') {
+    const joinToken = new URLSearchParams(window.location.search).get('token') || ''
+    return (
+      <JoinWorkspace
+        token={joinToken}
+        onJoined={() => {
+          window.history.replaceState({}, '', '/')
+          setPathname('/')
+          useStore.getState().setStep('agency' as any)
+          setScreen('app')
+        }}
+      />
+    )
+  }
+
+  // ── Auth screens ──────────────────────────────────────────────────────────
   if (screen === 'landing') return <Landing onLogin={() => setScreen('login')} onSignup={() => setScreen('signup')} />
   if (screen === 'login')   return <Login
                                      onSuccess={handleLoginSuccess}
