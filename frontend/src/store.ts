@@ -335,10 +335,23 @@ export const useStore = create<AppState>()(
         }),
 
         setVideoUrl: (url) => {
-          const { activeProjectId, jobId } = get()
+          const { activeProjectId, jobId, agencyProjectId } = get()
           set({ videoUrl: url, renderStatus: 'complete' })
           // Notify UI to refresh video count and token balance
           try { document.dispatchEvent(new CustomEvent('sceneforge:render-complete')) } catch {}
+
+          // Link job ID back to the agency project so the client review link shows the video
+          if (agencyProjectId && jobId) {
+            try {
+              import('./lib/api').then(({ api }) => {
+                api.put(`/api/agency/projects/${agencyProjectId}`, {
+                  render_job_ids: [jobId],
+                  status: 'in_review',
+                }).catch(() => {})
+              })
+            } catch {}
+          }
+
           if (activeProjectId) {
             // Save job_id + video_url on the project so openProject can restore it
             set((s) => ({
