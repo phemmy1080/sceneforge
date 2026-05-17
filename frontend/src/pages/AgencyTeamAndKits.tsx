@@ -38,7 +38,7 @@ export function AgencyTeam() {
 
   async function load() {
     try {
-      const res = await api.get("/agency/workspace/members");
+      const res = await api.get("/api/agency/workspace/members");
       setMembers(res.data.members);
       setPending(res.data.pending_invites);
     } finally {
@@ -52,7 +52,7 @@ export function AgencyTeam() {
     setError("");
     setInviteMsg("");
     try {
-      await api.post("/agency/workspace/invite", { email: inviteEmail.trim(), role: inviteRole });
+      await api.post("/api/agency/workspace/invite", { email: inviteEmail.trim(), role: inviteRole });
       setInviteMsg(`Invite sent to ${inviteEmail}`);
       setInviteEmail("");
       await load();
@@ -66,7 +66,7 @@ export function AgencyTeam() {
   async function removeM(uid: string) {
     if (!confirm("Remove this member?")) return;
     try {
-      await api.delete(`/agency/workspace/members/${uid}`);
+      await api.delete(`/api/agency/workspace/members/${uid}`);
       setMembers(m => m.filter(x => x.user_id !== uid));
     } catch (e: any) {
       alert(e.response?.data?.detail || "Failed to remove member");
@@ -75,7 +75,7 @@ export function AgencyTeam() {
 
   async function changeRole(uid: string, role: string) {
     try {
-      await api.patch(`/agency/workspace/members/${uid}/role`, { role });
+      await api.patch(`/api/agency/workspace/members/${uid}/role`, { role });
       setMembers(m => m.map(x => x.user_id === uid ? { ...x, role } : x));
     } catch (e: any) {
       alert(e.response?.data?.detail || "Failed to update role");
@@ -213,7 +213,7 @@ export function AgencyBrandKits() {
 
   async function load() {
     try {
-      const res = await api.get("/agency/brand-kits");
+      const res = await api.get("/api/agency/brand-kits");
       setKits(res.data.brand_kits);
     } finally {
       setLoading(false);
@@ -222,7 +222,7 @@ export function AgencyBrandKits() {
 
   async function deleteKit(id: string) {
     if (!confirm("Delete this brand kit?")) return;
-    await api.delete(`/agency/brand-kits/${id}`);
+    await api.delete(`/api/agency/brand-kits/${id}`);
     setKits(k => k.filter(x => x.id !== id));
   }
 
@@ -336,9 +336,9 @@ function BrandKitForm({
     };
     try {
       if (kit) {
-        await api.put(`/agency/brand-kits/${kit.id}`, payload);
+        await api.put(`/api/agency/brand-kits/${kit.id}`, payload);
       } else {
-        await api.post("/agency/brand-kits", payload);
+        await api.post("/api/agency/brand-kits", payload);
       }
       onSaved();
     } catch (e: any) {
