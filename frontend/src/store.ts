@@ -3,10 +3,8 @@ import { devtools, persist } from 'zustand/middleware'
 import type { IdeaItem, Scene, RenderRequest } from './lib/api'
 import { projectsApi } from './lib/api'
 
-export type AppStep =
-  | 'projects' | 'setup' | 'ideas' | 'script' | 'scenes' | 'voice' | 'export'
-  | 'upload' | 'upgrade' | 'plans'
-  | 'agency' | 'agency-projects' | 'agency-new' | 'agency-detail' | 'agency-team' | 'agency-kits'
+export type AppStep = 'projects' | 'setup' | 'ideas' | 'script' | 'scenes' | 'voice' | 'export' | 'profile' | 'upload' | 'upgrade' | 'plans' | 'agency' | 'agency-projects' | 'agency-new' | 'agency-detail' | 'agency-team' | 'agency-kits'
+
 export interface ProjectConfig {
   niche: string; style: string; platform: string
   tone: string; audience: string; context: string
@@ -75,6 +73,8 @@ interface AppState {
   videoUrl: string | null
   backendSynced: boolean
 
+  agencyProjectId: string
+  setAgencyProjectId: (id: string) => void
   setStep: (step: AppStep) => void
   markStepComplete: (step: AppStep) => void
   addProject: (args: { name: string; niche: string; style: string; platform: string; folder: string }) => void
@@ -137,6 +137,8 @@ export const useStore = create<AppState>()(
         ...CLEAR_WORKFLOW,
         backendSynced: false,
 
+        agencyProjectId: '',
+        setAgencyProjectId: (id) => set({ agencyProjectId: id }),
         setStep: (step) => set({ currentStep: step }),
         markStepComplete: (step) => set((s) => ({
           completedSteps: new Set([...s.completedSteps, step])
