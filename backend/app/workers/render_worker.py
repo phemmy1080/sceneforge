@@ -20,6 +20,7 @@ from app.services.security import (
     register_active_job, unregister_active_job,
     track_render_abuse,
 )
+from app.services.agency_service import deduct_pool_tokens
 
 settings = get_settings()
 logger   = logging.getLogger(__name__)
@@ -43,9 +44,11 @@ async def render_video(ctx, job_id: str, payload: dict):
     # user_id and prev_job_id are stored in Redis by render.py (not in payload)
     _uid            = await redis.get(f"job:{job_id}:user_id")
     _prev           = await redis.get(f"job:{job_id}:prev_job_id")
+    _ws             = await redis.get(f"job:{job_id}:ws_id")
     # decode bytes → str if Redis returns bytes instead of str
     user_id         = _uid.decode()  if isinstance(_uid,  bytes) else _uid
     prev_job_stored = _prev.decode() if isinstance(_prev, bytes) else _prev
+    ws_id           = _ws.decode()   if isinstance(_ws,   bytes) else _ws
     output_dir.mkdir(parents=True, exist_ok=True)
     if user_id:
         await register_active_job(redis, user_id, job_id)
@@ -213,15 +216,33 @@ async def render_video(ctx, job_id: str, payload: dict):
             try:
                 from app.services.auth import deduct_tokens, get_token_balance
                 if not is_re_render:
-                    user_out = await deduct_tokens(redis, user_id, job_id)
-                    tokens_remaining = user_out.tokens_remaining
-                    logger.info("Tokens deducted ✓ — user=%s remaining=%d",
-                                user_id, tokens_remaining)
+                    if ws_id:
+                        # Agency workspace — deduct from shared pool
+                        try:
+                            new_balance = await deduct_pool_tokens(redis, ws_id, 100)
+                            tokens_remaining = new_balance
+                            logger.info("Pool tokens deducted ✓ — ws=%s remaining=%d",
+                                        ws_id, tokens_remaining)
+                        except ValueError:
+                            # Pool exhausted — fall back to user tokens
+                            logger.warning("Pool exhausted for ws=%s — falling back to user tokens", ws_id)
+                            user_out = await deduct_tokens(redis, user_id, job_id)
+                            tokens_remaining = user_out.tokens_remaining
+                    else:
+                        # Regular user — deduct from personal tokens
+                        user_out = await deduct_tokens(redis, user_id, job_id)
+                        tokens_remaining = user_out.tokens_remaining
+                        logger.info("Tokens deducted ✓ — user=%s remaining=%d",
+                                    user_id, tokens_remaining)
                 else:
-                    bal = await get_token_balance(redis, user_id)
-                    tokens_remaining = bal["tokens_remaining"]
-                    logger.info("Re-render — tokens not deducted, remaining=%d",
-                                tokens_remaining)
+                    # Re-render — just read balance, don't deduct
+                    if ws_id:
+                        raw_pool = await redis.get(f"agency:tokens:{ws_id}")
+                        tokens_remaining = int(raw_pool) if raw_pool else 0
+                    else:
+                        bal = await get_token_balance(redis, user_id)
+                        tokens_remaining = bal["tokens_remaining"]
+                    logger.info("Re-render — tokens not deducted, remaining=%d", tokens_remaining)
             except Exception as e:
                 logger.error("Token deduction failed for user %s: %s", user_id, e, exc_info=True)
         else:
