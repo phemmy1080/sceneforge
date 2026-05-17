@@ -11,6 +11,11 @@ interface Comment {
   id: string; author_name: string; scene_index: number | null;
   text: string; is_client: boolean; resolved: boolean; created_at: string;
 }
+interface SceneClip {
+  index: number;
+  url: string;
+  label: string;
+}
 interface BrandKit { id: string; client_name: string; }
 
 const STATUSES = [
@@ -219,6 +224,9 @@ export function ProjectDetail() {
   const [copied, setCopied] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [busy, setBusy] = useState("");
+  const [sceneClips, setSceneClips] = useState<SceneClip[]>([]);
+  const [activeScene, setActiveScene] = useState<number | null>(null);
+  const [sceneCommentText, setSceneCommentText] = useState("");
 
   useEffect(() => { if (id) load(); }, [id]);
 
@@ -227,7 +235,48 @@ export function ProjectDetail() {
       const res = await api.get(`/api/agency/projects/${id}`);
       setProject(res.data.project);
       setComments(res.data.comments);
+
+      // Load scene clips from the latest render job
+      const jobIds: string[] = res.data.project.render_job_ids || [];
+      if (jobIds.length > 0) {
+        loadSceneClips(jobIds[jobIds.length - 1]);
+      }
     } finally { setLoading(false); }
+  }
+
+  async function loadSceneClips(jobId: string) {
+    try {
+      const res = await api.get(`/api/render/status/${jobId}`);
+      const r2 = res.data.result?.r2_urls || {};
+      const clips: SceneClip[] = [];
+      // Collect scene_0.mp4, scene_1.mp4 … in order
+      let i = 0;
+      while (r2[`scene_${i}.mp4`]) {
+        clips.push({ index: i, url: r2[`scene_${i}.mp4`], label: `Scene ${i + 1}` });
+        i++;
+      }
+      // Also try scene_0_with_subs.mp4 pattern if plain clips missing
+      if (clips.length === 0) {
+        i = 0;
+        while (r2[`scene_${i}_with_subs.mp4`]) {
+          clips.push({ index: i, url: r2[`scene_${i}_with_subs.mp4`], label: `Scene ${i + 1}` });
+          i++;
+        }
+      }
+      setSceneClips(clips);
+    } catch {}
+  }
+
+  async function postSceneComment() {
+    if (!sceneCommentText.trim()) return;
+    try {
+      const res = await api.post(`/api/agency/projects/${id}/comments`, {
+        text: sceneCommentText,
+        scene_index: activeScene,
+      });
+      setComments(c => [...c, res.data.comment]);
+      setSceneCommentText("");
+    } catch {}
   }
 
   async function changeStatus(s: string) {
@@ -379,10 +428,132 @@ export function ProjectDetail() {
         </div>
       )}
 
+      {/* ── Scene review panel ── */}
+      {sceneClips.length > 0 && (
+        <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
+            <span className="text-sm font-bold text-white">Scene review</span>
+            <span className="text-xs text-white/30">{sceneClips.length} scene{sceneClips.length !== 1 ? "s" : ""}</span>
+          </div>
+
+          {/* Scene grid */}
+          <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {sceneClips.map(clip => {
+              const sceneCmts = comments.filter(c => c.scene_index === clip.index && !c.resolved);
+              const isActive = activeScene === clip.index;
+              return (
+                <div key={clip.index}
+                  onClick={() => setActiveScene(isActive ? null : clip.index)}
+                  className={`relative rounded-xl overflow-hidden cursor-pointer border transition-all ${
+                    isActive
+                      ? "border-amber-400/50 ring-1 ring-amber-400/30"
+                      : "border-white/[0.08] hover:border-white/[0.2]"
+                  }`}>
+                  <video
+                    src={clip.url}
+                    className="w-full aspect-video bg-black object-cover"
+                    muted
+                    playsInline
+                    preload="metadata"
+                    onMouseOver={e => (e.target as HTMLVideoElement).play()}
+                    onMouseOut={e => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0; }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
+                  <div className="absolute bottom-0 left-0 right-0 px-2.5 pb-2 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-white/90">{clip.label}</span>
+                    {sceneCmts.length > 0 && (
+                      <span className="text-[10px] bg-amber-400/20 border border-amber-400/30 text-amber-300 px-1.5 py-0.5 rounded-full font-semibold">
+                        {sceneCmts.length} note{sceneCmts.length !== 1 ? "s" : ""}
+                      </span>
+                    )}
+                  </div>
+                  {isActive && (
+                    <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center">
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round"><path d="M2 5h6M5 2l3 3-3 3"/></svg>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Active scene — full player + comment input */}
+          {activeScene !== null && (
+            <div className="border-t border-white/[0.06]">
+              <div className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  <span className="text-xs font-semibold text-amber-300">Scene {activeScene + 1} selected</span>
+                  <button onClick={() => setActiveScene(null)}
+                    className="ml-auto text-xs text-white/25 hover:text-white/60 transition">
+                    Deselect
+                  </button>
+                </div>
+
+                {/* Full video player */}
+                <video
+                  key={sceneClips[activeScene]?.url}
+                  src={sceneClips[activeScene]?.url}
+                  controls
+                  className="w-full rounded-xl bg-black mb-4"
+                  style={{ maxHeight: 280 }}
+                />
+
+                {/* Existing scene comments */}
+                {comments.filter(c => c.scene_index === activeScene).length > 0 && (
+                  <div className="space-y-2 mb-4">
+                    <div className="text-[11px] font-bold text-white/30 uppercase tracking-widest mb-2">
+                      Notes on scene {activeScene + 1}
+                    </div>
+                    {comments.filter(c => c.scene_index === activeScene).map(c => (
+                      <div key={c.id} className={`flex gap-2.5 ${c.resolved ? "opacity-35" : ""}`}>
+                        <div className={`w-6 h-6 rounded-full text-[10px] font-bold flex items-center justify-center flex-shrink-0 ${
+                          c.is_client ? "bg-violet-400/20 text-violet-300" : "bg-white/[0.08] text-white/50"
+                        }`}>
+                          {c.author_name.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-semibold text-white/70">{c.author_name}</span>
+                            {c.is_client && <span className="text-[10px] text-violet-400">Client</span>}
+                            {c.resolved && <span className="text-[10px] text-white/20">Resolved</span>}
+                          </div>
+                          <p className="text-xs text-white/50 mt-0.5 leading-relaxed">{c.text}</p>
+                        </div>
+                        {!c.resolved && (
+                          <button onClick={() => resolve(c.id)}
+                            className="text-[10px] text-white/20 hover:text-emerald-400 transition flex-shrink-0 self-start mt-0.5">
+                            ✓
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add scene comment */}
+                <div className="flex gap-2">
+                  <input type="text"
+                    placeholder={`Add note on Scene ${activeScene + 1}…`}
+                    value={sceneCommentText}
+                    onChange={e => setSceneCommentText(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && postSceneComment()}
+                    className="flex-1 bg-white/[0.06] border border-white/[0.1] rounded-xl px-3.5 py-2 text-white text-sm outline-none focus:border-amber-400/50 placeholder:text-white/20 transition" />
+                  <button onClick={postSceneComment} disabled={!sceneCommentText.trim()}
+                    className="bg-amber-400 hover:bg-amber-300 text-black font-bold px-4 py-2 rounded-xl text-sm transition disabled:opacity-40">
+                    Note
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Comments */}
       <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl overflow-hidden">
         <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
-          <span className="text-sm font-bold text-white">Comments</span>
+          <span className="text-sm font-bold text-white">All comments</span>
           <span className="text-xs text-white/30">{comments.length} total</span>
         </div>
 
