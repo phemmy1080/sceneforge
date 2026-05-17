@@ -30,6 +30,7 @@ DEFAULT_PLANS = {
     "starter": {"amount": 1000, "currency": "NGN", "tokens": 500,  "label": "Starter", "videos": 5},
     "pro":     {"amount": 2000, "currency": "NGN", "tokens": 1200, "label": "Pro",     "videos": 12},
     "studio":  {"amount": 5000, "currency": "NGN", "tokens": 3500, "label": "Studio",  "videos": 35},
+    "agency":  {"amount": 100000, "currency": "NGN", "tokens": 3500, "label": "Agency",  "videos": 500},
 }
 
 
