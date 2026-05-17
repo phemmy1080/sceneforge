@@ -95,8 +95,8 @@ export default function AgencyDashboard() {
     try {
       setLoading(true);
       const [wsRes, dashRes] = await Promise.all([
-        api.get("/agency/workspace"),
-        api.get("/agency/workspace/dashboard"),
+        api.get("/api/agency/workspace"),
+        api.get("/api/agency/workspace/dashboard"),
       ]);
       setWorkspace(wsRes.data.workspace);
       setData(dashRes.data);
@@ -265,7 +265,7 @@ function SetupWorkspace({ onCreated }: { onCreated: () => void }) {
     setLoading(true);
     setError("");
     try {
-      await api.post("/agency/workspace", { name: name.trim() });
+      await api.post("/api/agency/workspace", { name: name.trim() });
       onCreated();
     } catch (e: any) {
       setError(e.response?.data?.detail || "Failed to create workspace");
