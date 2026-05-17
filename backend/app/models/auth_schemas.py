@@ -27,6 +27,9 @@ class UserOut(BaseModel):
     tokens_total: int = 1000       # original allocation
     created_at: str
     email_verified: bool = False
+    workspace_id: Optional[str] = None
+    workspace_role: Optional[str] = None
+    
 
 
 class TokenResponse(BaseModel):
