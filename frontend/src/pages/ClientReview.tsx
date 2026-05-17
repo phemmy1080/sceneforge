@@ -61,14 +61,24 @@ export default function ClientReview({ token }: { token: string }) {
       setData(res.data);
       setComments(res.data.comments || []);
 
-      // Try to load video URL from latest render job
-      const jobIds: string[] = res.data.project.render_job_ids || [];
-      if (jobIds.length > 0) {
-        try {
-          const lastJob = jobIds[jobIds.length - 1];
-          const jobRes = await axios.get(`${BASE}/api/render/status/${lastJob}`);
-          if (jobRes.data.output_url) setVideoUrl(jobRes.data.output_url);
-        } catch {}
+      // Backend now returns video_url directly — no separate job status call needed
+      const directUrl = res.data.project?.video_url || '';
+      if (directUrl) {
+        setVideoUrl(directUrl);
+      } else {
+        // Fallback: try job status API for older projects
+        const jobIds: string[] = res.data.project.render_job_ids || [];
+        for (let i = jobIds.length - 1; i >= 0; i--) {
+          try {
+            const jobRes = await axios.get(`${BASE}/api/render/status/${jobIds[i]}`);
+            const d = jobRes.data;
+            const url = d.result?.video_url
+                     || d.result?.r2_urls?.['final_video_music.mp4']
+                     || d.result?.r2_urls?.['final_video.mp4']
+                     || '';
+            if (url) { setVideoUrl(url); break; }
+          } catch {}
+        }
       }
 
       if (res.data.review.status !== "pending") {
@@ -176,7 +186,7 @@ export default function ClientReview({ token }: { token: string }) {
       {/* Header */}
       <div className="border-b border-white/5 px-5 py-4 flex items-center justify-between max-w-3xl mx-auto">
         <div>
-          <div className="text-xs text-zinc-500 font-mono mb-0.5">sceneraforge.com</div>
+          <div className="text-xs text-zinc-500 font-mono mb-0.5">scenraforge.com</div>
           <div className="text-sm font-semibold">{project.title}</div>
           <div className="text-xs text-zinc-500">{project.client_name} · {project.platform}</div>
         </div>
@@ -205,7 +215,7 @@ export default function ClientReview({ token }: { token: string }) {
               </div>
               <div className="text-zinc-500 text-sm">
                 {project.render_job_ids.length === 0
-                  ? "Video not yet rendered"
+                  ? "Video is being prepared — check back soon"
                   : "Loading video…"}
               </div>
             </div>
@@ -315,7 +325,7 @@ export default function ClientReview({ token }: { token: string }) {
         </div>
 
         <p className="text-center text-zinc-600 text-xs">
-          Powered by SceneForge · sceneraforge.com
+          Powered by SceneForge · scenraforge.com
         </p>
       </div>
     </div>
