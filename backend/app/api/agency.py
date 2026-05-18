@@ -529,6 +529,56 @@ async def resolve_comment(
     return {"message": "Comment resolved"}
 
 
+class EditCommentRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=2000)
+
+
+@router.patch("/projects/{proj_id}/comments/{comment_id}")
+async def edit_comment(
+    proj_id: str,
+    comment_id: str,
+    req: EditCommentRequest,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    """Edit a comment — only the original author can edit."""
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    project = await svc.get_project(redis, proj_id)
+    if not project or project["ws_id"] != ws["id"]:
+        raise HTTPException(404, "Project not found")
+    try:
+        updated = await svc.edit_comment(redis, proj_id, comment_id, user.id, req.text)
+        if not updated:
+            raise HTTPException(404, "Comment not found")
+        return {"comment": updated}
+    except ValueError as e:
+        raise HTTPException(403, str(e))
+
+
+@router.delete("/projects/{proj_id}/comments/{comment_id}")
+async def delete_comment(
+    proj_id: str,
+    comment_id: str,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    """Delete a comment — author or workspace owner can delete."""
+    user = await _get_user(authorization, redis)
+    ws = await _require_workspace(user.id, redis)
+    project = await svc.get_project(redis, proj_id)
+    if not project or project["ws_id"] != ws["id"]:
+        raise HTTPException(404, "Project not found")
+    is_owner = ws.get("owner_id") == user.id
+    try:
+        ok = await svc.delete_comment(redis, proj_id, comment_id, user.id, is_owner)
+        if not ok:
+            raise HTTPException(404, "Comment not found")
+        return {"message": "Comment deleted"}
+    except ValueError as e:
+        raise HTTPException(403, str(e))
+
+
 # ── Workspace rename ─────────────────────────────────────────────────────────
 
 @router.patch("/workspace/rename")
