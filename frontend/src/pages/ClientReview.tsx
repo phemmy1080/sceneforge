@@ -16,6 +16,7 @@ interface ReviewData {
     client_name: string;
     platform: string;
     render_job_ids: string[];
+    video_url?: string;
   };
   comments: Comment[];
 }
@@ -27,6 +28,7 @@ interface Comment {
   text: string;
   created_at: string;
 }
+interface SceneClip { index: number; url: string; }
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -47,6 +49,8 @@ export default function ClientReview({ token }: { token: string }) {
   const [commentText, setCommentText] = useState("");
   const [authorName, setAuthorName] = useState(() => localStorage.getItem("review_name") || "");
   const [sceneIndex, setSceneIndex] = useState<number | null>(null);
+  const [sceneClips, setSceneClips] = useState<SceneClip[]>([]);
+  const [activeScene, setActiveScene] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [decision, setDecision] = useState<"approved" | "changes_requested" | "">("");
   const [decisionMsg, setDecisionMsg] = useState("");
@@ -84,6 +88,42 @@ export default function ClientReview({ token }: { token: string }) {
       if (res.data.review.status !== "pending") {
         setDecided(true);
         setDecision(res.data.review.status as any);
+      }
+
+      // Load individual scene clips
+      const jobIds: string[] = res.data.project.render_job_ids || [];
+      if (jobIds.length > 0) {
+        try {
+          const jobRes = await axios.get(`${BASE}/api/render/status/${jobIds[jobIds.length - 1]}`);
+          const jobData = jobRes.data;
+          const r2 = jobData.result?.r2_urls || {};
+          const workerBase = (jobData.result?.video_url || '').replace(/\/renders\/.*$/, '');
+          const clips: SceneClip[] = [];
+          // Primary: R2 scene_01.mp4 keys
+          let i = 1;
+          while (i <= 50) {
+            const pad = String(i).padStart(2, '0');
+            const key = `scene_${pad}.mp4`;
+            if (r2[key]) { clips.push({ index: i - 1, url: r2[key] }); i++; }
+            else { break; }
+          }
+          // Fallback A: unpadded keys
+          if (clips.length === 0) {
+            i = 1;
+            while (r2[`scene_${i}.mp4`]) {
+              clips.push({ index: i - 1, url: r2[`scene_${i}.mp4`] }); i++;
+            }
+          }
+          // Fallback B: worker base URL
+          if (clips.length === 0 && workerBase) {
+            const count = jobData.result?.scene_count || 0;
+            for (let j = 1; j <= count; j++) {
+              const pad = String(j).padStart(2, '0');
+              clips.push({ index: j - 1, url: `${workerBase}/renders/${jobIds[jobIds.length-1]}/scene_${pad}.mp4` });
+            }
+          }
+          setSceneClips(clips);
+        } catch {}
       }
     } catch (e: any) {
       setError(
@@ -197,30 +237,122 @@ export default function ClientReview({ token }: { token: string }) {
 
       <div className="max-w-3xl mx-auto px-5 py-6 space-y-6">
 
-        {/* Video player */}
+        {/* ── Full video ── */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
           {videoUrl ? (
-            <video
-              src={videoUrl}
-              controls
-              className="w-full aspect-video bg-black"
-              poster=""
-            />
+            <video src={videoUrl} controls className="w-full aspect-video bg-black" />
           ) : (
             <div className="aspect-video bg-zinc-950 flex flex-col items-center justify-center gap-3">
               <div className="w-14 h-14 rounded-full bg-zinc-800 flex items-center justify-center">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="white" opacity="0.4">
-                  <path d="M6 4l12 6-12 6V4z"/>
-                </svg>
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="white" opacity="0.4"><path d="M6 4l12 6-12 6V4z"/></svg>
               </div>
               <div className="text-zinc-500 text-sm">
-                {project.render_job_ids.length === 0
-                  ? "Video is being prepared — check back soon"
-                  : "Loading video…"}
+                {project.render_job_ids.length === 0 ? "Video is being prepared — check back soon" : "Loading video…"}
               </div>
             </div>
           )}
         </div>
+
+        {/* ── Scene-by-scene review ── */}
+        {sceneClips.length > 0 && (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
+              <div>
+                <div className="text-sm font-semibold text-white">Review scene by scene</div>
+                <div className="text-xs text-zinc-500 mt-0.5">Click a scene to watch it and leave a note</div>
+              </div>
+              <span className="text-xs text-zinc-600">{sceneClips.length} scenes</span>
+            </div>
+
+            {/* Scene grid */}
+            <div className="p-4 grid grid-cols-2 gap-3">
+              {sceneClips.map(clip => {
+                const hasNotes = comments.some(c => c.scene_index === clip.index);
+                const isActive = activeScene === clip.index;
+                return (
+                  <div key={clip.index}
+                    onClick={() => { setActiveScene(isActive ? null : clip.index); setSceneIndex(isActive ? null : clip.index); }}
+                    className={`relative rounded-xl overflow-hidden cursor-pointer border transition-all ${
+                      isActive ? "border-[#c9a84c]/60 ring-1 ring-[#c9a84c]/30" : "border-zinc-800 hover:border-zinc-600"
+                    }`}>
+                    <video
+                      src={clip.url}
+                      className="w-full aspect-video bg-black object-cover"
+                      muted playsInline preload="metadata"
+                      onMouseOver={e => (e.target as HTMLVideoElement).play()}
+                      onMouseOut={e => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0; }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+                    <div className="absolute bottom-0 left-0 right-0 px-2.5 pb-2 flex items-center justify-between">
+                      <span className="text-xs font-semibold text-white/90">Scene {clip.index + 1}</span>
+                      {hasNotes && (
+                        <span className="text-[10px] bg-[#c9a84c]/20 border border-[#c9a84c]/30 text-[#c9a84c] px-1.5 py-0.5 rounded-full">noted</span>
+                      )}
+                    </div>
+                    {isActive && (
+                      <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-[#c9a84c] flex items-center justify-center">
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="black" strokeWidth="2.5" strokeLinecap="round"><path d="M2 5l2.5 2.5L8 2"/></svg>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Active scene player + note input */}
+            {activeScene !== null && (
+              <div className="border-t border-zinc-800 p-4 space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#c9a84c]" />
+                  <span className="text-xs font-semibold text-[#c9a84c]">Scene {activeScene + 1}</span>
+                  <button onClick={() => { setActiveScene(null); setSceneIndex(null); }}
+                    className="ml-auto text-xs text-zinc-600 hover:text-zinc-400 transition">Deselect</button>
+                </div>
+
+                {/* Full scene player */}
+                <video
+                  key={sceneClips[activeScene]?.url}
+                  src={sceneClips[activeScene]?.url}
+                  controls
+                  className="w-full rounded-xl bg-black"
+                  style={{ maxHeight: 260 }}
+                />
+
+                {/* Existing notes on this scene */}
+                {comments.filter(c => c.scene_index === activeScene).length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-[10.5px] font-bold text-zinc-600 uppercase tracking-wider">Notes on scene {activeScene + 1}</div>
+                    {comments.filter(c => c.scene_index === activeScene).map(c => (
+                      <div key={c.id} className="flex gap-2.5">
+                        <div className="w-6 h-6 rounded-full bg-zinc-800 text-zinc-400 text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                          {c.author_name.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="text-[11px] font-semibold text-zinc-300">{c.author_name}</div>
+                          <p className="text-xs text-zinc-500 mt-0.5 leading-relaxed">{c.text}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add note input — pre-pinned to this scene */}
+                <div className="flex gap-2">
+                  <input type="text"
+                    placeholder={`Note on Scene ${activeScene + 1}…`}
+                    value={commentText}
+                    onChange={e => setCommentText(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && postComment()}
+                    className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-[#c9a84c]/50 placeholder:text-zinc-600 transition" />
+                  <button onClick={postComment} disabled={!commentText.trim()}
+                    className="bg-[#c9a84c] hover:bg-[#d4b45c] text-black font-bold px-4 py-2.5 rounded-xl text-sm transition disabled:opacity-40">
+                    Note
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Your name */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
@@ -292,32 +424,18 @@ export default function ClientReview({ token }: { token: string }) {
             ))}
           </div>
 
-          {/* Comment input */}
-          <div className="px-5 py-4 border-t border-zinc-800 space-y-3">
-            <div className="flex gap-3">
-              <select
-                value={sceneIndex ?? ""}
-                onChange={e => setSceneIndex(e.target.value === "" ? null : Number(e.target.value))}
-                className="bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white outline-none"
-              >
-                <option value="">All scenes</option>
-                {Array.from({ length: 10 }, (_, i) => (
-                  <option key={i} value={i}>Scene {i + 1}</option>
-                ))}
-              </select>
-              <input
-                type="text"
-                placeholder="Leave a comment…"
+          {/* Overall comment — not tied to a scene */}
+          <div className="px-5 py-4 border-t border-zinc-800">
+            <div className="text-[10.5px] font-bold text-zinc-600 uppercase tracking-wider mb-2">Overall feedback</div>
+            <div className="flex gap-2">
+              <input type="text"
+                placeholder="General comment on the whole video…"
                 value={commentText}
-                onChange={e => setCommentText(e.target.value)}
+                onChange={e => { setSceneIndex(null); setCommentText(e.target.value); }}
                 onKeyDown={e => e.key === "Enter" && postComment()}
-                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 text-white text-sm outline-none focus:border-gold/40"
-              />
-              <button
-                onClick={postComment}
-                disabled={submitting || !commentText.trim()}
-                className="bg-gold text-black font-bold px-4 py-2 rounded-xl text-sm hover:bg-gold/90 transition disabled:opacity-40"
-              >
+                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-[#c9a84c]/40 placeholder:text-zinc-600 transition" />
+              <button onClick={postComment} disabled={submitting || !commentText.trim()}
+                className="bg-zinc-700 hover:bg-zinc-600 text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition disabled:opacity-40">
                 Post
               </button>
             </div>
