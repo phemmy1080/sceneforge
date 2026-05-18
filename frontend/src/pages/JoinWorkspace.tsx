@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { api, login, signup } from '../lib/api'
+import { api, login, signup, getMe } from '../lib/api'
 import { useAuthStore } from '../authStore'
 import { useStore } from '../store'
 
@@ -70,8 +70,13 @@ export default function JoinWorkspace({ token, onJoined }: Props) {
     setStep('joining')
     try {
       await api.post(`/api/agency/workspace/join/${token}`)
+      // Refresh user from /me so workspace_role is in the auth store
+      // before navigating — this is what makes the sidebar hide correctly
+      try {
+        const me = await getMe()
+        useAuthStore.getState().setAuth(me, useAuthStore.getState().token || '')
+      } catch {}
       setStep('done')
-      // Small delay so user sees the success screen, then navigate
       setTimeout(() => {
         onJoined()
       }, 1200)
