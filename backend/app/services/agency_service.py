@@ -592,6 +592,54 @@ async def resolve_comment(redis: aioredis.Redis, proj_id: str, comment_id: str) 
     return updated
 
 
+async def edit_comment(redis: aioredis.Redis, proj_id: str, comment_id: str,
+                       user_id: str, new_text: str) -> Optional[dict]:
+    """Edit a comment — only the original author can edit."""
+    raws = await redis.lrange(_comments_key(proj_id), 0, -1)
+    updated_comment = None
+    new_list = []
+    for r in raws:
+        c = json.loads(r)
+        if c["id"] == comment_id:
+            if c["author_id"] != user_id:
+                raise ValueError("You can only edit your own comments")
+            c["text"]       = new_text.strip()
+            c["edited"]     = True
+            c["edited_at"]  = _now()
+            updated_comment = c
+        new_list.append(json.dumps(c))
+    if updated_comment:
+        pipe = redis.pipeline()
+        pipe.delete(_comments_key(proj_id))
+        for item in new_list:
+            pipe.rpush(_comments_key(proj_id), item)
+        await pipe.execute()
+    return updated_comment
+
+
+async def delete_comment(redis: aioredis.Redis, proj_id: str, comment_id: str,
+                         user_id: str, is_workspace_owner: bool = False) -> bool:
+    """Delete a comment — author or workspace owner can delete."""
+    raws = await redis.lrange(_comments_key(proj_id), 0, -1)
+    found = False
+    new_list = []
+    for r in raws:
+        c = json.loads(r)
+        if c["id"] == comment_id:
+            if c["author_id"] != user_id and not is_workspace_owner:
+                raise ValueError("You can only delete your own comments")
+            found = True
+            continue  # skip — effectively deletes it
+        new_list.append(json.dumps(c))
+    if found:
+        pipe = redis.pipeline()
+        pipe.delete(_comments_key(proj_id))
+        for item in new_list:
+            pipe.rpush(_comments_key(proj_id), item)
+        await pipe.execute()
+    return found
+
+
 # ── Activity log ──────────────────────────────────────────────────────────────
 
 async def _log_activity(redis: aioredis.Redis, ws_id: str, user_id: str,
