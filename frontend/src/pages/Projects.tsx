@@ -25,13 +25,14 @@ export default function Projects() {
   // Redirect them to the agency dashboard automatically.
   useEffect(() => {
     const role = user?.workspace_role
-    if (role && role !== 'owner') {
+    const wsId = user?.workspace_id
+    if (wsId && role !== 'owner') {
       setStep('agency' as any)
     }
-  }, [user?.workspace_role])
+  }, [user?.workspace_id, user?.workspace_role])
 
   // Non-owners in a workspace see this redirect message briefly
-  if (user?.workspace_role && user.workspace_role !== 'owner') {
+  if (user?.workspace_id && user?.workspace_role !== 'owner') {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center space-y-2">
