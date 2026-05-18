@@ -177,7 +177,7 @@ function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => v
       {/* Scrollable nav */}
       <div className="flex-1 overflow-y-auto p-2 scrollbar-thin">
         {/* Hide personal workflow for non-owner workspace members */}
-        {(!user?.workspace_role || user.workspace_role === 'owner') && (
+        {(!user?.workspace_id || user.workspace_role === 'owner') && (
           <>
             <p className="text-[9.5px] font-bold text-white/25 uppercase tracking-widest px-2 pt-2 pb-1">Workflow</p>
             {STEPS.map((step) => {
@@ -209,7 +209,7 @@ function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => v
         <AgencyNav currentStep={currentStep} onStep={handleSetStep} />
 
         {/* Personal projects — hidden for non-owner workspace members */}
-        {(!user?.workspace_role || user.workspace_role === 'owner') && (
+        {(!user?.workspace_id || user.workspace_role === 'owner') && (
           <><div className="flex items-center justify-between px-2 pt-3 pb-1">
           <p className="text-[9.5px] font-bold text-white/25 uppercase tracking-widest">Projects</p>
           <button onClick={() => { onNewProject(); onClose?.() }} className="text-white/25 hover:text-white/55 text-[14px] leading-none px-1 transition-colors">+</button>
@@ -264,7 +264,7 @@ function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => v
       </div>
 
       {/* Active project status */}
-      {(!user?.workspace_role || user.workspace_role === 'owner') && activeProject && (
+      {(!user?.workspace_id || user.workspace_role === 'owner') && activeProject && (
         <div className="mx-2 mb-2 bg-violet-500/10 border border-violet-500/20 rounded-xl p-2.5 flex-shrink-0">
           <p className="text-[9.5px] font-semibold text-violet-400 uppercase tracking-widest mb-1">Active</p>
           <p className="text-[11.5px] text-white/75 font-medium leading-snug truncate">{activeProject.name}</p>
