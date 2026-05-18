@@ -340,15 +340,27 @@ export const useStore = create<AppState>()(
           // Notify UI to refresh video count and token balance
           try { document.dispatchEvent(new CustomEvent('sceneforge:render-complete')) } catch {}
 
-          // Link job ID back to the agency project so the client review link shows the video
+          // Link job ID back to the agency project so scene review works
           if (agencyProjectId && jobId) {
             try {
-              import('./lib/api').then(({ api }) => {
-                api.put(`/api/agency/projects/${agencyProjectId}`, {
-                  render_job_ids: [jobId],
-                  status: 'in_review',
-                }).catch(() => {})
-              })
+              // Use fetch directly — no import needed, always available
+              const token = (get() as any).token ||
+                JSON.parse(localStorage.getItem('sceneforge-auth') || '{}')
+                  ?.state?.token || '';
+              if (token) {
+                const base = import.meta.env?.VITE_API_URL ||
+                  'https://sceneforge-production-8d19.up.railway.app';
+                fetch(`${base}/api/agency/projects/${agencyProjectId}`, {
+                  method: 'PUT',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({
+                    render_job_ids: [jobId],
+                  }),
+                }).catch(() => {});
+              }
             } catch {}
           }
 
