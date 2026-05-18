@@ -9,8 +9,9 @@ interface Project {
   assigned_to: string[]; created_at: string; updated_at: string;
 }
 interface Comment {
-  id: string; author_name: string; scene_index: number | null;
+  id: string; author_name: string; author_id: string; scene_index: number | null;
   text: string; is_client: boolean; resolved: boolean; created_at: string;
+  edited?: boolean; edited_at?: string;
 }
 interface SceneClip {
   index: number;
@@ -348,6 +349,37 @@ export function ProjectDetail() {
     setComments(cs => cs.map(c => c.id === cid ? { ...c, resolved: true } : c));
   }
 
+  // Edit/delete state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+
+  function startEdit(c: Comment) {
+    setEditingId(c.id);
+    setEditText(c.text);
+  }
+
+  async function saveEdit(cid: string) {
+    if (!editText.trim()) return;
+    try {
+      const res = await api.patch(`/api/agency/projects/${id}/comments/${cid}`,
+        { text: editText.trim() });
+      setComments(cs => cs.map(c => c.id === cid ? res.data.comment : c));
+      setEditingId(null);
+    } catch (e: any) {
+      alert(e.response?.data?.detail || "Failed to edit");
+    }
+  }
+
+  async function deleteComment(cid: string) {
+    if (!confirm("Delete this note?")) return;
+    try {
+      await api.delete(`/api/agency/projects/${id}/comments/${cid}`);
+      setComments(cs => cs.filter(c => c.id !== cid));
+    } catch (e: any) {
+      alert(e.response?.data?.detail || "Failed to delete");
+    }
+  }
+
   async function copy() {
     await navigator.clipboard.writeText(reviewUrl);
     setCopied(true); setTimeout(() => setCopied(false), 2000);
@@ -600,7 +632,7 @@ export function ProjectDetail() {
                       Notes on scene {activeScene + 1}
                     </div>
                     {comments.filter(c => c.scene_index === activeScene).map(c => (
-                      <div key={c.id} className={`flex gap-2.5 ${c.resolved ? "opacity-35" : ""}`}>
+                      <div key={c.id} className={`flex gap-2.5 group ${c.resolved ? "opacity-35" : ""}`}>
                         <div className={`w-6 h-6 rounded-full text-[10px] font-bold flex items-center justify-center flex-shrink-0 ${
                           c.is_client ? "bg-violet-400/20 text-violet-300" : "bg-white/[0.08] text-white/50"
                         }`}>
@@ -611,15 +643,37 @@ export function ProjectDetail() {
                             <span className="text-[11px] font-semibold text-white/70">{c.author_name}</span>
                             {c.is_client && <span className="text-[10px] text-violet-400">Client</span>}
                             {c.resolved && <span className="text-[10px] text-white/20">Resolved</span>}
+                            {c.edited && <span className="text-[10px] text-white/20 italic">edited</span>}
                           </div>
-                          <p className="text-xs text-white/50 mt-0.5 leading-relaxed">{c.text}</p>
+                          {editingId === c.id ? (
+                            <div className="flex gap-1.5 mt-1">
+                              <input autoFocus value={editText}
+                                onChange={e => setEditText(e.target.value)}
+                                onKeyDown={e => { if (e.key === "Enter") saveEdit(c.id); if (e.key === "Escape") setEditingId(null); }}
+                                className="flex-1 bg-white/[0.06] border border-amber-400/40 rounded-lg px-2.5 py-1 text-white text-xs outline-none" />
+                              <button onClick={() => saveEdit(c.id)}
+                                className="text-[10px] bg-amber-400 text-black font-bold px-2 py-1 rounded-lg">Save</button>
+                              <button onClick={() => setEditingId(null)}
+                                className="text-[10px] text-white/30 px-1.5">✕</button>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-white/50 mt-0.5 leading-relaxed">{c.text}</p>
+                          )}
                         </div>
-                        {!c.resolved && (
-                          <button onClick={() => resolve(c.id)}
-                            className="text-[10px] text-white/20 hover:text-emerald-400 transition flex-shrink-0 self-start mt-0.5">
-                            ✓
-                          </button>
-                        )}
+                        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition flex-shrink-0 self-start">
+                          {!c.resolved && (
+                            <button onClick={() => resolve(c.id)} title="Resolve"
+                              className="w-5 h-5 flex items-center justify-center rounded text-white/20 hover:text-emerald-400 text-[10px]">✓</button>
+                          )}
+                          {c.author_id === currentUser?.id && !c.resolved && editingId !== c.id && (
+                            <button onClick={() => startEdit(c)} title="Edit"
+                              className="w-5 h-5 flex items-center justify-center rounded text-white/20 hover:text-amber-400 text-[10px]">✎</button>
+                          )}
+                          {(c.author_id === currentUser?.id || isOwner) && (
+                            <button onClick={() => deleteComment(c.id)} title="Delete"
+                              className="w-5 h-5 flex items-center justify-center rounded text-white/20 hover:text-rose-400 text-sm leading-none">×</button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -662,8 +716,12 @@ export function ProjectDetail() {
           {comments.length === 0 ? (
             <div className="py-10 text-center text-white/20 text-sm">No comments yet</div>
           ) : comments.map(c => (
-            <div key={c.id} className={`flex gap-3 px-5 py-3.5 ${c.resolved ? "opacity-35" : ""}`}>
-              <div className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center flex-shrink-0 ${c.is_client ? "bg-violet-400/20 text-violet-300" : "bg-white/[0.08] text-white/50"}`}>
+            <div key={c.id} className={`flex gap-3 px-5 py-3.5 transition group ${
+              c.resolved ? "opacity-35" : ""
+            } ${c.is_client && !c.resolved && isOwner ? "bg-violet-400/[0.03] border-l-2 border-violet-400/25" : ""}`}>
+              <div className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center flex-shrink-0 ${
+                c.is_client ? "bg-violet-400/20 text-violet-300" : "bg-white/[0.08] text-white/50"
+              }`}>
                 {c.author_name.slice(0, 2).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
@@ -672,15 +730,38 @@ export function ProjectDetail() {
                   {c.is_client && <span className="text-[10px] text-violet-400 font-semibold">Client</span>}
                   {c.scene_index !== null && <span className="text-[10px] text-white/25">Scene {(c.scene_index ?? 0) + 1}</span>}
                   <span className="text-[10px] text-white/20">{timeAgo(c.created_at)}</span>
+                  {c.edited && <span className="text-[10px] text-white/20 italic">edited</span>}
                 </div>
-                <p className="text-sm text-white/55 leading-relaxed">{c.text}</p>
+                {editingId === c.id ? (
+                  <div className="flex gap-2 mt-1">
+                    <input autoFocus value={editText}
+                      onChange={e => setEditText(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") saveEdit(c.id); if (e.key === "Escape") setEditingId(null); }}
+                      className="flex-1 bg-white/[0.06] border border-amber-400/40 rounded-lg px-3 py-1.5 text-white text-sm outline-none" />
+                    <button onClick={() => saveEdit(c.id)}
+                      className="text-xs bg-amber-400 text-black font-bold px-3 py-1.5 rounded-lg hover:bg-amber-300 transition">Save</button>
+                    <button onClick={() => setEditingId(null)}
+                      className="text-xs text-white/30 hover:text-white px-2 transition">✕</button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-white/55 leading-relaxed">{c.text}</p>
+                )}
               </div>
-              {!c.resolved && (
-                <button onClick={() => resolve(c.id)}
-                  className="text-[10px] text-white/20 hover:text-emerald-400 transition self-start mt-1 flex-shrink-0 font-medium">
-                  ✓ Resolve
-                </button>
-              )}
+              {/* Actions — visible on hover */}
+              <div className="flex items-start gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition mt-0.5">
+                {!c.resolved && (
+                  <button onClick={() => resolve(c.id)} title="Resolve"
+                    className="w-6 h-6 flex items-center justify-center rounded text-white/25 hover:text-emerald-400 hover:bg-emerald-400/10 transition text-xs">✓</button>
+                )}
+                {c.author_id === currentUser?.id && !c.resolved && editingId !== c.id && (
+                  <button onClick={() => startEdit(c)} title="Edit"
+                    className="w-6 h-6 flex items-center justify-center rounded text-white/25 hover:text-amber-400 hover:bg-amber-400/10 transition text-xs">✎</button>
+                )}
+                {(c.author_id === currentUser?.id || isOwner) && (
+                  <button onClick={() => deleteComment(c.id)} title="Delete"
+                    className="w-6 h-6 flex items-center justify-center rounded text-white/20 hover:text-rose-400 hover:bg-rose-400/10 transition text-sm leading-none">×</button>
+                )}
+              </div>
             </div>
           ))}
         </div>
