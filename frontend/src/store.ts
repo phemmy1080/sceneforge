@@ -348,7 +348,7 @@ export const useStore = create<AppState>()(
                 JSON.parse(localStorage.getItem('sceneforge-auth') || '{}')
                   ?.state?.token || '';
               if (token) {
-                const base = import.meta.env?.VITE_API_URL ||
+                const base = (import.meta as any).env?.VITE_API_URL ||
                   'https://sceneforge-production-8d19.up.railway.app';
                 fetch(`${base}/api/agency/projects/${agencyProjectId}`, {
                   method: 'PUT',
