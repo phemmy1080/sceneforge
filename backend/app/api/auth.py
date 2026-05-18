@@ -62,6 +62,12 @@ async def login(req: LoginRequest, redis=Depends(get_redis)):
     if not user.email_verified:
         raise HTTPException(status_code=403, detail="Please verify your email before logging in. Check your inbox or request a new code.")
     token = auth_service.issue_token(user.id)
+    # Enrich with workspace role so sidebar hides correctly immediately after login
+    import json as _j
+    raw = await redis.get(f"user:{user.id}")
+    if raw:
+        enriched = await auth_service.get_user_out_with_workspace(redis, user.id, _j.loads(raw))
+        return TokenResponse(access_token=token, user=enriched)
     return TokenResponse(access_token=token, user=user)
 
 
