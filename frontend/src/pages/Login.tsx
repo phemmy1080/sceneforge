@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { login } from '../lib/api'
+import { login, getMe } from '../lib/api'
 import { useAuthStore } from '../authStore'
 import type React from 'react'
 
@@ -27,6 +27,12 @@ export default function Login({ onSuccess, onSignup, onLanding, onForgot, onVeri
     try {
       const res = await login(email, password)
       setAuth(res.user, res.access_token)
+      // Fetch /me immediately to ensure workspace_role is in the store
+      // This is the key fix — login response may be cached without workspace fields
+      try {
+        const me = await getMe()
+        setAuth(me, res.access_token)
+      } catch {}
       onSuccess()
     } catch (err: any) {
       const status = err.response?.status
