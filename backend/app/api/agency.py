@@ -91,6 +91,10 @@ class BrandKitRequest(BaseModel):
     ai_tone: Optional[str] = ""
     default_cta: Optional[str] = ""
     font: Optional[str] = ""
+    intro_url: Optional[str] = ""
+    outro_url: Optional[str] = ""
+    watermark_position: Optional[str] = ""
+    brand_voice_notes: Optional[str] = ""
 
 class CreateProjectRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
@@ -311,6 +315,52 @@ async def get_pool_balance(
 
 
 # ── Brand kit endpoints ───────────────────────────────────────────────────────
+
+from fastapi import UploadFile, File as _File
+
+@router.post("/brand-kits/logo")
+async def upload_brand_logo(
+    file: UploadFile = _File(...),
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    """Upload a brand logo — multipart/form-data, field: file. Max 5MB."""
+    from app.services.storage import upload_file, r2_enabled
+    import tempfile, os, uuid as _uuid, mimetypes
+
+    user = await _get_user(authorization, redis)
+    ws   = await _require_workspace(user.id, redis)
+    await _require_role(ws["id"], user.id, redis, ("owner", "admin"))
+
+    allowed = {"image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif", "image/svg+xml"}
+    ct = (file.content_type or "").lower()
+    if ct not in allowed:
+        raise HTTPException(400, "Unsupported type. Use PNG, JPG, WebP, GIF or SVG.")
+
+    raw = await file.read()
+    if len(raw) > 5 * 1024 * 1024:
+        raise HTTPException(400, "Logo must be under 5 MB")
+
+    ext_map = {"image/jpeg": ".jpg", "image/jpg": ".jpg", "image/png": ".png",
+               "image/webp": ".webp", "image/gif": ".gif", "image/svg+xml": ".svg"}
+    ext = ext_map.get(ct, ".png")
+    key = f"brand-assets/{ws['id']}/logos/{_uuid.uuid4().hex[:10]}{ext}"
+
+    if r2_enabled():
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+            tmp.write(raw); tmp_path = tmp.name
+        try:
+            logo_url = await upload_file(tmp_path, key)
+        finally:
+            os.unlink(tmp_path)
+    else:
+        import base64
+        logo_url = f"data:{ct};base64,{base64.b64encode(raw).decode()}"
+        logger.warning("R2 not enabled — logo stored as data URL for ws=%s", ws["id"])
+
+    logger.info("Brand logo uploaded | ws=%s | url=%s", ws["id"], logo_url)
+    return {"logo_url": logo_url}
+
 
 @router.get("/brand-kits")
 async def list_brand_kits(
