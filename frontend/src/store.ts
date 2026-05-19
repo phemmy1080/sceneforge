@@ -139,7 +139,15 @@ export const useStore = create<AppState>()(
 
         agencyProjectId: '',
         setAgencyProjectId: (id) => set({ agencyProjectId: id }),
-        setStep: (step) => set({ currentStep: step }),
+        setStep: (step) => {
+          // Clear agency project context when navigating to personal/landing steps
+          const personalSteps = ['projects', 'landing', 'login', 'upgrade', 'plans']
+          if (personalSteps.includes(step as string)) {
+            set({ currentStep: step, agencyProjectId: '' })
+          } else {
+            set({ currentStep: step })
+          }
+        },
         markStepComplete: (step) => set((s) => ({
           completedSteps: new Set([...s.completedSteps, step])
         })),
