@@ -78,7 +78,14 @@ function AgencyNav({ currentStep, onStep }: { currentStep: string; onStep: (s: A
   // Show agency nav to anyone in a workspace (owner OR member)
   const inAgency = !!(user?.workspace_id || user?.plan === 'agency')
   // Also show during workflow steps when rendering for an agency project
-  const isActiveAgency = inAgency && (currentStep.startsWith('agency') || !!agencyProjectId)
+  const wsRole2 = user?.workspace_role
+  // Non-owner members always stay in agency context
+  const isNonOwnerMember2 = !!(wsRole2 && wsRole2 !== 'owner')
+  const isActiveAgency = inAgency && (
+    currentStep.startsWith('agency') ||
+    !!agencyProjectId ||
+    isNonOwnerMember2
+  )
   if (!isActiveAgency) return null
 
   const wsRole = user?.workspace_role || (user?.plan === 'agency' ? 'owner' : 'editor')
@@ -126,10 +133,15 @@ function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => v
   const wsRole           = user?.workspace_role || (user?.plan === 'agency' ? 'owner' : null)
   const isAgencyOwner    = wsRole === 'owner'
   const isAgencyAdmin    = wsRole === 'owner' || wsRole === 'admin'
-  const inWorkspace      = !!(user?.workspace_id)
-  // Agency mode = on agency step OR rendering for an agency project
-  // This keeps the sidebar in agency context during Setup→Scenes→Export workflow
-  const inAgencyMode     = inWorkspace && (currentStep.startsWith('agency') || !!agencyProjectId)
+  const inWorkspace      = !!(user?.workspace_id || user?.workspace_role)
+  // Agency mode:
+  // 1. On an agency step (dashboard/projects/team/kits)
+  // 2. agencyProjectId is set (creating a video for an agency project)
+  // 3. User is a workspace member (non-owner roles are always in agency mode)
+  const isNonOwnerMember = !!(user?.workspace_role && user.workspace_role !== 'owner')
+  const inAgencyMode     = !!agencyProjectId ||
+                           currentStep.startsWith('agency') ||
+                           (inWorkspace && isNonOwnerMember)
   // Show personal sidebar only when truly in personal mode
   const showPersonal     = !inAgencyMode
   const scenes         = useStore((s) => s.scenes)
