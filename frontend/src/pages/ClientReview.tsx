@@ -74,7 +74,9 @@ export default function ClientReview({ token }: { token: string }) {
         const jobIds: string[] = res.data.project.render_job_ids || [];
         for (let i = jobIds.length - 1; i >= 0; i--) {
           try {
-            const jobRes = await axios.get(`${BASE}/api/render/status/${jobIds[i]}`);
+            let jobRes;
+            try { jobRes = await axios.get(`${BASE}/api/render/status/${jobIds[i]}`); }
+            catch (e: any) { if (e?.response?.status === 404) continue; throw e; }
             const d = jobRes.data;
             const url = d.result?.video_url
                      || d.result?.r2_urls?.['final_video_music.mp4']
@@ -226,7 +228,7 @@ export default function ClientReview({ token }: { token: string }) {
       {/* Header */}
       <div className="border-b border-white/5 px-5 py-4 flex items-center justify-between max-w-3xl mx-auto">
         <div>
-          <div className="text-xs text-zinc-500 font-mono mb-0.5">scenraforge.com</div>
+          <div className="text-xs text-zinc-500 font-mono mb-0.5">sceneraforge.com</div>
           <div className="text-sm font-semibold">{project.title}</div>
           <div className="text-xs text-zinc-500">{project.client_name} · {project.platform}</div>
         </div>
@@ -443,7 +445,7 @@ export default function ClientReview({ token }: { token: string }) {
         </div>
 
         <p className="text-center text-zinc-600 text-xs">
-          Powered by SceneForge · scenraforge.com
+          Powered by SceneForge · sceneraforge.com
         </p>
       </div>
     </div>
