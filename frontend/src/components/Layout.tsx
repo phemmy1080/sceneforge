@@ -74,14 +74,23 @@ function TokenGateBar({ onUpgrade }: { onUpgrade: () => void }) {
 
 function AgencyNav({ currentStep, onStep }: { currentStep: string; onStep: (s: AppStep) => void }) {
   const user = useAuthStore((s: any) => s.user)
-  if (!user?.plan || user.plan !== 'agency') return null
+  // Show agency nav to anyone in a workspace (agency plan owner OR workspace member)
+  const inAgency = !!(user?.workspace_id || user?.plan === 'agency')
+  if (!inAgency) return null
 
-  const links = [
-    { id: 'agency',          label: 'Dashboard'  },
-    { id: 'agency-projects', label: 'Projects'   },
-    { id: 'agency-team',     label: 'Team'       },
-    { id: 'agency-kits',     label: 'Brand kits' },
+  const wsRole = user?.workspace_role || (user?.plan === 'agency' ? 'owner' : 'editor')
+  const isAdminOrOwner = wsRole === 'owner' || wsRole === 'admin'
+
+  // Base links everyone in agency sees
+  const links: { id: string; label: string }[] = [
+    { id: 'agency',          label: 'Dashboard' },
+    { id: 'agency-projects', label: 'Projects'  },
   ]
+  // Team and Brand kits only for admin/owner
+  if (isAdminOrOwner) {
+    links.push({ id: 'agency-team', label: 'Team' })
+    links.push({ id: 'agency-kits', label: 'Brand kits' })
+  }
 
   return (
     <>
