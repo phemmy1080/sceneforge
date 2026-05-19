@@ -288,6 +288,8 @@ export function ProjectDetail() {
       ]);
       setProject(projRes.data.project);
       setComments(projRes.data.comments);
+      // Keep agencyProjectId in sync — important for when editors navigate here
+      useStore.getState().setAgencyProjectId(id || '');
       // Only editors/admins can be assigned — not clients
       const eligible = (membersRes.data.members || []).filter(
         (m: Member) => m.role === 'editor' || m.role === 'admin' || m.role === 'owner'
@@ -642,7 +644,10 @@ export function ProjectDetail() {
             <div className="text-sm font-bold text-emerald-300">Client approved this video</div>
             <div className="text-xs text-white/40 mt-0.5">Ready to render and export. Click "Create video" or start the render from here.</div>
           </div>
-          <button onClick={() => useStore.getState().setStep('setup' as any)}
+          <button onClick={() => {
+              useStore.getState().setAgencyProjectId(id || '');
+              useStore.getState().setStep('setup' as any);
+            }}
             className="flex-shrink-0 bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-4 py-2 rounded-xl text-xs transition">
             Start render
           </button>
