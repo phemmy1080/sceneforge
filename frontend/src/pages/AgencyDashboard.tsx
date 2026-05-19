@@ -124,7 +124,13 @@ export default function AgencyDashboard() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "Active projects",   value: data.active_projects,             color: "text-white",       bg: "from-white/[0.06]",     icon: "📁" },
+          {
+            label: isAdminOrOwner ? "Active projects" : "Assigned to me",
+            value: isAdminOrOwner
+              ? data.active_projects
+              : data.recent_projects.filter((p: any) => p.assigned_to?.includes(currentUser?.id)).length,
+            color: "text-white", bg: "from-white/[0.06]", icon: "📁"
+          },
           { label: "Pending approvals", value: data.pending_approvals,           color: "text-amber-400",   bg: "from-amber-400/[0.08]", icon: "⏳" },
           { label: "Team members",      value: data.team_members,                color: "text-teal-400",    bg: "from-teal-400/[0.08]",  icon: "👥" },
           { label: "Shared tokens",     value: data.pool_tokens.toLocaleString(), color: "text-violet-300", bg: "from-violet-400/[0.08]",icon: "🪙" },
