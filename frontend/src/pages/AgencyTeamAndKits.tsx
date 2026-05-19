@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { api } from '../lib/api';
 import { useAuthStore } from '../authStore';
 
@@ -13,6 +13,8 @@ interface Invite {
 interface BrandKit {
   id: string; client_name: string; logo_url: string; colors: string[];
   subtitle_style: string; ai_tone: string; default_cta: string;
+  font: string; brand_voice_notes: string;
+  intro_url: string; outro_url: string; watermark_position: string;
 }
 interface Workspace { id: string; name: string; owner_id: string; seat_limit: number; }
 
@@ -572,82 +574,226 @@ export function AgencyBrandKits() {
 }
 
 function BrandKitForm({ kit, onSaved, onCancel }: { kit: BrandKit | null; onSaved: () => void; onCancel: () => void }) {
-  const [form, setForm] = useState({
-    client_name: kit?.client_name || "", logo_url: kit?.logo_url || "",
-    colors: kit?.colors?.join(", ") || "", subtitle_style: kit?.subtitle_style || "viral",
-    ai_tone: kit?.ai_tone || "", default_cta: kit?.default_cta || "",
+  const [tab, setTab]     = useState<"identity"|"voice"|"video">("identity");
+  const [form, setForm]   = useState({
+    client_name:        kit?.client_name        || "",
+    logo_url:           kit?.logo_url            || "",
+    colors:             kit?.colors?.join(", ") || "",
+    subtitle_style:     kit?.subtitle_style      || "viral",
+    ai_tone:            kit?.ai_tone             || "",
+    default_cta:        kit?.default_cta         || "",
+    font:               (kit as any)?.font                || "",
+    brand_voice_notes:  (kit as any)?.brand_voice_notes  || "",
+    intro_url:          (kit as any)?.intro_url           || "",
+    outro_url:          (kit as any)?.outro_url           || "",
+    watermark_position: (kit as any)?.watermark_position  || "",
   });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  async function save() {
-    if (!form.client_name.trim()) { setError("Client name required"); return; }
-    setSaving(true); setError("");
-    const payload = { ...form, colors: form.colors.split(",").map(s => s.trim()).filter(Boolean) };
-    try {
-      if (kit) await api.put(`/api/agency/brand-kits/${kit.id}`, payload);
-      else await api.post("/api/agency/brand-kits", payload);
-      onSaved();
-    } catch (e: any) { setError(e.response?.data?.detail || "Failed"); setSaving(false); }
-  }
+  const [saving, setSaving]       = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError]         = useState("");
+  const [preview, setPreview]     = useState(kit?.logo_url || "");
+  const fileRef                   = useRef<HTMLInputElement>(null);
 
   const F = (k: string) => ({
     value: form[k as keyof typeof form] as string,
     onChange: (e: any) => setForm(f => ({ ...f, [k]: e.target.value })),
   });
 
+  async function uploadLogo(file: File) {
+    const allowed = ["image/png","image/jpeg","image/jpg","image/webp","image/svg+xml","image/gif"];
+    if (!allowed.includes(file.type)) { setError("Use PNG, JPG, WebP or SVG"); return; }
+    if (file.size > 5 * 1024 * 1024)  { setError("Logo must be under 5 MB"); return; }
+    setUploading(true); setError("");
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const res = await api.post("/api/agency/brand-kits/logo", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setForm(f => ({ ...f, logo_url: res.data.logo_url }));
+      setPreview(res.data.logo_url);
+    } catch (e: any) {
+      setError(e.response?.data?.detail || "Upload failed");
+    } finally { setUploading(false); }
+  }
+
+  async function save() {
+    if (!form.client_name.trim()) { setError("Client name required"); return; }
+    setSaving(true); setError("");
+    const payload = { ...form, colors: form.colors.split(",").map((s:string) => s.trim()).filter(Boolean) };
+    try {
+      if (kit) await api.put(`/api/agency/brand-kits/${kit.id}`, payload);
+      else     await api.post("/api/agency/brand-kits", payload);
+      onSaved();
+    } catch (e: any) { setError(e.response?.data?.detail || "Failed"); setSaving(false); }
+  }
+
+  const TABS = [["identity","Identity"],["voice","Voice & content"],["video","Video settings"]] as const;
+  const LBL  = "block text-[11px] font-bold text-white/35 uppercase tracking-widest mb-1.5";
+  const INP  = "w-full bg-white/[0.06] border border-white/[0.1] rounded-xl px-3.5 py-2.5 text-white text-sm outline-none focus:border-amber-400/50 placeholder:text-white/20 transition";
+  const HINT = "text-[11px] text-white/25 mt-1.5 leading-relaxed";
+
   return (
-    <div className="bg-white/[0.04] border border-white/[0.1] rounded-2xl p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="font-bold text-white">{kit ? "Edit brand kit" : "New brand kit"}</div>
+    <div className="bg-white/[0.04] border border-white/[0.1] rounded-2xl overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.08]">
+        <div className="font-bold text-white text-sm">{kit ? "Edit brand kit" : "New brand kit"}</div>
         <button onClick={onCancel} className="w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-white hover:bg-white/[0.06] transition text-lg leading-none">×</button>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {[
-          { key: "client_name", label: "Client name *", ph: "CryptoNova" },
-          { key: "logo_url",    label: "Logo URL",      ph: "https://…/logo.png" },
-          { key: "ai_tone",     label: "AI tone",       ph: "Confident, fast-paced" },
-          { key: "default_cta", label: "Default CTA",   ph: "Follow for daily crypto alpha" },
-        ].map(f => (
-          <div key={f.key}>
-            <label className="block text-[11px] font-bold text-white/35 uppercase tracking-widest mb-1.5">{f.label}</label>
-            <input type="text" placeholder={f.ph} {...F(f.key)}
-              className="w-full bg-white/[0.06] border border-white/[0.1] rounded-xl px-3.5 py-2.5 text-white text-sm outline-none focus:border-amber-400/50 placeholder:text-white/20 transition" />
-          </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 px-5 pt-4">
+        {TABS.map(([id, label]) => (
+          <button key={id} onClick={() => setTab(id)}
+            className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition ${
+              tab === id ? "bg-amber-400/15 text-amber-300" : "text-white/35 hover:text-white/60"
+            }`}>
+            {label}
+          </button>
         ))}
       </div>
-      <div>
-        <label className="block text-[11px] font-bold text-white/35 uppercase tracking-widest mb-1.5">Brand colors <span className="normal-case font-normal text-white/20">(comma separated hex)</span></label>
-        <input type="text" placeholder="#0D1B2A, #00C8FF, #F7C948" {...F("colors")}
-          className="w-full bg-white/[0.06] border border-white/[0.1] rounded-xl px-3.5 py-2.5 text-white text-sm outline-none focus:border-amber-400/50 placeholder:text-white/20 transition font-mono" />
-        {form.colors && (
-          <div className="flex gap-1.5 mt-2 flex-wrap">
-            {form.colors.split(",").map(c => c.trim()).filter(Boolean).map((c, i) => (
-              <div key={i} style={{ background: c }} className="w-6 h-6 rounded-md border border-white/10" title={c} />
-            ))}
+
+      <div className="px-5 py-5 space-y-5">
+
+        {/* ─── IDENTITY ─── */}
+        {tab === "identity" && (<>
+          <div>
+            <label className={LBL}>Client name *</label>
+            <input type="text" placeholder="e.g. CryptoNova" className={INP} {...F("client_name")} />
           </div>
-        )}
-      </div>
-      <div>
-        <label className="block text-[11px] font-bold text-white/35 uppercase tracking-widest mb-1.5">Subtitle style</label>
-        <select {...F("subtitle_style")}
-          className="w-full bg-white/[0.06] border border-white/[0.1] rounded-xl px-3.5 py-2.5 text-white text-sm outline-none focus:border-amber-400/50 transition">
-          <option value="viral">Bold word-by-word (viral)</option>
-          <option value="minimal">Full line minimal</option>
-          <option value="karaoke">Karaoke highlight</option>
-          <option value="none">No subtitles</option>
-        </select>
-      </div>
-      {error && <p className="text-rose-400 text-xs">{error}</p>}
-      <div className="flex gap-3 pt-1">
-        <button onClick={save} disabled={saving}
-          className="flex-1 bg-amber-400 hover:bg-amber-300 text-black font-bold py-3 rounded-xl text-sm transition shadow-md shadow-amber-400/20 disabled:opacity-50">
-          {saving ? "Saving…" : kit ? "Save changes" : "Create brand kit"}
-        </button>
-        <button onClick={onCancel}
-          className="px-5 bg-white/[0.06] border border-white/[0.1] text-white/60 hover:text-white rounded-xl text-sm font-semibold transition">
-          Cancel
-        </button>
+
+          {/* Logo */}
+          <div>
+            <label className={LBL}>Brand logo</label>
+            <div className="flex gap-3 items-start">
+              {/* Preview box */}
+              <div className="w-16 h-16 rounded-xl bg-white/[0.05] border border-white/[0.1] flex-shrink-0 flex items-center justify-center overflow-hidden">
+                {preview
+                  ? <img src={preview} alt="logo" className="w-full h-full object-contain p-1.5" onError={() => setPreview("")} />
+                  : <span className="text-2xl opacity-20">🏷️</span>
+                }
+              </div>
+
+              <div className="flex-1 space-y-2">
+                {/* Upload btn */}
+                <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+                  className="flex items-center gap-2 text-xs border border-white/[0.1] hover:border-white/[0.2] text-white/55 hover:text-white px-3 py-2 rounded-lg transition disabled:opacity-40">
+                  {uploading
+                    ? <><div className="w-3 h-3 border border-white/40 border-t-transparent rounded-full animate-spin" />Uploading…</>
+                    : <>📁 Upload PNG, JPG, SVG — max 5 MB</>
+                  }
+                </button>
+                <input ref={fileRef} type="file" accept="image/*" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) uploadLogo(f); e.target.value = ""; }} />
+
+                {/* Divider */}
+                <div className="flex items-center gap-2">
+                  <div className="h-px flex-1 bg-white/[0.06]" />
+                  <span className="text-[10px] text-white/20">or paste a URL</span>
+                  <div className="h-px flex-1 bg-white/[0.06]" />
+                </div>
+
+                {/* URL input */}
+                <input type="text" placeholder="https://…/logo.png"
+                  value={form.logo_url}
+                  onChange={e => { setForm(f => ({ ...f, logo_url: e.target.value })); setPreview(e.target.value); }}
+                  className="w-full bg-white/[0.06] border border-white/[0.1] rounded-xl px-3 py-2 text-white text-xs outline-none focus:border-amber-400/50 placeholder:text-white/20 transition font-mono" />
+              </div>
+            </div>
+          </div>
+
+          {/* Colors */}
+          <div>
+            <label className={LBL}>Brand colors <span className="normal-case font-normal text-white/20">(comma-separated hex)</span></label>
+            <input type="text" placeholder="#0D1B2A, #00C8FF, #F7C948" className={`${INP} font-mono`} {...F("colors")} />
+            {form.colors && (
+              <div className="flex gap-1.5 mt-2 flex-wrap">
+                {form.colors.split(",").map((c:string) => c.trim()).filter(Boolean).map((c:string, i:number) => (
+                  <div key={i} style={{ background: c }} className="w-6 h-6 rounded-md border border-white/10" title={c} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Font */}
+          <div>
+            <label className={LBL}>Brand font <span className="normal-case font-normal text-white/20">(reference)</span></label>
+            <input type="text" placeholder="Montserrat, Inter, Playfair Display…" className={INP} {...F("font")} />
+          </div>
+        </>)}
+
+        {/* ─── VOICE & CONTENT ─── */}
+        {tab === "voice" && (<>
+          <div>
+            <label className={LBL}>AI tone</label>
+            <input type="text" placeholder="Confident, fast-paced, alpha energy" className={INP} {...F("ai_tone")} />
+            <p className={HINT}>Injected into every script prompt — AI writes in this voice automatically.</p>
+          </div>
+
+          <div>
+            <label className={LBL}>Default CTA</label>
+            <input type="text" placeholder="Follow for daily crypto alpha" className={INP} {...F("default_cta")} />
+            <p className={HINT}>Replaces the generic "follow me" at the end of every script.</p>
+          </div>
+
+          <div>
+            <label className={LBL}>Brand voice notes</label>
+            <textarea rows={5} placeholder={`Style guide notes for the AI:\n• Never use exclamation marks\n• Always cite real data\n• Second-person tone\n• Target: 25-40 male crypto traders`}
+              className={`${INP} resize-none`} {...F("brand_voice_notes")} />
+            <p className={HINT}>Dos, don'ts, audience details, language rules. The AI follows these on every script for this client.</p>
+          </div>
+        </>)}
+
+        {/* ─── VIDEO SETTINGS ─── */}
+        {tab === "video" && (<>
+          <div>
+            <label className={LBL}>Subtitle style</label>
+            <select className={INP} {...F("subtitle_style")}>
+              <option value="viral">Bold word-by-word (viral)</option>
+              <option value="minimal">Full line minimal</option>
+              <option value="karaoke">Karaoke highlight</option>
+              <option value="none">No subtitles</option>
+            </select>
+          </div>
+
+          <div>
+            <label className={LBL}>Intro clip URL <span className="normal-case font-normal text-white/20">(prepended to every video)</span></label>
+            <input type="text" placeholder="https://…/intro.mp4" className={`${INP} font-mono`} {...F("intro_url")} />
+            <p className={HINT}>A 2–3s branded intro clip added to the start of every video for this client.</p>
+          </div>
+
+          <div>
+            <label className={LBL}>Outro clip URL <span className="normal-case font-normal text-white/20">(appended to every video)</span></label>
+            <input type="text" placeholder="https://…/outro.mp4" className={`${INP} font-mono`} {...F("outro_url")} />
+            <p className={HINT}>A branded end screen or CTA clip added after the main video.</p>
+          </div>
+
+          <div>
+            <label className={LBL}>Logo watermark position</label>
+            <select className={INP} {...F("watermark_position")}>
+              <option value="">No watermark</option>
+              <option value="top-left">Top left</option>
+              <option value="top-right">Top right</option>
+              <option value="bottom-left">Bottom left</option>
+              <option value="bottom-right">Bottom right</option>
+              <option value="center">Centre</option>
+            </select>
+            <p className={HINT}>Overlays the client logo on every video frame. Requires a logo to be set on the Identity tab.</p>
+          </div>
+        </>)}
+
+        {error && <p className="text-rose-400 text-xs font-medium">{error}</p>}
+
+        <div className="flex gap-3 pt-1">
+          <button onClick={save} disabled={saving || uploading}
+            className="flex-1 bg-amber-400 hover:bg-amber-300 text-black font-bold py-3 rounded-xl text-sm transition shadow-md shadow-amber-400/20 disabled:opacity-50">
+            {saving ? "Saving…" : kit ? "Save changes" : "Create brand kit"}
+          </button>
+          <button onClick={onCancel}
+            className="px-5 bg-white/[0.06] border border-white/[0.1] text-white/60 hover:text-white rounded-xl text-sm font-semibold transition">
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
   );
