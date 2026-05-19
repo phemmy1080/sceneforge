@@ -26,8 +26,12 @@ export default function UserMenu({ onLogout }: UserMenuProps) {
   const wsRole   = user?.workspace_role  // 'owner' | 'admin' | 'editor' | 'client' | null
   const wsId     = user?.workspace_id
   const inAgency = !!(wsId && wsRole)
-  // Owner can switch between personal and agency contexts
-  const canSwitch = wsRole === 'owner'
+  // Anyone in a workspace can switch to personal mode if they had an account before
+  // joining (indicated by having personal tokens or videos). Clients cannot switch.
+  const hasPersonalHistory = (user?.videos_created ?? 0) > 0 ||
+    (user?.tokens_remaining ?? 0) > 0 ||
+    wsRole === 'owner'
+  const canSwitch = inAgency && wsRole !== 'client' && hasPersonalHistory
   // Current mode: editors/admins/clients are always in agency mode
   const currentMode = useStore((s) => s.currentStep)
   const isAgencyMode = currentMode.startsWith('agency')
@@ -181,7 +185,7 @@ export default function UserMenu({ onLogout }: UserMenuProps) {
                     }}>🏢</div>
                     <div style={{ flex: 1, textAlign: 'left' }}>
                       <p style={{ fontSize: 12, fontWeight: 600, color: isAgencyMode ? '#C9A84C' : 'rgba(255,255,255,0.7)', margin: 0 }}>Agency workspace</p>
-                      <p style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.3)', margin: 0 }}>Team projects &amp; clients</p>
+                      <p style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.3)', margin: 0, textTransform: 'capitalize' }}>{wsRole} · team projects</p>
                     </div>
                     {isAgencyMode && (
                       <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#C9A84C', flexShrink: 0 }} />
