@@ -73,10 +73,13 @@ function TokenGateBar({ onUpgrade }: { onUpgrade: () => void }) {
 
 
 function AgencyNav({ currentStep, onStep }: { currentStep: string; onStep: (s: AppStep) => void }) {
-  const user = useAuthStore((s: any) => s.user)
-  // Show agency nav to anyone in a workspace (agency plan owner OR workspace member)
+  const user            = useAuthStore((s: any) => s.user)
+  const agencyProjectId = useStore((s: any) => s.agencyProjectId)
+  // Show agency nav to anyone in a workspace (owner OR member)
   const inAgency = !!(user?.workspace_id || user?.plan === 'agency')
-  if (!inAgency) return null
+  // Also show during workflow steps when rendering for an agency project
+  const isActiveAgency = inAgency && (currentStep.startsWith('agency') || !!agencyProjectId)
+  if (!isActiveAgency) return null
 
   const wsRole = user?.workspace_role || (user?.plan === 'agency' ? 'owner' : 'editor')
   const isAdminOrOwner = wsRole === 'owner' || wsRole === 'admin'
@@ -115,17 +118,20 @@ function AgencyNav({ currentStep, onStep }: { currentStep: string; onStep: (s: A
 }
 
 function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => void; onNewProject: () => void; onClose?: () => void }) {
-  const currentStep    = useStore((s) => s.currentStep)
-  const completedSteps = useStore((s) => s.completedSteps)
-  const setStep        = useStore((s) => s.setStep)
-  const user           = useAuthStore((s: any) => s.user)
-  // Derive agency state — anyone in a workspace currently in agency mode
-  const inAgencyMode   = !!(user?.workspace_id && currentStep.startsWith('agency'))
-  const wsRole         = user?.workspace_role || (user?.plan === 'agency' ? 'owner' : null)
-  const isAgencyOwner  = wsRole === 'owner'
-  const isAgencyAdmin  = wsRole === 'owner' || wsRole === 'admin'
-  // Show personal sidebar: only when NOT in agency mode
-  const showPersonal   = !inAgencyMode
+  const currentStep      = useStore((s) => s.currentStep)
+  const completedSteps   = useStore((s) => s.completedSteps)
+  const setStep          = useStore((s) => s.setStep)
+  const agencyProjectId  = useStore((s: any) => s.agencyProjectId)
+  const user             = useAuthStore((s: any) => s.user)
+  const wsRole           = user?.workspace_role || (user?.plan === 'agency' ? 'owner' : null)
+  const isAgencyOwner    = wsRole === 'owner'
+  const isAgencyAdmin    = wsRole === 'owner' || wsRole === 'admin'
+  const inWorkspace      = !!(user?.workspace_id)
+  // Agency mode = on agency step OR rendering for an agency project
+  // This keeps the sidebar in agency context during Setup→Scenes→Export workflow
+  const inAgencyMode     = inWorkspace && (currentStep.startsWith('agency') || !!agencyProjectId)
+  // Show personal sidebar only when truly in personal mode
+  const showPersonal     = !inAgencyMode
   const scenes         = useStore((s) => s.scenes)
   const renderStatus   = useStore((s) => s.renderStatus)
   const projects       = useStore((s) => s.projects)
@@ -153,6 +159,25 @@ function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => v
     <>
       {/* Top */}
       <div className="p-3.5 border-b border-white/[0.07] flex-shrink-0">
+        {/* Agency workflow banner — shown when creating video for an agency project */}
+        {inAgencyMode && !currentStep.startsWith('agency') && agencyProjectId && (
+          <div className="mb-2.5 bg-amber-400/10 border border-amber-400/20 rounded-xl px-3 py-2.5 flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0 animate-pulse" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold text-amber-400/80 uppercase tracking-wider">Agency project</p>
+              <p className="text-[11px] text-white/60 truncate">Creating video for project</p>
+            </div>
+            <button
+              onClick={() => {
+                setStep('agency-detail' as any)
+                useStore.getState().setAgencyProjectId(agencyProjectId)
+              }}
+              className="text-[10px] text-amber-400/70 hover:text-amber-400 transition font-semibold flex-shrink-0"
+            >
+              ← Back
+            </button>
+          </div>
+        )}
         <div className="flex items-center justify-between mb-2.5">
           <div className="font-display text-[17px] font-extrabold tracking-tight px-1">
             Scene<span className="text-violet-400">Forge</span>
