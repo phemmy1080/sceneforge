@@ -45,9 +45,12 @@ export function AgencyProjects() {
   const setStep = useStore((s) => s.setStep);
   const setAgencyProjectId = useStore((s: any) => s.setAgencyProjectId);
   const currentUser = useAuthStore((s: any) => s.user);
-  const wsRole = currentUser?.workspace_role || 'editor';
-  const canCreate = wsRole === 'owner' || wsRole === 'admin' || wsRole === 'editor'; // editors CAN create
-  const canInvite = wsRole === 'owner' || wsRole === 'admin';
+  // workspace_role is set for members; owner may have null role but plan=agency
+  const wsRole = currentUser?.workspace_role ||
+    (currentUser?.plan === 'agency' ? 'owner' : 'editor');
+  const isAdminOrOwner = wsRole === 'owner' || wsRole === 'admin';
+  const canCreate = wsRole !== 'client'; // everyone except client can create
+  const canInvite = isAdminOrOwner;
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
@@ -264,9 +267,16 @@ export function ProjectDetail() {
   async function loadSceneClips(jobId: string) {
     if (!jobId) return;
     try {
-      const res = await api.get(`/api/render/status/${jobId}`);
-      // Job not found or still queued — don't show error, just no scenes
-      if (!res.data.result) return;
+      let res;
+      try {
+        res = await api.get(`/api/render/status/${jobId}`);
+      } catch (fetchErr: any) {
+        // 404 = job expired from Redis (24hr TTL) — silently ignore, no scene review
+        if (fetchErr?.response?.status === 404) return;
+        throw fetchErr;
+      }
+      // Job queued/processing — result not ready yet
+      if (!res.data?.result) return;
       const data = res.data;
       const r2 = data.result?.r2_urls || {};
       const workerBase = (data.result?.video_url || '')
