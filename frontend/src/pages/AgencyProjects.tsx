@@ -49,7 +49,7 @@ export function AgencyProjects() {
   const wsRole = currentUser?.workspace_role ||
     (currentUser?.plan === 'agency' ? 'owner' : 'editor');
   const isAdminOrOwner = wsRole === 'owner' || wsRole === 'admin';
-  const canCreate = wsRole !== 'client'; // everyone except client can create
+  const canCreate = isAdminOrOwner; // only owner/admin can create new projects
   const canInvite = isAdminOrOwner;
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
