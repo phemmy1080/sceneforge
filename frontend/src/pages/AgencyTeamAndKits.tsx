@@ -246,7 +246,7 @@ export function AgencyTeam() {
             </div>
           ))}
         </div>
-      </div>
+      </div>}
 
       {/* ── Active members ── */}
       <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl overflow-hidden">
