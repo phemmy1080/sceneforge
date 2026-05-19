@@ -295,7 +295,7 @@ export function ProjectDetail() {
       setMembers(eligible);
 
       // Load scene clips from the latest render job
-      const jobIds: string[] = res.data.project.render_job_ids || [];
+      const jobIds: string[] = projRes.data.project.render_job_ids || [];
       if (jobIds.length > 0) {
         loadSceneClips(jobIds[jobIds.length - 1]);
       }
