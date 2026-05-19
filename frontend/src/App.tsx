@@ -195,7 +195,20 @@ function Root() {
   }, [])
 
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+  const currentUser     = useAuthStore((s: any) => s.user)
+  const setAuth         = useAuthStore((s: any) => s.setAuth)
+  const authToken       = useAuthStore((s: any) => s.token)
   const logout          = useAuthStore((s) => s.logout)
+
+  // On first load, if authenticated but workspace fields are missing, refresh /me
+  // This handles editors who logged in before workspace_role was added to the response
+  useEffect(() => {
+    if (isAuthenticated && authToken && !currentUser?.workspace_id && !currentUser?.workspace_role) {
+      import('./lib/api').then(({ getMe }) => {
+        getMe().then(me => setAuth(me, authToken)).catch(() => {})
+      })
+    }
+  }, [isAuthenticated])
 
   const [screen, setScreen] = useState<Screen>(() => {
     // /join link — handle before anything else
