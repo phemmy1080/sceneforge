@@ -255,7 +255,9 @@ Rules:
         raise ValueError(f"Model returned invalid JSON: {exc}") from exc
 
     valid_types = {'hook', 'intro', 'main', 'cta'}
+    scenes = []
     for item in data:
+        # Fix scene type
         t = str(item.get('type', 'main')).lower().strip()
         if t not in valid_types:
             if t.startswith('ct'):   item['type'] = 'cta'
@@ -263,4 +265,26 @@ Rules:
             elif t.startswith('in'): item['type'] = 'intro'
             else:                    item['type'] = 'main'
 
-    return [Scene(**item) for item in data]
+        # Skip scenes with empty or whitespace-only text — GPT-4o occasionally
+        # returns an empty string for a scene, causing Pydantic validation to fail
+        text = str(item.get('text', '')).strip()
+        if not text:
+            logger.warning("Skipping scene with empty text: %s", item)
+            continue
+        item['text'] = text
+
+        # Also sanitise visual_prompt — allow empty (has default in schema)
+        vp = str(item.get('visual_prompt', '')).strip()
+        if vp:
+            item['visual_prompt'] = vp
+
+        try:
+            scenes.append(Scene(**item))
+        except Exception as exc:
+            logger.warning("Skipping invalid scene %s: %s", item, exc)
+            continue
+
+    if not scenes:
+        raise ValueError("AI returned no valid scenes — please try again")
+
+    return scenes
