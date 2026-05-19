@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { api } from '../lib/api'
 import { useStore } from '../store'
+import { useAuthStore } from '../authStore'
 
 interface Message {
   id: number
@@ -68,14 +69,16 @@ const DEFAULT_ACTIONS = [
 let msgId = 0
 
 export default function ChatBot() {
-  const currentStep    = useStore((s) => s.currentStep)
-  const config         = useStore((s) => s.config)
-  const scenes         = useStore((s) => s.scenes)
-  const script         = useStore((s) => s.script)
-  const ideas          = useStore((s) => s.ideas)
-  const selectedIdea   = useStore((s) => s.selectedIdea)
-  const projects       = useStore((s) => s.projects)
+  const currentStep     = useStore((s) => s.currentStep)
+  const config          = useStore((s) => s.config)
+  const scenes          = useStore((s) => s.scenes)
+  const script          = useStore((s) => s.script)
+  const ideas           = useStore((s) => s.ideas)
+  const selectedIdea    = useStore((s) => s.selectedIdea)
+  const projects        = useStore((s) => s.projects)
   const activeProjectId = useStore((s) => s.activeProjectId)
+  const agencyProjectId = useStore((s: any) => s.agencyProjectId)
+  const user            = useAuthStore((s: any) => s.user)
 
   const activeProject = projects.find(p => p.id === activeProjectId)
   const stepInfo      = STEP_GREETINGS[currentStep] || STEP_GREETINGS['setup']
@@ -96,6 +99,22 @@ export default function ChatBot() {
 
   const buildContext = useCallback(() => {
     const parts: string[] = []
+
+    // ── Agency context ────────────────────────────────────────────────────────
+    const wsRole  = user?.workspace_role || (user?.plan === 'agency' ? 'owner' : null)
+    const wsId    = user?.workspace_id
+    const inAgency = !!(wsId && (currentStep.startsWith('agency') || agencyProjectId))
+
+    if (inAgency) {
+      parts.push(`Mode: Agency workspace`)
+      if (wsRole)        parts.push(`Role: ${wsRole}`)
+      if (user?.plan)    parts.push(`Plan: ${user.plan}`)
+      if (agencyProjectId) parts.push(`Rendering for agency project ID: ${agencyProjectId}`)
+    } else {
+      if (user?.plan)    parts.push(`Plan: ${user.plan}`)
+    }
+
+    // ── Workflow context ──────────────────────────────────────────────────────
     if (activeProject?.name)  parts.push(`Project: "${activeProject.name}"`)
     if (currentStep)           parts.push(`Current step: ${currentStep}`)
     if (config.niche)          parts.push(`Niche: ${config.niche}`)
@@ -103,16 +122,16 @@ export default function ChatBot() {
     if (config.platform)       parts.push(`Platform: ${config.platform}`)
     if (config.tone)           parts.push(`Tone: ${config.tone}`)
     if (ideas.length > 0) {
-      const ideaList = ideas.map((idea, i) =>
+      const ideaList = ideas.map((idea: any, i: number) =>
         `${i+1}. "${idea.title}" — Hook: ${idea.hook} | Angle: ${idea.angle}`
       ).join(' || ')
       parts.push(`Generated ideas (${ideas.length} total): ${ideaList}`)
     }
-    if (selectedIdea) parts.push(`Selected idea: "${selectedIdea.title}" — ${selectedIdea.hook}`)
-    if (scenes.length > 0)     parts.push(`Scenes: ${scenes.length} scenes, est. ${scenes.reduce((s,sc)=>s+(sc.duration||0),0)}s total`)
-    if (script?.length > 20)   parts.push(`Script preview: "${script.slice(0,120)}..."`)
+    if (selectedIdea) parts.push(`Selected idea: "${(selectedIdea as any).title}" — ${(selectedIdea as any).hook}`)
+    if (scenes.length > 0)     parts.push(`Scenes: ${scenes.length} scenes, est. ${scenes.reduce((s: number, sc: any) => s + (sc.duration || 0), 0)}s total`)
+    if (script?.length > 20)   parts.push(`Script preview: "${script.slice(0, 120)}..."`)
     return parts.join(' | ')
-  }, [activeProject, currentStep, config, scenes, script, ideas, selectedIdea])
+  }, [activeProject, currentStep, config, scenes, script, ideas, selectedIdea, user, agencyProjectId])
 
   const [open, setOpen]         = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
