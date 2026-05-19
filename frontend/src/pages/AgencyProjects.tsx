@@ -524,8 +524,8 @@ export function ProjectDetail() {
               <button
                 onClick={() => {
                   if (!canCreate) return;
-                  useStore.getState().setAgencyProjectId(id || '');
-                  useStore.getState().setStep('setup' as any);
+                  // Atomic: sets agencyProjectId + step together, no partial render
+                  useStore.getState().startAgencyVideo(id || '');
                 }}
                 disabled={!canCreate}
                 title={!canCreate ? "You are not assigned to this project" : undefined}
@@ -645,8 +645,7 @@ export function ProjectDetail() {
             <div className="text-xs text-white/40 mt-0.5">Ready to render and export. Click "Create video" or start the render from here.</div>
           </div>
           <button onClick={() => {
-              useStore.getState().setAgencyProjectId(id || '');
-              useStore.getState().setStep('setup' as any);
+              useStore.getState().startAgencyVideo(id || '');
             }}
             className="flex-shrink-0 bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-4 py-2 rounded-xl text-xs transition">
             Start render
