@@ -26,13 +26,14 @@ export default function Projects() {
   useEffect(() => {
     const role = user?.workspace_role
     const wsId = user?.workspace_id
-    if (wsId && role !== 'owner') {
+    // Only auto-redirect clients — editors can voluntarily switch to personal
+    if (wsId && role === 'client') {
       setStep('agency' as any)
     }
   }, [user?.workspace_id, user?.workspace_role])
 
-  // Non-owners in a workspace see this redirect message briefly
-  if (user?.workspace_id && user?.workspace_role !== 'owner') {
+  // Only clients are force-redirected — editors/admins can access personal mode
+  if (user?.workspace_id && user?.workspace_role === 'client') {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center space-y-2">
