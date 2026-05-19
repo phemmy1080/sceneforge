@@ -19,6 +19,7 @@ interface SceneClip {
   label: string;
 }
 interface BrandKit { id: string; client_name: string; }
+interface Member { user_id: string; name: string; email: string; role: string; initials: string; }
 
 const STATUSES = [
   { key: "draft",         label: "Draft",         color: "bg-white/[0.08] text-white/50",          dot: "#6b7280" },
@@ -57,7 +58,14 @@ export function AgencyProjects() {
 
   useEffect(() => { api.get("/api/agency/projects").then(r => setProjects(r.data.projects)).finally(() => setLoading(false)); }, []);
 
-  const filtered = filter === "all" ? projects : projects.filter(p => p.status === filter);
+  // Editors can only ACTION assigned projects but can VIEW all
+  // Backend already filters clients — here we just track which ones are assigned to the editor
+  const myProjects = (wsRole === 'editor' || wsRole === 'client')
+    ? projects.filter(p => p.assigned_to?.includes(currentUser?.id || ''))
+    : projects;
+
+  const allFiltered   = filter === "all" ? projects : projects.filter(p => p.status === filter);
+  const filtered      = allFiltered; // all projects visible to everyone for viewing
 
   return (
     <div className="max-w-4xl space-y-5 pb-8">
@@ -115,12 +123,34 @@ export function AgencyProjects() {
               return (
                 <div key={p.id}
                   onClick={() => { setAgencyProjectId(p.id); setStep('agency-detail' as any); }}
-                  className="flex items-center gap-4 px-5 py-4 hover:bg-white/[0.03] cursor-pointer transition group">
+                  className={`flex items-center gap-4 px-5 py-4 hover:bg-white/[0.03] cursor-pointer transition group ${
+                    myProjects.some(mp => mp.id === p.id) && wsRole === 'editor'
+                      ? 'border-l-2 border-amber-400/30' : ''
+                  }`}>
                   <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.dot }} />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-bold text-white/80 group-hover:text-amber-300 transition truncate">{p.title}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-sm font-bold text-white/80 group-hover:text-amber-300 transition truncate">{p.title}</div>
+                      {myProjects.some(mp => mp.id === p.id) && wsRole === 'editor' && (
+                        <span className="text-[10px] bg-amber-400/15 text-amber-300 border border-amber-400/20 px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0">Assigned</span>
+                      )}
+                    </div>
                     <div className="text-xs text-white/30 mt-0.5">{p.client_name || "No client"} · {p.platform}</div>
                   </div>
+                  {/* Assigned members avatars */}
+                  {p.assigned_to && p.assigned_to.length > 0 && isAdminOrOwner && (
+                    <div className="flex -space-x-1.5 flex-shrink-0">
+                      {p.assigned_to.slice(0, 3).map((uid, i) => (
+                        <div key={uid} className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 border border-[#0A0A0F] flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0"
+                          style={{ zIndex: 3 - i }}>
+                          {uid.slice(0, 2).toUpperCase()}
+                        </div>
+                      ))}
+                      {p.assigned_to.length > 3 && (
+                        <div className="w-6 h-6 rounded-full bg-white/10 border border-[#0A0A0F] flex items-center justify-center text-[9px] text-white/50">+{p.assigned_to.length - 3}</div>
+                      )}
+                    </div>
+                  )}
                   <span className={`text-[11px] px-2.5 py-1 rounded-full font-semibold flex-shrink-0 ${s.color}`}>{s.label}</span>
                   <span className="text-[11px] text-white/20 flex-shrink-0 hidden sm:block">{timeAgo(p.updated_at)}</span>
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-white/20 flex-shrink-0">
@@ -244,14 +274,25 @@ export function ProjectDetail() {
   const [sceneClips, setSceneClips] = useState<SceneClip[]>([]);
   const [activeScene, setActiveScene] = useState<number | null>(null);
   const [sceneCommentText, setSceneCommentText] = useState("");
+  const [members, setMembers] = useState<Member[]>([]);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assigning, setAssigning] = useState(false);
 
   useEffect(() => { if (id) load(); }, [id]);
 
   async function load() {
     try {
-      const res = await api.get(`/api/agency/projects/${id}`);
-      setProject(res.data.project);
-      setComments(res.data.comments);
+      const [projRes, membersRes] = await Promise.all([
+        api.get(`/api/agency/projects/${id}`),
+        api.get("/api/agency/workspace/members"),
+      ]);
+      setProject(projRes.data.project);
+      setComments(projRes.data.comments);
+      // Only editors/admins can be assigned — not clients
+      const eligible = (membersRes.data.members || []).filter(
+        (m: Member) => m.role === 'editor' || m.role === 'admin' || m.role === 'owner'
+      );
+      setMembers(eligible);
 
       // Load scene clips from the latest render job
       const jobIds: string[] = res.data.project.render_job_ids || [];
@@ -361,6 +402,21 @@ export function ProjectDetail() {
     } catch {}
   }
 
+  async function toggleAssign(memberId: string) {
+    if (!project) return;
+    setAssigning(true);
+    const current = project.assigned_to || [];
+    const updated = current.includes(memberId)
+      ? current.filter(id => id !== memberId)
+      : [...current, memberId];
+    try {
+      const res = await api.put(`/api/agency/projects/${id}`, { assigned_to: updated });
+      setProject(res.data.project);
+    } catch (e: any) {
+      alert(e.response?.data?.detail || "Failed to update assignment");
+    } finally { setAssigning(false); }
+  }
+
   async function resolve(cid: string) {
     await api.patch(`/api/agency/projects/${id}/comments/${cid}/resolve`);
     setComments(cs => cs.map(c => c.id === cid ? { ...c, resolved: true } : c));
@@ -458,14 +514,28 @@ export function ProjectDetail() {
             🔗 {busy === "review" ? "Generating…" : "Client review link"}
           </button>}
 
-          {/* Start video — sets agencyProjectId so sidebar stays in agency context */}
-          <button onClick={() => {
-            useStore.getState().setAgencyProjectId(id || '');
-            useStore.getState().setStep('setup' as any);
-          }}
-            className="flex items-center gap-1.5 text-xs bg-amber-400 hover:bg-amber-300 text-black font-bold px-3.5 py-1.5 rounded-full transition shadow-md shadow-amber-400/20">
-            ▶ Create video
-          </button>
+          {/* Create video — editors must be assigned, owners/admins always can */}
+          {(() => {
+            const isAssigned = project.assigned_to?.includes(currentUser?.id || '');
+            const canCreate  = isAdmin || isAssigned;
+            return (
+              <button
+                onClick={() => {
+                  if (!canCreate) return;
+                  useStore.getState().setAgencyProjectId(id || '');
+                  useStore.getState().setStep('setup' as any);
+                }}
+                disabled={!canCreate}
+                title={!canCreate ? "You are not assigned to this project" : undefined}
+                className={`flex items-center gap-1.5 text-xs font-bold px-3.5 py-1.5 rounded-full transition shadow-md ${
+                  canCreate
+                    ? "bg-amber-400 hover:bg-amber-300 text-black shadow-amber-400/20"
+                    : "bg-white/[0.06] text-white/25 cursor-not-allowed"
+                }`}>
+                ▶ Create video
+              </button>
+            );
+          })()}
         </div>
       </div>
 
@@ -482,6 +552,87 @@ export function ProjectDetail() {
           </button>
         </div>
       )}
+
+      {/* ── Assignment panel ── */}
+      <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <div className="text-sm font-bold text-white">Assigned team</div>
+            <div className="text-xs text-white/30 mt-0.5">
+              {project.assigned_to?.length
+                ? `${project.assigned_to.length} member${project.assigned_to.length !== 1 ? "s" : ""} assigned`
+                : "No one assigned yet"}
+            </div>
+          </div>
+          {isAdmin && (
+            <button onClick={() => setAssignOpen(o => !o)}
+              className="text-xs border border-white/[0.1] text-white/50 hover:text-white hover:border-white/[0.2] px-3 py-1.5 rounded-lg transition font-medium">
+              {assignOpen ? "Done" : "Manage"}
+            </button>
+          )}
+        </div>
+
+        {/* Assigned member chips */}
+        <div className="flex flex-wrap gap-2">
+          {members.filter(m => project.assigned_to?.includes(m.user_id)).map((m, i) => (
+            <div key={m.user_id} className="flex items-center gap-2 bg-white/[0.06] border border-white/[0.1] rounded-full pl-1 pr-3 py-1">
+              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                {m.initials}
+              </div>
+              <span className="text-xs text-white/70 font-medium">{m.name || m.email}</span>
+              <span className="text-[10px] text-white/30 capitalize">{m.role}</span>
+              {isAdmin && (
+                <button onClick={() => toggleAssign(m.user_id)}
+                  className="text-white/25 hover:text-rose-400 transition ml-1 text-sm leading-none">×</button>
+              )}
+            </div>
+          ))}
+          {(!project.assigned_to?.length) && !assignOpen && (
+            <div className="text-xs text-white/25 italic py-1">
+              {isAdmin ? "Click Manage to assign team members" : "No editors assigned yet"}
+            </div>
+          )}
+        </div>
+
+        {/* Assign dropdown — owner/admin only */}
+        {assignOpen && isAdmin && (
+          <div className="mt-3 pt-3 border-t border-white/[0.06]">
+            <div className="text-[11px] font-bold text-white/30 uppercase tracking-widest mb-2">Available members</div>
+            <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
+              {members.map(m => {
+                const assigned = project.assigned_to?.includes(m.user_id);
+                return (
+                  <button key={m.user_id}
+                    onClick={() => toggleAssign(m.user_id)}
+                    disabled={assigning}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition text-left ${
+                      assigned
+                        ? "bg-amber-400/10 border-amber-400/25"
+                        : "bg-white/[0.03] border-white/[0.07] hover:border-white/[0.15]"
+                    }`}>
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                      {m.initials}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className={`text-sm font-semibold ${assigned ? "text-amber-300" : "text-white/70"}`}>
+                        {m.name || m.email}
+                      </div>
+                      <div className="text-xs text-white/30 capitalize">{m.role}</div>
+                    </div>
+                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                      assigned ? "bg-amber-400 border-amber-400" : "border-white/20"
+                    }`}>
+                      {assigned && (
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round"><path d="M2 5l2 2.5L8 2"/></svg>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* ── Client decision banner (owner only) ── */}
       {isOwner && project.status === 'approved' && (
