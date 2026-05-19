@@ -214,8 +214,8 @@ export function AgencyTeam() {
         )}
       </div>
 
-      {/* ── Invite ── */}
-      <div className="bg-white/[0.04] border border-white/[0.08] rounded-2xl p-5 space-y-3">
+      {/* ── Invite — admin/owner only ── */}
+      {isAdmin && <div className="bg-white/[0.04] border border-white/[0.08] rounded-2xl p-5 space-y-3">
         <div className="text-sm font-bold text-white">Invite someone</div>
         <div className="flex gap-2 flex-wrap">
           <input type="email" placeholder="teammate@email.com"
