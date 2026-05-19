@@ -73,6 +73,8 @@ export default function UserMenu({ onLogout }: UserMenuProps) {
 
   function switchToPersonal() {
     setOpen(false)
+    // Clear agency project context so sidebar returns to personal mode fully
+    useStore.getState().setAgencyProjectId('')
     setStep('projects' as any)
   }
 
