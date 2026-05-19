@@ -240,7 +240,7 @@ export default function AgencyDashboard() {
           { label: "All projects", sub: "View & manage", icon: "📁", step: "agency-projects", show: true },
           { label: "Brand kits",  sub: "Manage clients", icon: "🎨", step: "agency-kits",     show: isAdminOrOwner },
           { label: "Team",        sub: "Invite members", icon: "👥", step: "agency-team",     show: isAdminOrOwner },
-          { label: "New project", sub: "Start creating", icon: "✨", step: "agency-new",      show: role !== 'client' },
+          { label: "New project", sub: "Start creating", icon: "✨", step: "agency-new",      show: isAdminOrOwner },
         ].filter(q => q.show)
         return (
           <div className={`grid gap-3 ${links.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : links.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
