@@ -57,6 +57,7 @@ function timeAgo(iso: string) {
 export default function AgencyDashboard() {
   const setStep = useStore((s) => s.setStep);
   const setAgencyProjectId = useStore((s: any) => s.setAgencyProjectId);
+  const currentUser = useAuthStore((s: any) => s.user);
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -230,22 +231,29 @@ export default function AgencyDashboard() {
         </div>
       </div>
 
-      {/* Quick links */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: "All projects",  sub: "View & manage", icon: "📁", step: "agency-projects" },
-          { label: "Brand kits",   sub: "Manage clients", icon: "🎨", step: "agency-kits" },
-          { label: "Team",         sub: "Invite members", icon: "👥", step: "agency-team" },
-          { label: "New project",  sub: "Start creating", icon: "✨", step: "agency-new" },
-        ].map(q => (
-          <button key={q.label} onClick={() => setStep(q.step as any)}
-            className="bg-white/[0.03] border border-white/[0.07] hover:border-amber-400/25 hover:bg-amber-400/[0.04] rounded-2xl p-4 text-left transition-all group active:scale-95">
-            <div className="text-2xl mb-2">{q.icon}</div>
-            <div className="text-sm font-bold text-white/70 group-hover:text-white transition">{q.label}</div>
-            <div className="text-xs text-white/25 mt-0.5">{q.sub}</div>
-          </button>
-        ))}
-      </div>
+      {/* Quick links — role aware */}
+      {(() => {
+        const role = workspace?.owner_id === currentUser?.id ? 'owner' : (currentUser?.workspace_role || 'editor')
+        const isAdminOrOwner = role === 'owner' || role === 'admin'
+        const links = [
+          { label: "All projects", sub: "View & manage", icon: "📁", step: "agency-projects", show: true },
+          { label: "Brand kits",  sub: "Manage clients", icon: "🎨", step: "agency-kits",     show: isAdminOrOwner },
+          { label: "Team",        sub: "Invite members", icon: "👥", step: "agency-team",     show: isAdminOrOwner },
+          { label: "New project", sub: "Start creating", icon: "✨", step: "agency-new",      show: role !== 'client' },
+        ].filter(q => q.show)
+        return (
+          <div className={`grid gap-3 ${links.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : links.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+            {links.map(q => (
+              <button key={q.label} onClick={() => setStep(q.step as any)}
+                className="bg-white/[0.03] border border-white/[0.07] hover:border-amber-400/25 hover:bg-amber-400/[0.04] rounded-2xl p-4 text-left transition-all group active:scale-95">
+                <div className="text-2xl mb-2">{q.icon}</div>
+                <div className="text-sm font-bold text-white/70 group-hover:text-white transition">{q.label}</div>
+                <div className="text-xs text-white/25 mt-0.5">{q.sub}</div>
+              </button>
+            ))}
+          </div>
+        )
+      })()}
     </div>
   );
 }
