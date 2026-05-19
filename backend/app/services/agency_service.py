@@ -348,18 +348,23 @@ async def create_brand_kit(redis: aioredis.Redis, ws_id: str, owner_id: str,
                            data: dict) -> dict:
     kit_id = str(uuid.uuid4())
     kit = {
-        "id":           kit_id,
-        "ws_id":        ws_id,
-        "client_name":  data.get("client_name", "Unnamed client"),
-        "logo_url":     data.get("logo_url", ""),
-        "colors":       data.get("colors", []),
+        "id":             kit_id,
+        "ws_id":          ws_id,
+        "client_name":    data.get("client_name", "Unnamed client"),
+        "logo_url":       data.get("logo_url", ""),
+        "colors":         data.get("colors", []),
         "subtitle_style": data.get("subtitle_style", "viral"),
-        "ai_tone":      data.get("ai_tone", ""),
-        "default_cta":  data.get("default_cta", ""),
-        "font":         data.get("font", ""),
-        "created_by":   owner_id,
-        "created_at":   _now(),
-        "updated_at":   _now(),
+        "ai_tone":        data.get("ai_tone", ""),
+        "default_cta":    data.get("default_cta", ""),
+        "font":           data.get("font", ""),
+        # New fields
+        "intro_url":      data.get("intro_url", ""),
+        "outro_url":      data.get("outro_url", ""),
+        "watermark_position": data.get("watermark_position", ""),
+        "brand_voice_notes":  data.get("brand_voice_notes", ""),
+        "created_by":     owner_id,
+        "created_at":     _now(),
+        "updated_at":     _now(),
     }
     pipe = redis.pipeline()
     pipe.set(_kit_key(kit_id), json.dumps(kit))
@@ -390,7 +395,7 @@ async def update_brand_kit(redis: aioredis.Redis, kit_id: str, data: dict) -> di
     kit = await get_brand_kit(redis, kit_id)
     if not kit:
         raise ValueError("Brand kit not found")
-    allowed = {"client_name","logo_url","colors","subtitle_style","ai_tone","default_cta","font"}
+    allowed = {"client_name","logo_url","colors","subtitle_style","ai_tone","default_cta","font","intro_url","outro_url","watermark_position","brand_voice_notes"}
     for k, v in data.items():
         if k in allowed:
             kit[k] = v
