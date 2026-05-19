@@ -73,17 +73,17 @@ function TokenGateBar({ onUpgrade }: { onUpgrade: () => void }) {
 
 
 function AgencyNav({ currentStep, onStep }: { currentStep: string; onStep: (s: AppStep) => void }) {
-  const user = useAuthStore((s: any) => s.user)
+  const user            = useAuthStore((s: any) => s.user)
+  const step            = useStore((s) => s.currentStep)
+  const agencyProjId    = useStore((s: any) => s.agencyProjectId)
 
-  // Single atomic selector — reads step + agencyProjectId together
-  const isActiveAgency = useStore((s: any) => {
-    const step   = s.currentStep as string
-    const projId = s.agencyProjectId as string
-    const wsRole = user?.workspace_role
-    const inAgency = !!(user?.workspace_id || user?.plan === 'agency')
-    const isNonOwner = !!(wsRole && wsRole !== 'owner')
-    return inAgency && (step.startsWith('agency') || !!projId || isNonOwner)
-  })
+  // All computed from fresh values — no stale closure
+  const wsRoleNav    = user?.workspace_role
+  const inAgency     = !!(user?.workspace_id || user?.plan === 'agency')
+  const isNonOwnerNav = !!(wsRoleNav && wsRoleNav !== 'owner')
+  const isActiveAgency = inAgency && (
+    step.startsWith('agency') || !!agencyProjId || isNonOwnerNav
+  )
   if (!isActiveAgency) return null
 
   const wsRole = user?.workspace_role || (user?.plan === 'agency' ? 'owner' : 'editor')
@@ -126,30 +126,25 @@ function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => v
   const currentStep      = useStore((s) => s.currentStep)
   const completedSteps   = useStore((s) => s.completedSteps)
   const setStep          = useStore((s) => s.setStep)
+  const agencyProjectId  = useStore((s: any) => s.agencyProjectId)
   const user             = useAuthStore((s: any) => s.user)
 
-  // Read step + agencyProjectId in ONE atomic selector so React
-  // never sees a partial update where step changed but id hasn't yet
-  const { agencyProjectId, inAgencyMode } = useStore((s: any) => {
-    const step  = s.currentStep as string
-    const projId = s.agencyProjectId as string
-    const wsRole = user?.workspace_role
-    const inWorkspace = !!(user?.workspace_id || wsRole)
-    const isNonOwner  = !!(wsRole && wsRole !== 'owner')
-    return {
-      agencyProjectId: projId,
-      inAgencyMode:
-        !!projId ||
-        step.startsWith('agency') ||
-        (inWorkspace && isNonOwner),
-    }
-  })
+  // Derive role fields from user (outside any selector — always fresh)
+  const wsRole        = user?.workspace_role || (user?.plan === 'agency' ? 'owner' : null)
+  const isAgencyOwner = wsRole === 'owner'
+  const isAgencyAdmin = wsRole === 'owner' || wsRole === 'admin'
+  const inWorkspace   = !!(user?.workspace_id || user?.workspace_role)
+  const isNonOwner    = !!(wsRole && wsRole !== 'owner')
 
-  const wsRole           = user?.workspace_role || (user?.plan === 'agency' ? 'owner' : null)
-  const isAgencyOwner    = wsRole === 'owner'
-  const isAgencyAdmin    = wsRole === 'owner' || wsRole === 'admin'
-  // Show personal sidebar only when truly in personal mode
-  const showPersonal     = !inAgencyMode
+  // inAgencyMode — computed from both stores, all fresh values
+  // Three conditions, ANY one is enough:
+  // 1. agencyProjectId is set                → creating video for an agency project
+  // 2. currentStep is an agency screen       → on agency dashboard/projects/team/kits
+  // 3. user is a non-owner workspace member  → editors/admins/clients always in agency
+  const inAgencyMode  = !!agencyProjectId ||
+                        currentStep.startsWith('agency') ||
+                        (inWorkspace && isNonOwner)
+  const showPersonal  = !inAgencyMode
   const scenes         = useStore((s) => s.scenes)
   const renderStatus   = useStore((s) => s.renderStatus)
   const projects       = useStore((s) => s.projects)
