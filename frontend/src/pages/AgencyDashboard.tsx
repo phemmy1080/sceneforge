@@ -64,6 +64,10 @@ export default function AgencyDashboard() {
   const [error, setError] = useState("");
   const [workspace, setWorkspace] = useState<{ name: string } | null>(null);
 
+  // Role — derived once, used everywhere in this component
+  const wsRole = currentUser?.workspace_role || (currentUser?.plan === 'agency' ? 'owner' : 'editor');
+  const isAdminOrOwner = wsRole === 'owner' || wsRole === 'admin';
+
   useEffect(() => { load(); }, []);
 
   async function load() {
@@ -106,13 +110,15 @@ export default function AgencyDashboard() {
           </div>
           <h1 className="text-2xl font-extrabold text-white tracking-tight">{workspace?.name}</h1>
         </div>
-        <button
-          onClick={() => setStep('agency-new' as any)}
-          className="flex items-center gap-2 bg-amber-400 hover:bg-amber-300 active:scale-95 text-black font-bold px-5 py-2.5 rounded-xl text-sm transition-all shadow-lg shadow-amber-400/25"
-        >
-          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M6 1v10M1 6h10"/></svg>
-          New project
-        </button>
+        {isAdminOrOwner && (
+          <button
+            onClick={() => setStep('agency-new' as any)}
+            className="flex items-center gap-2 bg-amber-400 hover:bg-amber-300 active:scale-95 text-black font-bold px-5 py-2.5 rounded-xl text-sm transition-all shadow-lg shadow-amber-400/25"
+          >
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M6 1v10M1 6h10"/></svg>
+            New project
+          </button>
+        )}
       </div>
 
       {/* Stats */}
@@ -147,10 +153,12 @@ export default function AgencyDashboard() {
             <div className="py-14 text-center">
               <div className="text-4xl mb-3">🎬</div>
               <div className="text-white/35 text-sm mb-4">No projects yet</div>
-              <button onClick={() => setStep('agency-new' as any)}
-                className="text-xs bg-amber-400/10 border border-amber-400/25 text-amber-300 px-4 py-2 rounded-lg hover:bg-amber-400/15 transition font-medium">
-                Create your first project →
-              </button>
+              {isAdminOrOwner && (
+                <button onClick={() => setStep('agency-new' as any)}
+                  className="text-xs bg-amber-400/10 border border-amber-400/25 text-amber-300 px-4 py-2 rounded-lg hover:bg-amber-400/15 transition font-medium">
+                  Create your first project →
+                </button>
+              )}
             </div>
           ) : (
             <div className="divide-y divide-white/[0.04]">
@@ -234,8 +242,6 @@ export default function AgencyDashboard() {
 
       {/* Quick links — role aware */}
       {(() => {
-        const role = currentUser?.workspace_role || (currentUser?.plan === 'agency' ? 'owner' : 'editor')
-        const isAdminOrOwner = role === 'owner' || role === 'admin'
         const links = [
           { label: "All projects", sub: "View & manage", icon: "📁", step: "agency-projects", show: true },
           { label: "Brand kits",  sub: "Manage clients", icon: "🎨", step: "agency-kits",     show: isAdminOrOwner },
