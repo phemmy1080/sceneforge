@@ -458,8 +458,11 @@ export function ProjectDetail() {
             🔗 {busy === "review" ? "Generating…" : "Client review link"}
           </button>}
 
-          {/* Start video */}
-          <button onClick={() => useStore.getState().setStep('setup' as any)}
+          {/* Start video — sets agencyProjectId so sidebar stays in agency context */}
+          <button onClick={() => {
+            useStore.getState().setAgencyProjectId(id || '');
+            useStore.getState().setStep('setup' as any);
+          }}
             className="flex items-center gap-1.5 text-xs bg-amber-400 hover:bg-amber-300 text-black font-bold px-3.5 py-1.5 rounded-full transition shadow-md shadow-amber-400/20">
             ▶ Create video
           </button>
