@@ -75,6 +75,7 @@ interface AppState {
 
   agencyProjectId: string
   setAgencyProjectId: (id: string) => void
+  startAgencyVideo: (projectId: string) => void
   setStep: (step: AppStep) => void
   markStepComplete: (step: AppStep) => void
   addProject: (args: { name: string; niche: string; style: string; platform: string; folder: string }) => void
@@ -139,6 +140,14 @@ export const useStore = create<AppState>()(
 
         agencyProjectId: '',
         setAgencyProjectId: (id) => set({ agencyProjectId: id }),
+
+        // Atomic: sets agencyProjectId + currentStep in a single update
+        // so Layout never sees a partial state (step changed, id not yet set)
+        startAgencyVideo: (projectId: string) => set({
+          agencyProjectId: projectId,
+          currentStep: 'setup' as any,
+        }),
+
         setStep: (step) => {
           // Clear agency project context when navigating to personal/landing steps
           const personalSteps = ['projects', 'landing', 'login', 'upgrade', 'plans']
