@@ -70,7 +70,11 @@ api.interceptors.response.use(
     }
 
     // All other errors — show toast
-    if (status !== 401) {
+    // Skip toast for: render status 404s (expired jobs), and requests marked silent
+    const url = error?.config?.url || ''
+    const isSilent = error?.config?.silent === true
+    const isExpiredJob = status === 404 && url.includes('/render/status/')
+    if (status !== 401 && !isSilent && !isExpiredJob) {
       document.dispatchEvent(new CustomEvent('api-error', {
         detail: { message: friendly, status, raw: error?.response?.data }
       }))
