@@ -44,6 +44,10 @@ function timeAgo(iso: string) {
 export function AgencyProjects() {
   const setStep = useStore((s) => s.setStep);
   const setAgencyProjectId = useStore((s: any) => s.setAgencyProjectId);
+  const currentUser = useAuthStore((s: any) => s.user);
+  const wsRole = currentUser?.workspace_role || 'editor';
+  const canCreate = wsRole === 'owner' || wsRole === 'admin' || wsRole === 'editor'; // editors CAN create
+  const canInvite = wsRole === 'owner' || wsRole === 'admin';
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
@@ -62,11 +66,13 @@ export function AgencyProjects() {
             <p className="text-white/35 text-xs">{projects.length} project{projects.length !== 1 ? "s" : ""}</p>
           </div>
         </div>
-        <button onClick={() => setStep('agency-new' as any)}
-          className="flex items-center gap-2 bg-amber-400 hover:bg-amber-300 active:scale-95 text-black font-bold px-4 py-2.5 rounded-xl text-sm transition-all shadow-md shadow-amber-400/20">
-          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M6 1v10M1 6h10"/></svg>
-          New project
-        </button>
+        {canCreate && (
+          <button onClick={() => setStep('agency-new' as any)}
+            className="flex items-center gap-2 bg-amber-400 hover:bg-amber-300 active:scale-95 text-black font-bold px-4 py-2.5 rounded-xl text-sm transition-all shadow-md shadow-amber-400/20">
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M6 1v10M1 6h10"/></svg>
+            New project
+          </button>
+        )}
       </div>
 
       {/* Filter pills */}
@@ -91,10 +97,12 @@ export function AgencyProjects() {
         <div className="bg-white/[0.03] border border-dashed border-white/[0.1] rounded-2xl py-16 text-center space-y-3">
           <div className="text-4xl">🎬</div>
           <div className="text-white/50 font-semibold">No projects found</div>
-          <button onClick={() => setStep('agency-new' as any)}
-            className="text-sm bg-amber-400/10 border border-amber-400/25 text-amber-300 px-5 py-2 rounded-xl hover:bg-amber-400/15 transition font-medium">
-            Create your first project →
-          </button>
+          {canCreate && (
+            <button onClick={() => setStep('agency-new' as any)}
+              className="text-sm bg-amber-400/10 border border-amber-400/25 text-amber-300 px-5 py-2 rounded-xl hover:bg-amber-400/15 transition font-medium">
+              Create your first project →
+            </button>
+          )}
         </div>
       ) : (
         <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl overflow-hidden">
@@ -246,20 +254,19 @@ export function ProjectDetail() {
       const jobIds: string[] = res.data.project.render_job_ids || [];
       if (jobIds.length > 0) {
         loadSceneClips(jobIds[jobIds.length - 1]);
-      } else {
-        // render_job_ids not linked yet — try finding via project's last known job
-        // Check if there's a jobId in the store from the most recent render
-        const storeJobId = (window as any).__store?.getState?.()?.jobId;
-        if (storeJobId) {
-          loadSceneClips(storeJobId);
-        }
       }
+      // Note: if render_job_ids is empty, scene review is simply hidden
+      // Don't try store jobId — it belongs to whatever project was last rendered
+      // which could be a completely different project → causes "Job not found" errors
     } finally { setLoading(false); }
   }
 
   async function loadSceneClips(jobId: string) {
+    if (!jobId) return;
     try {
       const res = await api.get(`/api/render/status/${jobId}`);
+      // Job not found or still queued — don't show error, just no scenes
+      if (!res.data.result) return;
       const data = res.data;
       const r2 = data.result?.r2_urls || {};
       const workerBase = (data.result?.video_url || '')
