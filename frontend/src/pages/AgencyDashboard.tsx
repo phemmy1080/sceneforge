@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useStore } from '../store';
+import { useAuthStore } from '../authStore';
 import { api } from '../lib/api';
 
 interface Project {
@@ -233,7 +234,7 @@ export default function AgencyDashboard() {
 
       {/* Quick links — role aware */}
       {(() => {
-        const role = workspace?.owner_id === currentUser?.id ? 'owner' : (currentUser?.workspace_role || 'editor')
+        const role = currentUser?.workspace_role || (currentUser?.plan === 'agency' ? 'owner' : 'editor')
         const isAdminOrOwner = role === 'owner' || role === 'admin'
         const links = [
           { label: "All projects", sub: "View & manage", icon: "📁", step: "agency-projects", show: true },
