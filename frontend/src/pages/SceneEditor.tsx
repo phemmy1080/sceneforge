@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useStore } from '../store'
+import { useAuthStore } from '../authStore'
 import { usePlanLimits } from '../hooks/usePlanLimits'
-import { searchVisuals, type Scene, type VisualResult } from '../lib/api'
+import { searchVisuals, type Scene, type VisualResult, api } from '../lib/api'
 import { Button, Badge, PageHeader } from '../components/ui'
 
 const TYPE_COLORS = {
@@ -10,6 +11,16 @@ const TYPE_COLORS = {
   main: 'purple',
   cta: 'amber',
 } as const
+
+interface ReviewNote {
+  id: string
+  author_name: string
+  text: string
+  scene_index: number | null
+  is_client: boolean
+  resolved: boolean
+  created_at: string
+}
 
 export default function SceneEditor() {
   const scenes = useStore((s) => s.scenes)
@@ -25,10 +36,58 @@ export default function SceneEditor() {
 
   const [visualResults, setVisualResults] = useState<VisualResult[]>([])
   const [visualLoading, setVisualLoading] = useState(false)
+
+  // Review notes from agency project comments
+  const [reviewNotes, setReviewNotes] = useState<ReviewNote[]>([])
+  const [notesLoading, setNotesLoading] = useState(false)
+  const [showNotes, setShowNotes] = useState(true)
+
+  // Custom image upload per scene
+  const [uploading, setUploading] = useState<Record<number, boolean>>({})
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const uploadingForScene = useRef<number | null>(null)
+
+  const agencyProjectId = useStore((s: any) => s.agencyProjectId)
+  const user = useAuthStore((s: any) => s.user)
   const [selectedVisualId, setSelectedVisualId] = useState<string | null>(null)
 
   const activeScene = scenes[activeSceneIndex]
   const totalDuration = scenes.reduce((s, sc) => s + sc.duration, 0)
+
+  // Load review notes for this agency project
+  useEffect(() => {
+    if (!agencyProjectId) return
+    setNotesLoading(true)
+    api.get(`/api/agency/projects/${agencyProjectId}`)
+      .then(r => {
+        const notes: ReviewNote[] = (r.data.comments || []).filter(
+          (c: ReviewNote) => !c.resolved
+        )
+        setReviewNotes(notes)
+      })
+      .catch(() => {})
+      .finally(() => setNotesLoading(false))
+  }, [agencyProjectId])
+
+  // Upload custom image for a scene
+  async function uploadCustomImage(sceneIndex: number, file: File) {
+    const allowed = ['image/png','image/jpeg','image/jpg','image/webp']
+    if (!allowed.includes(file.type)) { alert('Use PNG, JPG or WebP'); return }
+    if (file.size > 10 * 1024 * 1024) { alert('Image must be under 10 MB'); return }
+    setUploading(u => ({ ...u, [sceneIndex]: true }))
+    const fd = new FormData()
+    fd.append('file', file)
+    try {
+      const res = await api.post('/api/agency/scene-image', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      updateScene(sceneIndex, { custom_image_url: res.data.image_url } as any)
+    } catch (e: any) {
+      alert(e.response?.data?.detail || 'Upload failed')
+    } finally {
+      setUploading(u => ({ ...u, [sceneIndex]: false }))
+    }
+  }
 
   async function handleSearchVisuals() {
     if (!activeScene) return
@@ -210,6 +269,47 @@ export default function SceneEditor() {
               </div>
             </div>
 
+            {/* ── Review notes for this scene ── */}
+            {agencyProjectId && reviewNotes.filter(n =>
+              n.scene_index === activeSceneIndex || n.scene_index === null
+            ).length > 0 && (
+              <div className="mb-4 bg-amber-400/[0.07] border border-amber-400/20 rounded-xl overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-amber-400/10">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                    <span className="text-xs font-bold text-amber-300">Review notes</span>
+                  </div>
+                  <button onClick={() => setShowNotes(n => !n)}
+                    className="text-[10px] text-amber-400/50 hover:text-amber-300 transition">
+                    {showNotes ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+                {showNotes && (
+                  <div className="divide-y divide-amber-400/10 max-h-48 overflow-y-auto">
+                    {reviewNotes
+                      .filter(n => n.scene_index === activeSceneIndex || n.scene_index === null)
+                      .map(note => (
+                      <div key={note.id} className="flex gap-2.5 px-3 py-2.5">
+                        <div className={`w-5 h-5 rounded-full text-[9px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                          note.is_client ? 'bg-violet-400/20 text-violet-300' : 'bg-white/[0.08] text-white/50'
+                        }`}>
+                          {note.author_name.slice(0,2).toUpperCase()}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-semibold text-white/70">{note.author_name}</span>
+                            {note.is_client && <span className="text-[9px] text-violet-400 font-semibold">Client</span>}
+                            {note.scene_index === null && <span className="text-[9px] text-white/25">General</span>}
+                          </div>
+                          <p className="text-xs text-white/55 leading-relaxed mt-0.5">{note.text}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Visual description */}
             <div className="mb-4">
               <label className="block text-[12px] font-medium text-white/50 mb-1.5">
@@ -281,6 +381,59 @@ export default function SceneEditor() {
                 <p className="text-[12px] text-white/40 animate-pulse">Searching Pexels…</p>
               </div>
             )}
+
+            {/* ── Custom image upload ── */}
+            <div className="mb-4 mt-2">
+              <label className="block text-[12px] font-medium text-white/50 mb-1.5">
+                Upload your own image
+                <span className="ml-2 text-[10px] text-white/25 font-normal">overrides stock footage for this scene</span>
+              </label>
+
+              {/* Show current custom image */}
+              {(activeScene as any).custom_image_url && (
+                <div className="relative mb-2 group">
+                  <img
+                    src={(activeScene as any).custom_image_url}
+                    alt="Custom scene image"
+                    className="w-full aspect-video object-cover rounded-lg border border-white/10"
+                  />
+                  <button
+                    onClick={() => updateScene(activeSceneIndex, { custom_image_url: null } as any)}
+                    className="absolute top-2 right-2 w-6 h-6 bg-black/70 text-white/70 hover:text-rose-400 rounded-full text-sm leading-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+                    ×
+                  </button>
+                  <div className="absolute bottom-2 left-2 text-[10px] bg-black/60 text-amber-300 px-2 py-0.5 rounded-full font-semibold">
+                    Custom image ✓
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={() => {
+                  uploadingForScene.current = activeSceneIndex
+                  fileInputRef.current?.click()
+                }}
+                disabled={uploading[activeSceneIndex]}
+                className="w-full flex items-center justify-center gap-2 py-2.5 border border-dashed border-white/15 hover:border-white/30 rounded-lg text-[12px] text-white/40 hover:text-white/70 transition disabled:opacity-40">
+                {uploading[activeSceneIndex] ? (
+                  <><div className="w-3.5 h-3.5 border border-white/40 border-t-transparent rounded-full animate-spin" /> Uploading…</>
+                ) : (
+                  <><span>📷</span> Choose PNG, JPG or WebP — max 10 MB</>
+                )}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files?.[0]
+                  const si = uploadingForScene.current
+                  if (f && si !== null) uploadCustomImage(si, f)
+                  e.target.value = ''
+                }}
+              />
+            </div>
           </div>
         )}
       </div>
