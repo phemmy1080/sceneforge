@@ -955,35 +955,3 @@ export function ProjectDetail() {
     </div>
   );
 }
-
-
-// ─── Agency workflow wrapper ───────────────────────────────────────────────────
-// Renders normal workflow steps while keeping currentStep = 'agency-workflow'
-// so the agency sidebar never disappears during video creation.
-import SetupPage       from '../pages/Setup'
-import IdeasPage       from '../pages/Ideas'
-import ScriptPage      from '../pages/Script'
-import SceneEditorPage from '../pages/SceneEditor'
-import VoiceVisualsPage from '../pages/VoiceVisuals'
-import ExportPage      from '../pages/Export'
-import UploadScriptPage from '../pages/UploadScript'
-
-export function AgencyWorkflow() {
-  const agencyWorkflowStep = useStore((s: any) => s.agencyWorkflowStep) || 'setup'
-  const agencyProjectId    = useStore((s: any) => s.agencyProjectId)
-
-  useEffect(() => {
-    if (!agencyProjectId) {
-      useStore.getState().setStep('agency-projects' as any)
-    }
-  }, [agencyProjectId])
-
-  if (agencyWorkflowStep === 'setup')  return <SetupPage />
-  if (agencyWorkflowStep === 'ideas')  return <IdeasPage />
-  if (agencyWorkflowStep === 'script') return <ScriptPage />
-  if (agencyWorkflowStep === 'scenes') return <SceneEditorPage />
-  if (agencyWorkflowStep === 'voice')  return <VoiceVisualsPage />
-  if (agencyWorkflowStep === 'export') return <ExportPage />
-  if (agencyWorkflowStep === 'upload') return <UploadScriptPage />
-  return <SetupPage />
-}
