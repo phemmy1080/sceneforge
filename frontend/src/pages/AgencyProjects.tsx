@@ -404,6 +404,12 @@ export function ProjectDetail() {
     } catch {}
   }
 
+  // Jump straight into the SceneEditor at a specific scene index
+  // One atomic store update — no setTimeout, no race conditions
+  function editScene(sceneIndex: number) {
+    useStore.getState().startAgencyVideo(id || '', 'scenes', sceneIndex)
+  }
+
   async function toggleAssign(memberId: string) {
     if (!project) return;
     setAssigning(true);
@@ -785,10 +791,24 @@ export function ProjectDetail() {
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                   <span className="text-xs font-semibold text-amber-300">Scene {activeScene + 1} selected</span>
-                  <button onClick={() => setActiveScene(null)}
-                    className="ml-auto text-xs text-white/25 hover:text-white/60 transition">
-                    Deselect
-                  </button>
+                  <div className="ml-auto flex items-center gap-2">
+                    {/* Edit this scene — jumps into SceneEditor at this index */}
+                    {(() => {
+                      const isAssigned = project.assigned_to?.includes(currentUser?.id || '');
+                      if (isAdmin || isAssigned) return (
+                        <button
+                          onClick={() => editScene(activeScene)}
+                          className="flex items-center gap-1.5 text-[11px] bg-amber-400/15 border border-amber-400/25 text-amber-300 hover:bg-amber-400/20 px-2.5 py-1 rounded-lg transition font-semibold">
+                          ✎ Edit scene {activeScene + 1}
+                        </button>
+                      );
+                      return null;
+                    })()}
+                    <button onClick={() => setActiveScene(null)}
+                      className="text-xs text-white/25 hover:text-white/60 transition">
+                      Deselect
+                    </button>
+                  </div>
                 </div>
 
                 {/* Full video player */}
