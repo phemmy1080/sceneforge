@@ -3,7 +3,7 @@ import { devtools, persist } from 'zustand/middleware'
 import type { IdeaItem, Scene, RenderRequest } from './lib/api'
 import { projectsApi } from './lib/api'
 
-export type AppStep = 'projects' | 'setup' | 'ideas' | 'script' | 'scenes' | 'voice' | 'export' | 'profile' | 'upload' | 'upgrade' | 'plans' | 'agency' | 'agency-projects' | 'agency-new' | 'agency-detail' | 'agency-team' | 'agency-kits'
+export type AppStep = 'projects' | 'setup' | 'ideas' | 'script' | 'scenes' | 'voice' | 'export' | 'profile' | 'upload' | 'upgrade' | 'plans' | 'agency' | 'agency-projects' | 'agency-new' | 'agency-detail' | 'agency-team' | 'agency-kits' | 'agency-workflow'
 
 export interface ProjectConfig {
   niche: string; style: string; platform: string
@@ -76,6 +76,8 @@ interface AppState {
   agencyProjectId: string
   setAgencyProjectId: (id: string) => void
   startAgencyVideo: (projectId: string) => void
+  agencyWorkflowStep: string
+  setAgencyWorkflowStep: (step: string) => void
   setStep: (step: AppStep) => void
   markStepComplete: (step: AppStep) => void
   addProject: (args: { name: string; niche: string; style: string; platform: string; folder: string }) => void
@@ -145,14 +147,32 @@ export const useStore = create<AppState>()(
         // so Layout never sees a partial state (step changed, id not yet set)
         startAgencyVideo: (projectId: string) => set({
           agencyProjectId: projectId,
-          currentStep: 'setup' as any,
+          currentStep: 'agency-workflow' as AppStep,
+          // Reset workflow state for fresh start
+          ...CLEAR_WORKFLOW,
         }),
 
+        // Within agency-workflow, track which sub-step we're on
+        agencyWorkflowStep: 'setup' as string,
+        setAgencyWorkflowStep: (step: string) => set({ agencyWorkflowStep: step }),
+
         setStep: (step) => {
-          // Clear agency project context when navigating to personal/landing steps
+          const current = get().currentStep
+          const agencyProjId = get().agencyProjectId
           const personalSteps = ['projects', 'landing', 'login', 'upgrade', 'plans']
+          const workflowSteps = ['setup','ideas','script','scenes','voice','export','upload']
+
+          // If we're in agency-workflow mode and the step is a workflow sub-step,
+          // redirect to agencyWorkflowStep instead of changing currentStep
+          if (current === 'agency-workflow' && agencyProjId &&
+              workflowSteps.includes(step as string)) {
+            set({ agencyWorkflowStep: step as string })
+            return
+          }
+
+          // Clear agency context when going to personal steps
           if (personalSteps.includes(step as string)) {
-            set({ currentStep: step, agencyProjectId: '' })
+            set({ currentStep: step, agencyProjectId: '', agencyWorkflowStep: 'setup' })
           } else {
             set({ currentStep: step })
           }
