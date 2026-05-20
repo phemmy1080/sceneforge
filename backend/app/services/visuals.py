@@ -188,17 +188,44 @@ async def generate_placeholder_visual(scene: Scene, output_dir: str) -> VisualFi
     return VisualFile(path=out_path, media_type="video", source="placeholder")
 
 
+async def download_custom_image(url: str, output_dir: str, scene_id: int) -> VisualFile:
+    """Download a user-uploaded custom image from URL."""
+    import httpx
+    ext = ".jpg"
+    for suffix in [".png", ".webp", ".gif"]:
+        if suffix in url.lower():
+            ext = suffix
+            break
+    out_path = os.path.join(output_dir, f"custom_{scene_id}{ext}")
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.get(url)
+        resp.raise_for_status()
+    with open(out_path, "wb") as f:
+        f.write(resp.content)
+    return VisualFile(path=out_path, media_type="image", source="custom")
+
+
 async def get_visual_for_scene(
     scene: Scene,
     output_dir: str,
     source: VisualSource = VisualSource.mixed,
     user_plan: str = "free",
+    custom_image_url: Optional[str] = None,
 ) -> VisualFile:
     """
     Route visual sourcing based on preference.
+    custom_image_url: per-scene user-uploaded image (highest priority).
     DALL-E is only available for pro and studio plans.
     mixed: try Pexels first, fall back to placeholder.
     """
+    # Custom uploaded image takes priority over everything else
+    if custom_image_url or getattr(scene, "custom_image_url", None):
+        url = custom_image_url or scene.custom_image_url
+        try:
+            return await download_custom_image(url, output_dir, scene.id)
+        except Exception as e:
+            logger.warning("Custom image download failed for scene %s: %s — falling back", scene.id, e)
+
     if source == VisualSource.dalle:
         # Gate DALL-E to pro and studio plans only
         if user_plan not in {"pro", "studio"}:
