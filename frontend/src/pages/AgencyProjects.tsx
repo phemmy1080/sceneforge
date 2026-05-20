@@ -405,9 +405,45 @@ export function ProjectDetail() {
   }
 
   // Jump straight into the SceneEditor at a specific scene index
-  // One atomic store update — no setTimeout, no race conditions
-  function editScene(sceneIndex: number) {
-    useStore.getState().startAgencyVideo(id || '', 'scenes', sceneIndex)
+  async function editScene(sceneIndex: number) {
+    const store = useStore.getState()
+
+    // Try to load scenes from the last render job so the editor isn't empty
+    const jobIds: string[] = project?.render_job_ids || []
+    let loadedScenes = false
+
+    if (jobIds.length > 0) {
+      const lastJobId = jobIds[jobIds.length - 1]
+      try {
+        const res = await api.get(`/api/render/scenes/${lastJobId}`)
+        if (res.data.scenes?.length) {
+          // Hydrate the store with scenes from the render
+          store.setScenes(res.data.scenes)
+          loadedScenes = true
+        }
+      } catch {
+        // 404 = job scenes not stored (old render) — fall through
+      }
+    }
+
+    if (!loadedScenes) {
+      // No scenes in Redis — need to go through script step first
+      // But navigate to setup so editor can regenerate
+      store.startAgencyVideo(id || '', 'setup', 0)
+      // Show a toast/alert explaining why
+      setTimeout(() => {
+        alert('No saved scene data found for this project. Please run through Setup → Script → Scenes to regenerate the scenes first, then come back to edit.')
+      }, 300)
+      return
+    }
+
+    // Scenes loaded — go straight to SceneEditor at the right index
+    // startAgencyVideo sets activeSceneIndex atomically, overriding setScenes' reset to 0
+    store.startAgencyVideo(id || '', 'scenes', sceneIndex)
+    // Belt-and-suspenders: set it again after a tick to be sure
+    requestAnimationFrame(() => {
+      useStore.getState().setActiveSceneIndex(sceneIndex)
+    })
   }
 
   async function toggleAssign(memberId: string) {
