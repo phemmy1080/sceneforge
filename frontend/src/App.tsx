@@ -56,6 +56,28 @@ function applyDeepLink(): boolean {
   return true
 }
 
+// ── Agency workflow wrapper ──────────────────────────────────────────────────
+// Keeps currentStep = 'agency-workflow' so the sidebar never flips to personal.
+// Internal sub-step (setup/ideas/etc.) lives in agencyWorkflowStep.
+function AgencyWorkflow() {
+  const agencyWorkflowStep = useStore((s: any) => s.agencyWorkflowStep) || 'setup'
+  const agencyProjectId    = useStore((s: any) => s.agencyProjectId)
+  const setStep            = useStore((s) => s.setStep)
+
+  useEffect(() => {
+    if (!agencyProjectId) setStep('agency-projects' as any)
+  }, [agencyProjectId])
+
+  if (agencyWorkflowStep === 'setup')  return <Setup />
+  if (agencyWorkflowStep === 'ideas')  return <Ideas />
+  if (agencyWorkflowStep === 'script') return <Script />
+  if (agencyWorkflowStep === 'scenes') return <SceneEditor />
+  if (agencyWorkflowStep === 'voice')  return <VoiceVisuals />
+  if (agencyWorkflowStep === 'export') return <Export />
+  if (agencyWorkflowStep === 'upload') return <UploadScript />
+  return <Setup />
+}
+
 function AppPages({ onLogout }: { onLogout: () => void }) {
   const currentStep   = useStore((s) => s.currentStep)
   const setStep       = useStore((s) => s.setStep)
@@ -135,6 +157,8 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
         {currentStep === 'voice'           && <VoiceVisuals />}
         {currentStep === 'export'          && <Export />}
         {currentStep === 'upload'          && <UploadScript />}
+        {/* Agency workflow — same components, keeps agency sidebar context */}
+        {currentStep === 'agency-workflow' && <AgencyWorkflow />}
         {currentStep === 'upgrade'         && <Plans onBack={() => setStep('setup')} />}
         {currentStep === 'plans'           && <Plans onBack={() => setStep('setup')} />}
         {currentStep === 'agency'          && <AgencyDashboard />}
