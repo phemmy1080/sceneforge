@@ -167,7 +167,15 @@ function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => v
   }
 
   function handleSetStep(step: AppStep) {
-    setStep(step)
+    const workflowSteps = ['setup','ideas','script','scenes','voice','export','upload']
+    if (currentStepRaw === 'agency-workflow' &&
+        workflowSteps.includes(step as string)) {
+      // Redirect to agencyWorkflowStep — keeps currentStep as 'agency-workflow'
+      const setAgencyWorkflowStep = useStore.getState().setAgencyWorkflowStep
+      if (setAgencyWorkflowStep) setAgencyWorkflowStep(step as string)
+    } else {
+      setStep(step)
+    }
     onClose?.()
   }
 
@@ -237,7 +245,7 @@ function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => v
       {/* Scrollable nav */}
       <div className="flex-1 overflow-y-auto p-2 scrollbar-thin">
         {/* Hide personal workflow for non-owner workspace members */}
-        {(showPersonal || currentStep === 'agency-workflow') && (
+        {(showPersonal || currentStepRaw === 'agency-workflow') && (
           <>
             <p className="text-[9.5px] font-bold text-white/25 uppercase tracking-widest px-2 pt-2 pb-1">Workflow</p>
             {STEPS.map((step) => {
