@@ -318,6 +318,46 @@ async def get_pool_balance(
 
 from fastapi import UploadFile, File as _File
 
+@router.post("/scene-image")
+async def upload_scene_image(
+    file: UploadFile = _File(...),
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    """Upload a custom image for a scene. Max 10MB. Returns {image_url}."""
+    from app.services.storage import upload_file, r2_enabled
+    import tempfile, os, uuid as _uuid
+
+    user = await _get_user(authorization, redis)
+
+    allowed = {"image/png","image/jpeg","image/jpg","image/webp","image/gif"}
+    ct = (file.content_type or "").lower()
+    if ct not in allowed:
+        raise HTTPException(400, "Use PNG, JPG, WebP or GIF")
+
+    raw = await file.read()
+    if len(raw) > 10 * 1024 * 1024:
+        raise HTTPException(400, "Image must be under 10 MB")
+
+    ext_map = {"image/jpeg":".jpg","image/jpg":".jpg","image/png":".png",
+               "image/webp":".webp","image/gif":".gif"}
+    ext = ext_map.get(ct, ".jpg")
+    key = f"scene-images/{user.id}/{_uuid.uuid4().hex[:10]}{ext}"
+
+    if r2_enabled():
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+            tmp.write(raw); tmp_path = tmp.name
+        try:
+            url = await upload_file(tmp_path, key)
+        finally:
+            os.unlink(tmp_path)
+    else:
+        import base64
+        url = f"data:{ct};base64,{base64.b64encode(raw).decode()}"
+
+    return {"image_url": url}
+
+
 @router.post("/brand-kits/logo")
 async def upload_brand_logo(
     file: UploadFile = _File(...),
