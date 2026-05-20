@@ -178,12 +178,32 @@ async def start_render(
     pool = await arq.create_pool(
         arq.connections.RedisSettings.from_dsn(settings.redis_url)
     )
+    # Store scenes so the SceneEditor can reload them if the session is lost
+    await redis.set(
+        f"job:{job_id}:scenes",
+        json.dumps([s.model_dump() for s in req.scenes]),
+        ex=86400 * 7  # 7 days — editors may come back days later
+    )
     await pool.enqueue_job("render_video", job_id, req.model_dump(), _job_id=job_id)
     await pool.close()
     await redis.aclose()
 
     logger.info("Render job queued: %s", job_id)
     return RenderJobResponse(job_id=job_id, status="queued")
+
+
+@router.get("/scenes/{job_id}")
+async def get_job_scenes(
+    job_id: str,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    """Return the scenes that were used in a render job."""
+    raw = await redis.get(f"job:{job_id}:scenes")
+    if not raw:
+        raise HTTPException(404, "Scenes not found for this job")
+    scenes = json.loads(raw)
+    return {"scenes": scenes}
 
 
 @router.get("/status/{job_id}", response_model=JobStatusResponse)
