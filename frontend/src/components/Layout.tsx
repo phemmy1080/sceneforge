@@ -82,7 +82,7 @@ function AgencyNav({ currentStep, onStep }: { currentStep: string; onStep: (s: A
   const inAgency     = !!(user?.workspace_id || user?.plan === 'agency')
   const isNonOwnerNav = !!(wsRoleNav && wsRoleNav !== 'owner')
   const isActiveAgency = inAgency && (
-    step.startsWith('agency') || !!agencyProjId || isNonOwnerNav
+(step.startsWith('agency') || step === 'agency-workflow') || !!agencyProjId || isNonOwnerNav
   )
   if (!isActiveAgency) return null
 
@@ -123,11 +123,14 @@ function AgencyNav({ currentStep, onStep }: { currentStep: string; onStep: (s: A
 }
 
 function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => void; onNewProject: () => void; onClose?: () => void }) {
-  const currentStep      = useStore((s) => s.currentStep)
+  const currentStepRaw   = useStore((s) => s.currentStep)
+  const agencyWorkflowStep = useStore((s: any) => s.agencyWorkflowStep) || 'setup'
   const completedSteps   = useStore((s) => s.completedSteps)
   const setStep          = useStore((s) => s.setStep)
   const agencyProjectId  = useStore((s: any) => s.agencyProjectId)
   const user             = useAuthStore((s: any) => s.user)
+  // Use sub-step for display when in agency workflow
+  const currentStep = currentStepRaw === 'agency-workflow' ? agencyWorkflowStep : currentStepRaw
 
   // Derive role fields from user (outside any selector — always fresh)
   const wsRole        = user?.workspace_role || (user?.plan === 'agency' ? 'owner' : null)
@@ -142,7 +145,7 @@ function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => v
   // 2. currentStep is an agency screen       → on agency dashboard/projects/team/kits
   // 3. user is a non-owner workspace member  → editors/admins/clients always in agency
   const inAgencyMode  = !!agencyProjectId ||
-                        currentStep.startsWith('agency') ||
+                        (currentStepRaw.startsWith('agency') || currentStepRaw === 'agency-workflow') ||
                         (inWorkspace && isNonOwner)
   const showPersonal  = !inAgencyMode
   const scenes         = useStore((s) => s.scenes)
@@ -234,7 +237,7 @@ function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => v
       {/* Scrollable nav */}
       <div className="flex-1 overflow-y-auto p-2 scrollbar-thin">
         {/* Hide personal workflow for non-owner workspace members */}
-        {showPersonal && (
+        {(showPersonal || currentStep === 'agency-workflow') && (
           <>
             <p className="text-[9.5px] font-bold text-white/25 uppercase tracking-widest px-2 pt-2 pb-1">Workflow</p>
             {STEPS.map((step) => {
