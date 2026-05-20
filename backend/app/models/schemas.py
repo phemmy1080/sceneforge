@@ -18,6 +18,8 @@ class VisualSource(str, Enum):
     pexels_video = "pexels_video"
     pexels_photo = "pexels_photo"
     dalle = "dalle"
+    custom = "custom"       # user-uploaded images per scene
+    mixed = "mixed"         # auto-detect per scene
     mixed = "mixed"
 
 
@@ -84,6 +86,8 @@ class Scene(BaseModel):
     visual_keyword: str = Field(default="", max_length=200)
     emotion: Optional[str] = Field(default=None, max_length=100)
     b_roll_note: Optional[str] = Field(default=None, max_length=300)
+    custom_image_url: Optional[str] = Field(default=None, max_length=1000,
+                                           description="User-uploaded image URL for this scene")
 
 
 class GenerateScenesResponse(BaseModel):
