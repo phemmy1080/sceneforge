@@ -75,7 +75,7 @@ interface AppState {
 
   agencyProjectId: string
   setAgencyProjectId: (id: string) => void
-  startAgencyVideo: (projectId: string) => void
+  startAgencyVideo: (projectId: string, subStep?: string, sceneIndex?: number) => void
   agencyWorkflowStep: string
   setAgencyWorkflowStep: (step: string) => void
   setStep: (step: AppStep) => void
@@ -145,11 +145,13 @@ export const useStore = create<AppState>()(
 
         // Atomic: sets agencyProjectId + currentStep in a single update
         // so Layout never sees a partial state (step changed, id not yet set)
-        startAgencyVideo: (projectId: string) => set({
+        startAgencyVideo: (projectId: string, subStep?: string, sceneIndex?: number) => set({
           agencyProjectId: projectId,
           currentStep: 'agency-workflow' as AppStep,
-          // Reset workflow state for fresh start
-          ...CLEAR_WORKFLOW,
+          agencyWorkflowStep: subStep || 'setup',
+          ...(sceneIndex !== undefined ? { activeSceneIndex: sceneIndex } : {}),
+          // Reset workflow state for fresh start (only when going to setup)
+          ...(!subStep || subStep === 'setup' ? CLEAR_WORKFLOW : {}),
         }),
 
         // Within agency-workflow, track which sub-step we're on
