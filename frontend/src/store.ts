@@ -74,6 +74,8 @@ interface AppState {
   backendSynced: boolean
 
   agencyProjectId: string
+  agencyProjectMeta: { title: string; client_name: string } | null
+  setAgencyProjectMeta: (meta: { title: string; client_name: string } | null) => void
   setAgencyProjectId: (id: string) => void
   startAgencyVideo: (projectId: string, subStep?: string, sceneIndex?: number) => void
   startAgencyExport: (projectId: string, jobId: string, videoUrl: string) => void
@@ -142,7 +144,9 @@ export const useStore = create<AppState>()(
         backendSynced: false,
 
         agencyProjectId: '',
+        agencyProjectMeta: null as { title: string; client_name: string } | null,
         setAgencyProjectId: (id) => set({ agencyProjectId: id }),
+        setAgencyProjectMeta: (meta: { title: string; client_name: string } | null) => set({ agencyProjectMeta: meta }),
 
         // Atomic: sets agencyProjectId + currentStep in a single update
         // so Layout never sees a partial state (step changed, id not yet set)
@@ -187,7 +191,7 @@ export const useStore = create<AppState>()(
 
           // Clear agency context when going to personal steps
           if (personalSteps.includes(step as string)) {
-            set({ currentStep: step, agencyProjectId: '', agencyWorkflowStep: 'setup' })
+            set({ currentStep: step, agencyProjectId: '', agencyWorkflowStep: 'setup', agencyProjectMeta: null })
           } else {
             set({ currentStep: step })
           }
