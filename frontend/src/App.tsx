@@ -225,12 +225,23 @@ function Root() {
   const logout          = useAuthStore((s) => s.logout)
 
   // On first load, if authenticated but workspace fields are missing, refresh /me
-  // This handles editors who logged in before workspace_role was added to the response
   useEffect(() => {
     if (isAuthenticated && authToken && !currentUser?.workspace_id && !currentUser?.workspace_role) {
       import('./lib/api').then(({ getMe }) => {
         getMe().then(me => setAuth(me, authToken)).catch(() => {})
       })
+    }
+  }, [isAuthenticated])
+
+  // Handle ?agency_project=ID deep link from approval notification emails
+  useEffect(() => {
+    if (!isAuthenticated) return
+    const params = new URLSearchParams(window.location.search)
+    const projId = params.get('agency_project')
+    if (projId) {
+      window.history.replaceState({}, '', '/')
+      useStore.getState().setAgencyProjectId(projId)
+      useStore.getState().setStep('agency-detail' as any)
     }
   }, [isAuthenticated])
 
