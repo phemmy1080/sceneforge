@@ -853,16 +853,42 @@ ${emailBody}`)}
               if (jobIds.length > 0) {
                 const lastJobId = jobIds[jobIds.length - 1];
                 try {
-                  const res = await api.get(`/api/render/status/${lastJobId}`);
-                  const videoUrl = res.data?.result?.video_url || '';
+                  const [statusRes, scenesRes] = await Promise.allSettled([
+                    api.get(`/api/render/status/${lastJobId}`),
+                    api.get(`/api/render/scenes/${lastJobId}`),
+                  ]);
+
+                  const videoUrl = statusRes.status === 'fulfilled'
+                    ? statusRes.value.data?.result?.video_url || '' : '';
+
                   if (videoUrl) {
-                    // Atomic: set all render state + navigate to export in one update
+                    // Load scenes so Export page shows scene count + duration
+                    if (scenesRes.status === 'fulfilled' && scenesRes.value.data?.scenes?.length) {
+                      store.setScenes(scenesRes.value.data.scenes);
+                    }
+
+                    // Populate config from agency project so caption generator has context
+                    store.setConfig({
+                      niche:    project.notes || project.client_name || '',
+                      platform: project.platform || '',
+                      style:    '',
+                      tone:     '',
+                      audience: '',
+                    });
+
+                    // Set active project name for the title display
+                    // Use a synthetic project entry if not in personal projects list
+                    store.setAgencyProjectMeta({
+                      title: project.title,
+                      client_name: project.client_name,
+                    });
+
                     store.startAgencyExport(id || '', lastJobId, videoUrl);
                     return;
                   }
                 } catch {}
               }
-              // No completed render found — go to setup to create a new one
+              // No completed render found — start fresh from setup
               store.startAgencyVideo(id || '', 'setup');
             }}
             className="flex-shrink-0 bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-4 py-2 rounded-xl text-xs transition">
