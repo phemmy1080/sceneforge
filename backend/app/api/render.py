@@ -3,7 +3,7 @@ import json
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Header, Request
+from fastapi import APIRouter, HTTPException, Header, Request, Depends
 
 from app.config import get_settings
 from app.models.schemas import RenderRequest, RenderJobResponse, JobStatusResponse
