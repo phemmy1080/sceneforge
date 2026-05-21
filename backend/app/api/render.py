@@ -3,7 +3,7 @@ import json
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Header, Request, Depends
+from fastapi import APIRouter, HTTPException, Header, Request
 
 from app.config import get_settings
 from app.models.schemas import RenderRequest, RenderJobResponse, JobStatusResponse
@@ -193,17 +193,17 @@ async def start_render(
 
 
 @router.get("/scenes/{job_id}")
-async def get_job_scenes(
-    job_id: str,
-    authorization: Optional[str] = Header(None),
-    redis=Depends(get_redis),
-):
+async def get_job_scenes(job_id: str):
     """Return the scenes that were used in a render job."""
-    raw = await redis.get(f"job:{job_id}:scenes")
-    if not raw:
-        raise HTTPException(404, "Scenes not found for this job")
-    scenes = json.loads(raw)
-    return {"scenes": scenes}
+    redis = await _get_redis()
+    try:
+        raw = await redis.get(f"job:{job_id}:scenes")
+        if not raw:
+            raise HTTPException(404, "Scenes not found for this job")
+        scenes = json.loads(raw)
+        return {"scenes": scenes}
+    finally:
+        await redis.aclose()
 
 
 @router.get("/status/{job_id}", response_model=JobStatusResponse)
