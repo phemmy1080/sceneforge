@@ -844,10 +844,26 @@ ${emailBody}`)}
           <div className="w-10 h-10 rounded-full bg-emerald-400/15 flex items-center justify-center text-xl flex-shrink-0">✅</div>
           <div className="flex-1">
             <div className="text-sm font-bold text-emerald-300">Client approved this video</div>
-            <div className="text-xs text-white/40 mt-0.5">Ready to render and export. Click "Create video" or start the render from here.</div>
+            <div className="text-xs text-white/40 mt-0.5">Client has approved. Click "Start render" to go directly to the export and download page.</div>
           </div>
-          <button onClick={() => {
-              useStore.getState().startAgencyVideo(id || '');
+          <button onClick={async () => {
+              const store = useStore.getState();
+              const jobIds: string[] = project.render_job_ids || [];
+
+              if (jobIds.length > 0) {
+                const lastJobId = jobIds[jobIds.length - 1];
+                try {
+                  const res = await api.get(`/api/render/status/${lastJobId}`);
+                  const videoUrl = res.data?.result?.video_url || '';
+                  if (videoUrl) {
+                    // Atomic: set all render state + navigate to export in one update
+                    store.startAgencyExport(id || '', lastJobId, videoUrl);
+                    return;
+                  }
+                } catch {}
+              }
+              // No completed render found — go to setup to create a new one
+              store.startAgencyVideo(id || '', 'setup');
             }}
             className="flex-shrink-0 bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-4 py-2 rounded-xl text-xs transition">
             Start render
