@@ -25,7 +25,6 @@ SMTP_USER     = os.environ.get("SMTP_USER", "")
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
 
 
-
 async def _send(to: str, subject: str, html: str, text: str) -> None:
     from_email = getattr(settings, "email_from", None) or SMTP_USER or "hello.sceneforge@gmail.com"
     from_name  = getattr(settings, "email_from_name", None) or "SceneForge"
@@ -138,18 +137,6 @@ def _log_otp_fallback(to: str, subject: str) -> None:
         logger.warning("=" * 50)
 
 
-async def send_invite_email(to_email: str, inviter_name: str, workspace_name: str, invite_url: str):
-    subject = f"{inviter_name} invited you to {workspace_name} on SceneForge"
-    html = f"""
-    <p>Hi,</p>
-    <p><strong>{inviter_name}</strong> has invited you to join <strong>{workspace_name}</strong> on SceneForge.</p>
-    <p><a href="{invite_url}" style="background:#c9a84c;color:#000;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Accept invite</a></p>
-    <p>This link expires in 7 days.</p>
-    """
-    await send_email(to_email, subject, html)
-
-
-
 # ── Email templates ───────────────────────────────────────────────────────────
 
 async def send_verification_otp(to_email: str, full_name: str, otp: str) -> None:
@@ -247,10 +234,6 @@ async def send_token_confirmation(
     await _send(to_email, subject, html, text)
 
 
-"""
-Replace send_render_complete in backend/app/services/email.py
-"""
-
 async def send_render_complete(
     to_email: str,
     full_name: str,
@@ -259,22 +242,10 @@ async def send_render_complete(
     duration: int,
     video_url: str,
     tokens_remaining: int,
-    job_id: str = "",
-    project_id: str = "",
 ) -> None:
-    """Send render complete notification with direct download + deep link."""
-    from app.config import get_settings
-    app_url = get_settings().frontend_origin
-
-    # Direct R2 download URL (works without login if R2 is public)
-    direct_download = video_url  # R2 public URL — no auth needed
-
-    # Deep link → opens app → auto-navigates to export step for this project
-    # App reads ?job_id= and ?project_id= from URL on load
-    deep_link = f"{app_url}?job_id={job_id}&project_id={project_id}&step=export"
-
-    subject = f'🎬 Your video "{project_title}" is ready to download!'
-
+    """Send render complete notification email."""
+    app_url = settings.frontend_origin
+    subject = f'🎬 Your video "{project_title}" is ready!'
     html = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#080810;font-family:Arial,sans-serif;color:#F0F0FF">
@@ -282,76 +253,46 @@ async def send_render_complete(
     <tr><td align="center">
       <table width="520" cellpadding="0" cellspacing="0"
         style="background:#111118;border-radius:16px;border:1px solid rgba(255,255,255,0.08);overflow:hidden">
-
-        <!-- Header -->
         <tr><td style="background:linear-gradient(135deg,#1a0d33,#0a1a2e);padding:28px 40px;text-align:center">
           <h1 style="margin:0;font-size:24px;font-weight:800;color:#fff">
             Scene<span style="color:#A78BFA">Forge</span>
           </h1>
           <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.45)">Your video is ready</p>
         </td></tr>
-
-        <!-- Body -->
         <tr><td style="padding:36px 40px;text-align:center">
           <div style="font-size:48px;margin-bottom:16px">🎬</div>
           <h2 style="margin:0 0 8px;font-size:20px;font-weight:800;color:#fff">{project_title}</h2>
           <p style="margin:0 0 28px;font-size:13px;color:rgba(255,255,255,0.45)">
-            Hi {full_name}, your video has finished rendering!
+            Hi {full_name}, your video has finished rendering and is ready to download.
           </p>
-
-          <!-- Stats -->
           <div style="background:rgba(45,212,191,0.08);border:1px solid rgba(45,212,191,0.2);
-            border-radius:12px;padding:16px;margin-bottom:28px;display:inline-block;width:100%;box-sizing:border-box">
-            <table width="100%" cellpadding="0" cellspacing="0"><tr>
-              <td style="text-align:center;padding:0 8px">
-                <p style="margin:0;font-size:22px;font-weight:800;color:#fff">{scene_count}</p>
-                <p style="margin:3px 0 0;font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.08em">Scenes</p>
+            border-radius:12px;padding:16px 24px;display:inline-block;margin-bottom:28px">
+            <table cellpadding="0" cellspacing="0"><tr>
+              <td style="text-align:center;padding:0 16px">
+                <p style="margin:0;font-size:24px;font-weight:800;color:#fff">{scene_count}</p>
+                <p style="margin:4px 0 0;font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.08em">Scenes</p>
               </td>
               <td style="width:1px;background:rgba(255,255,255,0.08)"></td>
-              <td style="text-align:center;padding:0 8px">
-                <p style="margin:0;font-size:22px;font-weight:800;color:#fff">{duration}s</p>
-                <p style="margin:3px 0 0;font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.08em">Duration</p>
+              <td style="text-align:center;padding:0 16px">
+                <p style="margin:0;font-size:24px;font-weight:800;color:#fff">{duration}s</p>
+                <p style="margin:4px 0 0;font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.08em">Duration</p>
               </td>
               <td style="width:1px;background:rgba(255,255,255,0.08)"></td>
-              <td style="text-align:center;padding:0 8px">
-                <p style="margin:0;font-size:22px;font-weight:800;color:#2DD4BF">{tokens_remaining:,}</p>
-                <p style="margin:3px 0 0;font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.08em">Tokens left</p>
+              <td style="text-align:center;padding:0 16px">
+                <p style="margin:0;font-size:24px;font-weight:800;color:#2DD4BF">{tokens_remaining:,}</p>
+                <p style="margin:4px 0 0;font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.08em">Tokens left</p>
               </td>
             </tr></table>
-          </div>
-
-          <!-- Primary CTA — direct download -->
-          <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px">
-            <tr><td align="center">
-              <a href="{direct_download}"
-                style="display:inline-block;background:#7C5CFF;color:#fff;
-                text-decoration:none;padding:14px 40px;border-radius:10px;
-                font-size:15px;font-weight:700;">
-                ⬇ Download video now
-              </a>
-            </td></tr>
-          </table>
-          <p style="margin:0 0 20px;font-size:11px;color:rgba(255,255,255,0.25)">
-            Direct download — no login required
-          </p>
-
-          <!-- Secondary CTA — deep link to export -->
-          <table width="100%" cellpadding="0" cellspacing="0">
-            <tr><td align="center">
-              <a href="{deep_link}"
-                style="display:inline-block;background:transparent;color:#A78BFA;
-                text-decoration:none;padding:11px 32px;border-radius:10px;
-                font-size:13px;font-weight:600;border:1px solid rgba(167,139,250,0.3);">
-                Open in SceneForge → Export page
-              </a>
-            </td></tr>
-          </table>
-          <p style="margin:8px 0 0;font-size:11px;color:rgba(255,255,255,0.2)">
-            Download scenes, CapCut package, or voiceover separately
+          </div><br>
+          <a href="{app_url}" style="display:inline-block;background:#7C5CFF;color:#fff;
+            text-decoration:none;padding:14px 36px;border-radius:10px;
+            font-size:14px;font-weight:700;margin-bottom:16px">
+            Download your video →
+          </a>
+          <p style="margin:8px 0 0;font-size:12px;color:rgba(255,255,255,0.25)">
+            Open SceneForge → Export step to download your video, scenes, or CapCut package.
           </p>
         </td></tr>
-
-        <!-- Footer -->
         <tr><td style="padding:16px 40px;border-top:1px solid rgba(255,255,255,0.06);text-align:center">
           <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.2)">SceneForge · AI Video Studio</p>
         </td></tr>
@@ -359,15 +300,130 @@ async def send_render_complete(
     </td></tr>
   </table>
 </body></html>"""
-
     text = (
         f"Hi {full_name},\n\n"
         f'Your video "{project_title}" is ready!\n\n'
         f"{scene_count} scenes · {duration}s · {tokens_remaining:,} tokens remaining\n\n"
-        f"⬇ Direct download (no login): {direct_download}\n\n"
-        f"Open export page: {deep_link}\n\n"
+        f"Open SceneForge to download: {app_url}\n\n"
         f"— SceneForge"
     )
     await _send(to_email, subject, html, text)
 
+async def send_client_approved(
+    to_email: str,
+    owner_name: str,
+    client_name: str,
+    project_title: str,
+    project_url: str,
+    client_message: str = "",
+) -> None:
+    """Notify the workspace owner that a client approved their video."""
+    subject = f"✅ {client_name} approved “{project_title}”"
+    msg_block = ""
+    if client_message.strip():
+        msg_block = f"""
+          <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px 20px;margin:0 0 24px;text-align:left">
+            <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:.1em">Client message</p>
+            <p style="margin:0;font-size:14px;color:rgba(255,255,255,0.75);line-height:1.6;font-style:italic">"{client_message}"</p>
+          </div>"""
 
+    html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#080810;font-family:Arial,sans-serif;color:#F0F0FF">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#080810;padding:40px 0">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0" style="background:#111118;border-radius:16px;border:1px solid rgba(255,255,255,0.08);overflow:hidden">
+        <tr><td style="background:linear-gradient(135deg,#0a2010,#0a1a2e);padding:28px 40px;text-align:center">
+          <h1 style="margin:0;font-size:24px;font-weight:800;color:#fff">Scene<span style="color:#A78BFA">Forge</span></h1>
+          <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.45)">Agency workspace</p>
+        </td></tr>
+        <tr><td style="padding:36px 40px;text-align:center">
+          <div style="font-size:48px;margin-bottom:16px">&#x2705;</div>
+          <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#fff">Client approved!</h2>
+          <p style="margin:0 0 24px;font-size:14px;color:rgba(255,255,255,0.5);line-height:1.6">
+            Hi {owner_name}, <strong style="color:rgba(255,255,255,0.8)">{client_name}</strong> has approved
+            <strong style="color:rgba(255,255,255,0.8)">{project_title}</strong>.<br>
+            The project is ready to render and export.
+          </p>
+          {msg_block}
+          <a href="{project_url}" style="display:inline-block;background:#4ade80;color:#052e16;font-size:14px;font-weight:700;padding:14px 32px;border-radius:12px;text-decoration:none;margin-bottom:24px">
+            Open project &rarr;
+          </a>
+          <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.25)">
+            Next step: render the final video and export the MP4.
+          </p>
+        </td></tr>
+        <tr><td style="padding:16px 40px;border-top:1px solid rgba(255,255,255,0.06);text-align:center">
+          <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.2)">SceneForge Agency &middot; You are receiving this because you are the workspace owner</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+    text = (
+        f"Hi {owner_name},\n\n"
+        f"{client_name} has approved \"{project_title}\". "
+        f"The project is ready to render and export.\n\n"
+        + (f"Client message: {client_message}\n\n" if client_message.strip() else "")
+        + f"Open project: {project_url}\n\n\u2014 SceneForge"
+    )
+    await _send(to_email, subject, html, text)
+
+
+async def send_client_changes_requested(
+    to_email: str,
+    owner_name: str,
+    client_name: str,
+    project_title: str,
+    project_url: str,
+    client_message: str = "",
+) -> None:
+    """Notify the workspace owner that a client requested changes."""
+    subject = f"🔄 {client_name} requested changes on “{project_title}”"
+    msg_block = ""
+    if client_message.strip():
+        msg_block = f"""
+          <div style="background:rgba(255,190,11,0.06);border:1px solid rgba(255,190,11,0.2);border-radius:12px;padding:16px 20px;margin:0 0 24px;text-align:left">
+            <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:rgba(255,190,11,0.6);text-transform:uppercase;letter-spacing:.1em">Client feedback</p>
+            <p style="margin:0;font-size:14px;color:rgba(255,255,255,0.75);line-height:1.6;font-style:italic">"{client_message}"</p>
+          </div>"""
+
+    html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#080810;font-family:Arial,sans-serif;color:#F0F0FF">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#080810;padding:40px 0">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0" style="background:#111118;border-radius:16px;border:1px solid rgba(255,255,255,0.08);overflow:hidden">
+        <tr><td style="background:linear-gradient(135deg,#1a1000,#0a1a2e);padding:28px 40px;text-align:center">
+          <h1 style="margin:0;font-size:24px;font-weight:800;color:#fff">Scene<span style="color:#A78BFA">Forge</span></h1>
+          <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.45)">Agency workspace</p>
+        </td></tr>
+        <tr><td style="padding:36px 40px;text-align:center">
+          <div style="font-size:48px;margin-bottom:16px">&#x1f504;</div>
+          <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#fff">Changes requested</h2>
+          <p style="margin:0 0 24px;font-size:14px;color:rgba(255,255,255,0.5);line-height:1.6">
+            Hi {owner_name}, <strong style="color:rgba(255,255,255,0.8)">{client_name}</strong> has reviewed
+            <strong style="color:rgba(255,255,255,0.8)">{project_title}</strong> and requested changes.
+          </p>
+          {msg_block}
+          <a href="{project_url}" style="display:inline-block;background:#c9a84c;color:#1a0f00;font-size:14px;font-weight:700;padding:14px 32px;border-radius:12px;text-decoration:none;margin-bottom:24px">
+            View feedback &rarr;
+          </a>
+          <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.25)">
+            Read the client's scene notes, make edits, re-render, and send a new review link.
+          </p>
+        </td></tr>
+        <tr><td style="padding:16px 40px;border-top:1px solid rgba(255,255,255,0.06);text-align:center">
+          <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.2)">SceneForge Agency &middot; You are receiving this because you are the workspace owner</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+    text = (
+        f"Hi {owner_name},\n\n"
+        f"{client_name} has requested changes on \"{project_title}\".\n\n"
+        + (f"Their feedback: {client_message}\n\n" if client_message.strip() else "")
+        + f"Open project to review notes: {project_url}\n\n\u2014 SceneForge"
+    )
+    await _send(to_email, subject, html, text)
