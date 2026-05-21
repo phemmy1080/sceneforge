@@ -21,6 +21,7 @@ All Redis keys:
 """
 
 import json
+import asyncio
 import uuid
 import secrets
 import logging
@@ -507,14 +508,23 @@ async def delete_project(redis: aioredis.Redis, ws_id: str, proj_id: str):
 async def create_review_link(redis: aioredis.Redis, ws_id: str, proj_id: str,
                               created_by: str) -> dict:
     token = secrets.token_urlsafe(20)
+    # Pull client_name from the project so the approval email can use it
+    client_name = ""
+    try:
+        proj = await get_project(redis, proj_id)
+        if proj:
+            client_name = proj.get("client_name", "")
+    except Exception:
+        pass
     review = {
-        "token":      token,
-        "ws_id":      ws_id,
-        "proj_id":    proj_id,
-        "created_by": created_by,
-        "created_at": _now(),
-        "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
-        "status":     "pending",   # pending | approved | changes_requested
+        "token":       token,
+        "ws_id":       ws_id,
+        "proj_id":     proj_id,
+        "created_by":  created_by,
+        "client_name": client_name,
+        "created_at":  _now(),
+        "expires_at":  (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+        "status":      "pending",   # pending | approved | changes_requested
     }
     await redis.set(_review_key(token), json.dumps(review), ex=REVIEW_TTL)
     await _log_activity(redis, ws_id, created_by, "review_link_created",
@@ -529,25 +539,60 @@ async def get_review_link(redis: aioredis.Redis, token: str) -> Optional[dict]:
 
 async def submit_review_decision(redis: aioredis.Redis, token: str,
                                   decision: str, message: str = "") -> dict:
+    from app.services.email import send_client_approved, send_client_changes_requested
+
     review = await get_review_link(redis, token)
     if not review:
         raise ValueError("Review link not found or expired")
     if decision not in ("approved", "changes_requested"):
         raise ValueError("Invalid decision")
 
-    review["status"]    = decision
-    review["message"]   = message
+    review["status"]     = decision
+    review["message"]    = message
     review["decided_at"] = _now()
 
     await redis.set(_review_key(token), json.dumps(review), ex=REVIEW_TTL)
 
-    if decision == "approved":
-        project = await get_project(redis, review["proj_id"])
-        if project:
-            await update_project_status(
-                redis, review["ws_id"], review["proj_id"],
-                "client_reviewer", "approved"
-            )
+    # Update project status
+    new_status = "approved" if decision == "approved" else "client_review"
+    project = await get_project(redis, review["proj_id"])
+    if project:
+        await update_project_status(
+            redis, review["ws_id"], review["proj_id"],
+            "client_reviewer", new_status
+        )
+
+    # Notify workspace owner by email
+    try:
+        ws_id      = review.get("ws_id")
+        proj_id    = review.get("proj_id")
+        ws_raw     = await redis.get(f"workspace:{ws_id}")
+        workspace  = json.loads(ws_raw) if ws_raw else {}
+        owner_id   = workspace.get("owner_id", "")
+        owner_raw  = await redis.get(f"user:{owner_id}")
+        owner      = json.loads(owner_raw) if owner_raw else {}
+        owner_email = owner.get("email", "")
+        owner_name  = owner.get("full_name", "there")
+
+        client_name   = review.get("client_name") or "Your client"
+        project_title = project.get("title", "your project") if project else "your project"
+        # Link straight to the project detail page
+        project_url = f"https://scenraforge.com/?agency_project={proj_id}"
+
+        if owner_email:
+            if decision == "approved":
+                asyncio.create_task(send_client_approved(
+                    owner_email, owner_name, client_name,
+                    project_title, project_url, message
+                ))
+            else:
+                asyncio.create_task(send_client_changes_requested(
+                    owner_email, owner_name, client_name,
+                    project_title, project_url, message
+                ))
+    except Exception as e:
+        logger.warning("Failed to send approval notification: %s", e)
+
     return review
 
 
