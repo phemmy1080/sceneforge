@@ -76,6 +76,7 @@ interface AppState {
   agencyProjectId: string
   setAgencyProjectId: (id: string) => void
   startAgencyVideo: (projectId: string, subStep?: string, sceneIndex?: number) => void
+  startAgencyExport: (projectId: string, jobId: string, videoUrl: string) => void
   agencyWorkflowStep: string
   setAgencyWorkflowStep: (step: string) => void
   setStep: (step: AppStep) => void
@@ -152,6 +153,18 @@ export const useStore = create<AppState>()(
           ...(sceneIndex !== undefined ? { activeSceneIndex: sceneIndex } : {}),
           // Reset workflow state for fresh start (only when going to setup)
           ...(!subStep || subStep === 'setup' ? CLEAR_WORKFLOW : {}),
+        }),
+
+        // Jump directly to Export with an existing completed render — no setup needed
+        startAgencyExport: (projectId: string, jobId: string, videoUrl: string) => set({
+          agencyProjectId: projectId,
+          currentStep:       'agency-workflow' as AppStep,
+          agencyWorkflowStep: 'export',
+          jobId,
+          videoUrl,
+          renderProgress: 100,
+          renderStage:    'Done',
+          renderStatus:   'complete' as const,
         }),
 
         // Within agency-workflow, track which sub-step we're on
