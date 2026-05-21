@@ -20,7 +20,6 @@ class VisualSource(str, Enum):
     dalle = "dalle"
     custom = "custom"       # user-uploaded images per scene
     mixed = "mixed"         # auto-detect per scene
-    mixed = "mixed"
 
 
 class ExportType(str, Enum):
