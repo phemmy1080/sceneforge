@@ -269,6 +269,8 @@ export function ProjectDetail() {
   const [commentText, setCommentText] = useState("");
   const [reviewUrl, setReviewUrl] = useState("");
   const [copied, setCopied] = useState(false);
+  const [copiedMsg, setCopiedMsg] = useState(false);
+  const [shareTab, setShareTab] = useState<"whatsapp"|"email"|"copy">("whatsapp");
   const [statusOpen, setStatusOpen] = useState(false);
   const [busy, setBusy] = useState("");
   const [sceneClips, setSceneClips] = useState<SceneClip[]>([]);
@@ -584,18 +586,176 @@ export function ProjectDetail() {
       </div>
 
       {/* Review link card */}
-      {reviewUrl && (
-        <div className="bg-emerald-400/[0.05] border border-emerald-400/20 rounded-2xl p-4 flex items-center gap-3 flex-wrap">
-          <div className="flex-1 min-w-0">
-            <div className="text-[11px] font-bold text-emerald-400 mb-1 uppercase tracking-wide">Client review link ready</div>
-            <div className="text-xs text-white/40 font-mono truncate">{reviewUrl}</div>
+      {reviewUrl && (() => {
+        const clientName = project.client_name || "there";
+        const projectTitle = project.title || "your video";
+        const platform = project.platform ? ` on ${project.platform}` : "";
+        const expiryDays = 7;
+
+        const whatsappMsg =
+`Hi ${clientName} 👋
+
+Your video${platform} is ready for review!
+
+*${projectTitle}*
+
+Please watch the video and let us know what you think. You can:
+• Watch each scene individually
+• Leave notes pinned to specific scenes
+• Click *Approve* if you're happy ✅
+• Click *Request changes* if you'd like edits 🔄
+
+🔗 Review link: ${reviewUrl}
+
+This link expires in ${expiryDays} days. Looking forward to your feedback!`;
+
+        const emailSubject = `Video ready for your review — ${projectTitle}`;
+        const emailBody =
+`Hi ${clientName},
+
+Your video is ready for review.
+
+Project: ${projectTitle}${platform}
+
+Please use the link below to watch the video and share your feedback. You can review each scene individually, leave specific notes, and either approve the video or request changes.
+
+Review link: ${reviewUrl}
+
+What to do:
+1. Click the link above
+2. Watch the full video (and individual scenes)
+3. Leave any notes on scenes you'd like changed
+4. Click Approve or Request changes at the bottom
+
+The link will expire in ${expiryDays} days. No account or login needed.
+
+If you have any questions, feel free to reply to this email.
+
+Best regards`;
+
+        const copyMsg = `Hi ${clientName}, your video "${projectTitle}" is ready for review. Please use this link to watch, leave feedback, and approve: ${reviewUrl} (expires in ${expiryDays} days, no login needed)`;
+
+        async function copyMessage(text: string) {
+          await navigator.clipboard.writeText(text);
+          setCopiedMsg(true);
+          setTimeout(() => setCopiedMsg(false), 2500);
+        }
+
+        function openWhatsApp() {
+          window.open(`https://wa.me/?text=${encodeURIComponent(whatsappMsg)}`, "_blank");
+        }
+
+        function openEmail() {
+          window.open(`mailto:?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`, "_blank");
+        }
+
+        return (
+          <div className="bg-emerald-400/[0.05] border border-emerald-400/20 rounded-2xl overflow-hidden">
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-emerald-400/10 flex items-center justify-between">
+              <div>
+                <div className="text-sm font-bold text-emerald-300">🔗 Client review link ready</div>
+                <div className="text-[11px] text-white/35 mt-0.5 font-mono truncate max-w-xs">{reviewUrl}</div>
+              </div>
+              <button onClick={copy}
+                className="text-xs bg-emerald-400/15 border border-emerald-400/25 text-emerald-300 hover:bg-emerald-400/20 px-3.5 py-1.5 rounded-xl transition font-semibold flex-shrink-0 ml-3">
+                {copied ? "Copied ✓" : "Copy link"}
+              </button>
+            </div>
+
+            {/* Share tabs */}
+            <div className="px-5 pt-4 flex gap-2">
+              {(["whatsapp","email","copy"] as const).map(t => (
+                <button key={t} onClick={() => setShareTab(t)}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition ${
+                    shareTab === t
+                      ? "bg-emerald-400/15 text-emerald-300"
+                      : "text-white/35 hover:text-white/60"
+                  }`}>
+                  {t === "whatsapp" ? "📱 WhatsApp" : t === "email" ? "✉️ Email" : "📋 Quick copy"}
+                </button>
+              ))}
+            </div>
+
+            {/* Message preview */}
+            <div className="px-5 py-4">
+              {shareTab === "whatsapp" && (
+                <div className="space-y-3">
+                  <div className="bg-[#0f1c17] border border-emerald-900/50 rounded-xl p-4 text-xs text-emerald-100/70 leading-relaxed whitespace-pre-wrap font-mono max-h-52 overflow-y-auto">
+                    {whatsappMsg}
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={openWhatsApp}
+                      className="flex items-center gap-2 bg-[#25d366] hover:bg-[#20ba57] text-white font-bold px-4 py-2.5 rounded-xl text-xs transition shadow-md shadow-[#25d366]/20">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                      Open WhatsApp
+                    </button>
+                    <button onClick={() => copyMessage(whatsappMsg)}
+                      className="text-xs border border-white/[0.1] text-white/50 hover:text-white px-4 py-2.5 rounded-xl transition font-medium">
+                      {copiedMsg ? "Copied ✓" : "Copy message"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {shareTab === "email" && (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-3">
+                      <div className="text-[10px] font-bold text-white/25 uppercase tracking-widest mb-1">Subject</div>
+                      <div className="text-xs text-white/70">{emailSubject}</div>
+                    </div>
+                    <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-3 max-h-52 overflow-y-auto">
+                      <div className="text-[10px] font-bold text-white/25 uppercase tracking-widest mb-1">Body</div>
+                      <div className="text-xs text-white/60 leading-relaxed whitespace-pre-wrap">{emailBody}</div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={openEmail}
+                      className="flex items-center gap-2 bg-amber-400/15 border border-amber-400/25 text-amber-300 hover:bg-amber-400/20 px-4 py-2.5 rounded-xl text-xs transition font-bold">
+                      ✉️ Open in email client
+                    </button>
+                    <button onClick={() => copyMessage(`Subject: ${emailSubject}
+
+${emailBody}`)}
+                      className="text-xs border border-white/[0.1] text-white/50 hover:text-white px-4 py-2.5 rounded-xl transition font-medium">
+                      {copiedMsg ? "Copied ✓" : "Copy email"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {shareTab === "copy" && (
+                <div className="space-y-3">
+                  <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-3 text-xs text-white/60 leading-relaxed">
+                    {copyMsg}
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => copyMessage(copyMsg)}
+                      className="flex items-center gap-2 bg-white/[0.08] border border-white/[0.1] text-white/70 hover:text-white hover:bg-white/[0.12] px-4 py-2.5 rounded-xl text-xs transition font-semibold">
+                      {copiedMsg ? "✓ Copied!" : "📋 Copy message"}
+                    </button>
+                    <button onClick={() => copyMessage(reviewUrl)}
+                      className="text-xs border border-white/[0.1] text-white/35 hover:text-white/70 px-4 py-2.5 rounded-xl transition font-medium">
+                      Link only
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-white/25 leading-relaxed">
+                    Paste this anywhere — iMessage, Telegram, Slack, or any other chat. The client doesn't need an account to view and review.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Expiry note */}
+            <div className="px-5 pb-4">
+              <p className="text-[11px] text-white/20">
+                ⏱ Link expires in 7 days · No login required for the client · One approval decision per link
+              </p>
+            </div>
           </div>
-          <button onClick={copy}
-            className="text-xs bg-emerald-400/15 border border-emerald-400/25 text-emerald-300 hover:bg-emerald-400/25 px-4 py-2 rounded-xl transition font-semibold flex-shrink-0">
-            {copied ? "Copied ✓" : "Copy link"}
-          </button>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Assignment panel ── */}
       <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-4">
