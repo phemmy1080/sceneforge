@@ -392,11 +392,22 @@ export default function SceneEditor() {
               {/* Show current custom image */}
               {(activeScene as any).custom_image_url && (
                 <div className="relative mb-2 group">
-                  <img
-                    src={(activeScene as any).custom_image_url}
-                    alt="Custom scene image"
-                    className="w-full aspect-video object-cover rounded-lg border border-white/10"
-                  />
+                  {/* Fixed-height container with dark bg — image contained inside, never stretched */}
+                  <div className="w-full rounded-lg border border-white/10 bg-black overflow-hidden"
+                    style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <img
+                      src={(activeScene as any).custom_image_url}
+                      alt="Custom scene image"
+                      style={{
+                        maxWidth: '100%',
+                        maxHeight: '200px',
+                        width: 'auto',
+                        height: 'auto',
+                        objectFit: 'contain',
+                        display: 'block',
+                      }}
+                    />
+                  </div>
                   <button
                     onClick={() => updateScene(activeSceneIndex, { custom_image_url: null } as any)}
                     className="absolute top-2 right-2 w-6 h-6 bg-black/70 text-white/70 hover:text-rose-400 rounded-full text-sm leading-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
