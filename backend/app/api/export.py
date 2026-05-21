@@ -1,405 +1,244 @@
-from __future__ import annotations
-from typing import Optional
-"""
-backend/app/api/export.py
-Downloads serve from R2 (permanent) → worker proxy → local fallback.
-"""
+import { useStore } from '../store'
+import SharePanel from '../components/SharePanel'
+import { useJobPoller } from '../hooks/useJobPoller'
+import { exportUrl, voiceUrl } from '../lib/api'
+import { Badge, ProgressBar, PageHeader } from '../components/ui'
 
+export default function Export() {
+  const jobId             = useStore((s) => s.jobId)
+  const renderProgress    = useStore((s) => s.renderProgress)
+  const renderStage       = useStore((s) => s.renderStage)
+  const renderStatus      = useStore((s) => s.renderStatus)
+  const videoUrl          = useStore((s) => s.videoUrl)
+  const scenes            = useStore((s) => s.scenes)
+  const selectedIdea      = useStore((s) => s.selectedIdea)
+  const activeProjectId   = useStore((s) => s.activeProjectId)
+  const projects          = useStore((s) => s.projects)
+  const config            = useStore((s) => s.config)
+  const script            = useStore((s) => s.script)
+  const agencyProjectMeta = useStore((s: any) => s.agencyProjectMeta)
 
-import io
-import json
-import logging
-import os
-import re
-import zipfile
-from pathlib import Path
+  useJobPoller(jobId)
 
-import httpx
-from fastapi import APIRouter, Depends, HTTPException, Header, Query
-from typing import Optional
-from fastapi.responses import FileResponse, RedirectResponse, Response, StreamingResponse
+  const isProcessing = renderStatus === 'queued' || renderStatus === 'processing'
+  const isDone       = renderStatus === 'complete'
+  const isFailed     = renderStatus === 'failed'
 
-from app.config import get_settings
-from app.dependencies import get_redis
-from app.services.storage import get_r2_url, r2_enabled
-from app.services.security import validate_job_id, create_signed_url, verify_signed_url
-from app.services import auth as auth_service
+  const totalDuration = scenes.reduce((s, sc) => s + sc.duration, 0)
+  const activeProject = projects.find((p) => p.id === activeProjectId)
+  // Agency export: use meta from the agency project (title + client name)
+  const agencyTitle   = agencyProjectMeta
+    ? `${agencyProjectMeta.title}${agencyProjectMeta.client_name ? ' — ' + agencyProjectMeta.client_name : ''}`
+    : null
+  const projectTitle  = agencyTitle ?? selectedIdea?.title ?? activeProject?.name
 
-settings  = get_settings()
-router    = APIRouter()
-logger    = logging.getLogger(__name__)
+  // For caption generator: prefer agency project platform/niche if config is empty
+  const effectiveConfig = {
+    ...config,
+    niche:    config?.niche    || agencyProjectMeta?.client_name || '',
+    platform: config?.platform || '',
+  }
 
-WORKER_BASE_URL = os.environ.get("WORKER_BASE_URL", "").rstrip("/")
+  if (!jobId) {
+    return (
+      <div>
+        <PageHeader title="Export" subtitle="Download your finished video" />
+        <div className="py-16 text-center">
+          <div className="text-4xl mb-4">🎬</div>
+          <p className="text-white/50 text-sm mb-2">No render started yet.</p>
+          <p className="text-white/30 text-xs">Complete the Voice &amp; Visuals step to render your video.</p>
+          <p className="text-white/20 text-xs mt-4">If you previously rendered a video, open your project from the sidebar to restore it.</p>
+        </div>
+      </div>
+    )
+  }
 
+  return (
+    <div>
+      <PageHeader title="Export" subtitle="Download your finished video" />
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+      {/* ── Progress ── */}
+      {isProcessing && (
+        <div className="bg-[#111118] border border-white/[0.07] rounded-xl p-6 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[13px] font-medium text-white/80 animate-pulse">{renderStage || 'Processing…'}</p>
+            <span className="text-[13px] font-bold text-violet-400">{renderProgress}%</span>
+          </div>
+          <ProgressBar value={renderProgress} />
+          <div className="mt-4 flex flex-wrap gap-4">
+            {[
+              { label: 'Voice synthesis', done: renderProgress >= 35 },
+              { label: 'Visuals',         done: renderProgress >= 55 },
+              { label: 'FFmpeg render',   done: renderProgress >= 90 },
+              { label: 'Export files',    done: renderProgress >= 100 },
+            ].map(({ label, done }) => (
+              <div key={label} className="flex items-center gap-1.5 text-[12px]">
+                <div className={`w-1.5 h-1.5 rounded-full ${done ? 'bg-teal-400' : 'bg-white/20'}`} />
+                <span className={done ? 'text-teal-400' : 'text-white/40'}>{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-def _verify_job_id(job_id: str) -> str:
-    """Validate job_id format to prevent path traversal."""
-    import re
-    if not re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', job_id.lower()):
-        from fastapi import HTTPException
-        raise HTTPException(status_code=400, detail="Invalid job ID format")
-    return job_id.lower()
+      {/* ── Failed ── */}
+      {isFailed && (
+        <div className="bg-red-500/10 border border-red-500/25 rounded-xl p-5 mb-6">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0 text-red-400 text-sm mt-0.5">✕</div>
+            <div className="flex-1">
+              <p className="text-red-400 font-semibold text-[14px] mb-1">Video render failed</p>
+              <p className="text-white/60 text-[13px] leading-relaxed mb-3">
+                {renderStage && !renderStage.toLowerCase().includes('name') && !renderStage.includes('traceback')
+                  ? renderStage
+                  : 'Something went wrong while processing your video.'}
+              </p>
+              <div className="bg-white/5 border border-white/8 rounded-lg p-3 mb-3">
+                <p className="text-[11px] text-white/40 font-semibold uppercase tracking-wide mb-2">What to try</p>
+                <ul className="text-[12.5px] text-white/60 space-y-1.5 list-none">
+                  <li className="flex items-start gap-2"><span className="text-violet-400 mt-0.5">→</span>Go back to Voice &amp; Visuals and try a different visual source</li>
+                  <li className="flex items-start gap-2"><span className="text-violet-400 mt-0.5">→</span>Try fewer scenes or a shorter duration</li>
+                  <li className="flex items-start gap-2"><span className="text-violet-400 mt-0.5">→</span>Switch to Stock video (Pexels) if using AI images</li>
+                  <li className="flex items-start gap-2"><span className="text-violet-400 mt-0.5">→</span>Remove background music and try again</li>
+                </ul>
+              </div>
+              <button
+                onClick={() => useStore.getState().setStep('voice')}
+                className="text-[12.5px] font-semibold text-violet-400 hover:text-violet-300 flex items-center gap-1.5 transition-colors"
+              >
+                ← Back to Voice &amp; Visuals
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
+      {/* ── Success ── */}
+      {isDone && (
+        <>
+          {/* Banner */}
+          <div className="bg-teal-500/10 border border-teal-500/25 rounded-xl p-4 mb-6 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-teal-500/20 flex items-center justify-center flex-shrink-0">
+              <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="#2DD4BF" strokeWidth="2">
+                <circle cx="8" cy="8" r="6"/><path d="M5 8l2 2 4-4"/>
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-teal-400 font-semibold text-[14px] truncate">
+                {projectTitle ?? 'Video'} — ready
+              </p>
+              <div className="flex gap-3 mt-1">
+                {scenes.length > 0 && (
+                  <span className="text-[12px] text-white/45"><span className="text-white/70 font-medium">{scenes.length}</span> scenes</span>
+                )}
+                {totalDuration > 0 && (
+                  <span className="text-[12px] text-white/45"><span className="text-white/70 font-medium">{totalDuration}s</span> duration</span>
+                )}
+                {effectiveConfig?.platform && (
+                  <span className="text-[12px] text-white/45">📱 <span className="text-white/70 font-medium">{effectiveConfig.platform}</span></span>
+                )}
+                {agencyProjectMeta?.client_name && (
+                  <span className="text-[12px] text-white/45">🏷 <span className="text-amber-300/80 font-medium">{agencyProjectMeta.client_name}</span></span>
+                )}
+                {!agencyProjectMeta && activeProject?.folder && (
+                  <span className="text-[12px] text-white/45">saved to <span className="text-violet-400">/{activeProject.folder}</span></span>
+                )}
+              </div>
+            </div>
+            <span className="text-[10px] font-bold bg-teal-500/15 text-teal-400 px-2.5 py-1 rounded-full uppercase tracking-widest flex-shrink-0">
+              Exported
+            </span>
+          </div>
 
-async def _verify_job_ownership(redis, job_id: str, authorization: str | None) -> None:
-    """
-    Verify the requesting user owns this render job.
-    If no auth header — allow (anonymous / preview access).
-    If auth header present — must match the job's owner.
-    """
-    if not authorization:
-        return   # anonymous access allowed (e.g. share links)
-    token = authorization.removeprefix("Bearer ").strip()
-    if not token:
-        return
-    request_user_id = auth_service.verify_token(token)
-    if not request_user_id:
-        return   # invalid token — treat as anonymous
-    raw = await redis.get(f"job:{job_id}:user_id")
-    if not raw:
-        return   # no owner stored — allow (legacy jobs)
-    job_owner = raw.decode() if isinstance(raw, bytes) else raw
-    if job_owner != request_user_id:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=403, detail="You do not have access to this render job")
+          {/* Video preview */}
+          {videoUrl && (
+            <div className="mb-6">
+              <p className="text-[11px] text-white/35 uppercase tracking-widest font-semibold mb-3">Preview</p>
+              <video
+                src={videoUrl}
+                controls
+                className="max-w-[260px] mx-auto rounded-xl border border-white/10 block"
+                style={{ maxHeight: 460 }}
+              />
+            </div>
+          )}
 
+          {/* Video downloads */}
+          <p className="text-[11px] text-white/35 uppercase tracking-widest font-semibold mb-3">Downloads</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+            {[
+              { type: 'full'   as const, icon: '🎬', title: 'Full video',      desc: 'Single MP4 — voice, visuals, subtitles', badge: 'MP4 · H.264',       color: 'teal'   as const },
+              { type: 'scenes' as const, icon: '🗂',  title: 'Scene bundle',    desc: 'Per-scene MP4 clips + JSON',              badge: 'ZIP · scenes + JSON', color: 'purple' as const },
+              { type: 'capcut' as const, icon: '✂️',  title: 'CapCut package',  desc: 'Scene files + draft_content.json',        badge: 'CapCut ready',       color: 'amber'  as const },
+            ].map(({ type, icon, title, desc, badge, color }) => (
+              <a
+                key={type}
+                href={exportUrl(jobId, type, projectTitle)}
+                download
+                className="block bg-[#111118] border border-white/[0.07] rounded-xl p-5 text-center hover:border-white/15 hover:-translate-y-0.5 transition-all duration-150 cursor-pointer"
+              >
+                <div className="text-2xl mb-3">{icon}</div>
+                <p className="font-semibold text-[13.5px] text-white mb-1">{title}</p>
+                <p className="text-[12px] text-white/40 mb-3">{desc}</p>
+                <Badge color={color}>{badge}</Badge>
+              </a>
+            ))}
+          </div>
 
-def _job_dir(job_id: str) -> Path:
-    p = Path(settings.renders_dir) / job_id
-    if not p.exists():
-        raise HTTPException(status_code=404, detail="Render job not found")
-    return p
+          {/* ── Voice extraction ── */}
+          <p className="text-[11px] text-white/35 uppercase tracking-widest font-semibold mb-3">Extract voice</p>
+          <div className="flex flex-col sm:flex-row gap-3 mb-2">
+            {(['mp3', 'wav'] as const).map((fmt) => (
+              <a
+                key={fmt}
+                href={voiceUrl(jobId, fmt, projectTitle)}
+                download
+                className="flex items-center gap-3 flex-1 bg-[#111118] border border-white/[0.07] rounded-xl px-4 py-3.5 hover:border-white/15 hover:-translate-y-0.5 transition-all duration-150 cursor-pointer"
+              >
+                <div className="w-9 h-9 rounded-lg bg-violet-500/15 flex items-center justify-center flex-shrink-0">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#A78BFA" strokeWidth="1.5">
+                    <path d="M8 2v8M5 4v6M11 4v6M2 7v2M14 7v2"/>
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-semibold text-white">Voiceover · {fmt.toUpperCase()}</p>
+                  <p className="text-[11.5px] text-white/40">
+                    {fmt === 'mp3' ? 'Compressed · smaller file' : 'Uncompressed · studio quality'}
+                  </p>
+                </div>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5">
+                  <path d="M8 2v8M4 7l4 4 4-4M2 14h12"/>
+                </svg>
+              </a>
+            ))}
+          </div>
+          <p className="text-[11px] text-white/25 mb-8">
+            Audio extracted from your rendered video — ready for podcasts, voiceover reuse, or archiving
+          </p>
 
+          {/* Share panel */}
+          {videoUrl && (
+            <SharePanel
+              videoUrl={videoUrl}
+              niche={effectiveConfig?.niche}
+              platform={effectiveConfig?.platform}
+              projectTitle={projectTitle}
+              script={script}
+            />
+          )}
 
-def _safe_filename(title: str, suffix: str) -> str:
-    clean = re.sub(r"[^\w\s\-]", "", title).strip()
-    clean = re.sub(r"\s+", "_", clean)[:60].strip("_")
-    return f"{clean}{suffix}" if clean else f"sceneforge{suffix}"
-
-
-async def _worker_get(client: httpx.AsyncClient, job_id: str, path: str) -> httpx.Response:
-    return await client.get(f"{WORKER_BASE_URL}/renders/{job_id}/{path}")
-
-
-async def _resolve_video_url(redis, job_id: str) -> str | None:
-    """
-    Find the final video URL — check R2 first, then worker URL.
-    Returns the URL string or None.
-    """
-    # Check R2 URLs stored in Redis job result
-    for name in ("final_video_music.mp4", "final_video.mp4"):
-        url = await get_r2_url(redis, job_id, name)
-        if url:
-            return url
-    # Fall back to worker URL
-    if WORKER_BASE_URL:
-        return f"{WORKER_BASE_URL}/renders/{job_id}/final_video.mp4"
-    return None
-
-
-# ── Full video ────────────────────────────────────────────────────────────────
-
-@router.get("/full/{job_id}")
-async def export_full_video(
-    job_id: str,
-    title: str = Query(default=""),
-    redis=Depends(get_redis),
-    authorization: Optional[str] = Header(None),
-):
-    job_id = _verify_job_id(job_id)
-    await _verify_job_ownership(redis, job_id, authorization)
-    filename = _safe_filename(title, ".mp4") if title else "sceneforge_video.mp4"
-
-    # 1. Check R2 — redirect directly (fastest, permanent)
-    for name in ("final_video_music.mp4", "final_video.mp4"):
-        r2_url = await get_r2_url(redis, job_id, name)
-        if r2_url:
-            logger.info("Serving %s from R2: %s", job_id, r2_url)
-            return RedirectResponse(url=r2_url)
-
-    # 2. Proxy from worker
-    if WORKER_BASE_URL:
-        async with httpx.AsyncClient(timeout=120) as client:
-            for name in ("final_video_music.mp4", "final_video.mp4"):
-                try:
-                    resp = await _worker_get(client, job_id, name)
-                    if resp.status_code == 200:
-                        return Response(
-                            content=resp.content,
-                            media_type="video/mp4",
-                            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-                        )
-                except Exception as e:
-                    logger.warning("Worker proxy failed for %s: %s", name, e)
-
-    # 3. Local fallback
-    job_dir = _job_dir(job_id)
-    for name in ("final_video_music.mp4", "final_video.mp4"):
-        p = job_dir / name
-        if p.exists():
-            return FileResponse(str(p), media_type="video/mp4", filename=filename,
-                headers={"Content-Disposition": f'attachment; filename="{filename}"'})
-
-    raise HTTPException(status_code=404, detail="Video not rendered yet")
-
-
-# ── Scene bundle ──────────────────────────────────────────────────────────────
-
-@router.get("/scenes/{job_id}")
-async def export_scene_bundle(
-    job_id: str,
-    title: str = Query(default=""),
-    redis=Depends(get_redis),
-):
-    filename = _safe_filename(title, "_scenes.zip") if title else "scene_bundle.zip"
-
-    async def _build_zip_from_source(client: httpx.AsyncClient, use_r2: bool) -> io.BytesIO | None:
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-            for i in range(1, 25):
-                name = f"scene_{i:02d}.mp4"
-                if use_r2:
-                    url = await get_r2_url(redis, job_id, name)
-                    if not url:
-                        break
-                    resp = await client.get(url)
-                else:
-                    resp = await _worker_get(client, job_id, name)
-                if resp.status_code == 200:
-                    zf.writestr(name, resp.content)
-                else:
-                    break
-            # Add manifest
-            manifest_url = (await get_r2_url(redis, job_id, "manifest.json")
-                           if use_r2 else None)
-            if manifest_url:
-                resp = await client.get(manifest_url)
-                if resp.status_code == 200:
-                    zf.writestr("manifest.json", resp.content)
-            elif not use_r2 and WORKER_BASE_URL:
-                resp = await _worker_get(client, job_id, "manifest.json")
-                if resp.status_code == 200:
-                    zf.writestr("manifest.json", resp.content)
-            if not zf.namelist():
-                return None
-        buf.seek(0)
-        return buf
-
-    if r2_enabled() or WORKER_BASE_URL:
-        async with httpx.AsyncClient(timeout=120) as client:
-            use_r2 = r2_enabled() and bool(await get_r2_url(redis, job_id, "scene_01.mp4"))
-            buf = await _build_zip_from_source(client, use_r2)
-            if buf:
-                return StreamingResponse(buf, media_type="application/zip",
-                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})
-
-    # Local fallback
-    job_dir    = _job_dir(job_id)
-    scene_files = sorted(job_dir.glob("scene_*.mp4"))
-    if not scene_files:
-        raise HTTPException(status_code=404, detail="No scenes found")
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for sf in scene_files:
-            zf.write(sf, sf.name)
-        manifest = job_dir / "manifest.json"
-        if manifest.exists():
-            zf.write(manifest, "manifest.json")
-    buf.seek(0)
-    return StreamingResponse(buf, media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'})
-
-
-# ── CapCut package ────────────────────────────────────────────────────────────
-
-@router.get("/capcut/{job_id}")
-async def export_capcut_package(
-    job_id: str,
-    title: str = Query(default=""),
-    redis=Depends(get_redis),
-):
-    filename = _safe_filename(title, "_capcut.zip") if title else "capcut_package.zip"
-
-    if r2_enabled() or WORKER_BASE_URL:
-        async with httpx.AsyncClient(timeout=120) as client:
-            buf = io.BytesIO()
-            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-                for i in range(1, 25):
-                    name = f"scene_{i:02d}.mp4"
-                    url  = await get_r2_url(redis, job_id, name)
-                    resp = await client.get(url) if url else await _worker_get(client, job_id, name)
-                    if resp.status_code == 200:
-                        zf.writestr(name, resp.content)
-                    else:
-                        break
-                # draft_content.json
-                url  = await get_r2_url(redis, job_id, "draft_content.json")
-                resp = await client.get(url) if url else await _worker_get(client, job_id, "draft_content.json")
-                if resp.status_code == 200:
-                    zf.writestr("draft_content.json", resp.content)
-                zf.writestr("README.txt", "Import into CapCut: File > Import Project")
-                if not any(n.endswith(".mp4") for n in zf.namelist()):
-                    raise HTTPException(status_code=404, detail="No scenes found")
-            buf.seek(0)
-            return StreamingResponse(buf, media_type="application/zip",
-                headers={"Content-Disposition": f'attachment; filename="{filename}"'})
-
-    # Local fallback
-    job_dir    = _job_dir(job_id)
-    scene_files = sorted(job_dir.glob("scene_*.mp4"))
-    draft_file  = job_dir / "draft_content.json"
-    if not scene_files:
-        raise HTTPException(status_code=404, detail="No scenes found")
-    if not draft_file.exists():
-        raise HTTPException(status_code=404, detail="CapCut draft not generated")
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for sf in scene_files:
-            zf.write(sf, sf.name)
-        zf.write(draft_file, "draft_content.json")
-        zf.writestr("README.txt", "Import into CapCut: File > Import Project")
-    buf.seek(0)
-    return StreamingResponse(buf, media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'})
-
-
-# ── Voice extraction ──────────────────────────────────────────────────────────
-
-@router.get("/voice/{job_id}")
-async def export_voice(
-    job_id: str,
-    title: str = Query(default=""),
-    format: str = Query(default="mp3"),
-    redis=Depends(get_redis),
-):
-    import subprocess
-    fmt      = "wav" if format == "wav" else "mp3"
-    filename = _safe_filename(title, f"_voiceover.{fmt}") if title else f"voiceover.{fmt}"
-
-    # Get video — from R2, worker, or local
-    tmp_dir = Path(settings.renders_dir) / job_id
-    tmp_dir.mkdir(parents=True, exist_ok=True)
-    video_path: str | None = None
-
-    for name in ("final_video_music.mp4", "final_video.mp4"):
-        local = tmp_dir / name
-        if local.exists():
-            video_path = str(local)
-            break
-        # Try R2
-        r2_url = await get_r2_url(redis, job_id, name)
-        if r2_url:
-            try:
-                async with httpx.AsyncClient(timeout=120) as client:
-                    resp = await client.get(r2_url)
-                    if resp.status_code == 200:
-                        local.write_bytes(resp.content)
-                        video_path = str(local)
-                        break
-            except Exception as e:
-                logger.warning("R2 video download failed: %s", e)
-        # Try worker
-        if WORKER_BASE_URL:
-            try:
-                async with httpx.AsyncClient(timeout=120) as client:
-                    resp = await _worker_get(client, job_id, name)
-                    if resp.status_code == 200:
-                        local.write_bytes(resp.content)
-                        video_path = str(local)
-                        break
-            except Exception as e:
-                logger.warning("Worker download failed: %s", e)
-
-    if not video_path:
-        raise HTTPException(status_code=404, detail="Video not rendered yet")
-
-    cached = tmp_dir / f"voiceover.{fmt}"
-    if not cached.exists():
-        cmd = (["ffmpeg", "-y", "-i", video_path, "-vn",
-                "-acodec", "libmp3lame", "-q:a", "2", "-ar", "44100", "-ac", "2", str(cached)]
-               if fmt == "mp3" else
-               ["ffmpeg", "-y", "-i", video_path, "-vn",
-                "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "2", str(cached)])
-        result = subprocess.run(cmd, capture_output=True)
-        if result.returncode != 0:
-            raise HTTPException(status_code=500,
-                detail=f"Audio extraction failed: {result.stderr.decode()[:200]}")
-
-    media_type = "audio/wav" if fmt == "wav" else "audio/mpeg"
-    return FileResponse(str(cached), media_type=media_type, filename=filename,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'})
-
-
-# ── Manifest ──────────────────────────────────────────────────────────────────
-
-@router.get("/manifest/{job_id}")
-async def get_manifest(job_id: str, redis=Depends(get_redis)):
-    url = await get_r2_url(redis, job_id, "manifest.json")
-    if url:
-        async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.get(url)
-            if resp.status_code == 200:
-                return resp.json()
-    if WORKER_BASE_URL:
-        async with httpx.AsyncClient(timeout=30) as client:
-            resp = await _worker_get(client, job_id, "manifest.json")
-            if resp.status_code == 200:
-                return resp.json()
-    job_dir  = _job_dir(job_id)
-    manifest = job_dir / "manifest.json"
-    if not manifest.exists():
-        raise HTTPException(status_code=404, detail="Manifest not found")
-    with open(manifest) as f:
-        return json.load(f)
-
-@router.get("/signed/{job_id}")
-async def create_download_link(
-    job_id: str,
-    redis=Depends(get_redis),
-    authorization: Optional[str] = Header(None),
-):
-    """
-    Create a signed, time-limited download URL for a render.
-    The link expires in 1 hour and can only be used by the requesting user.
-    """
-    from app.config import get_settings
-    cfg = get_settings()
-    secret = cfg.admin_secret_key or "sceneforge-default-signing-key"
-
-    job_id = _verify_job_id(job_id)
-    await _verify_job_ownership(redis, job_id, authorization)
-
-    token = (authorization or "").removeprefix("Bearer ").strip()
-    user_id = auth_service.verify_token(token) if token else "anonymous"
-
-    signed_token = await create_signed_url(redis, job_id, user_id or "anonymous", secret)
-    return {
-        "token": signed_token,
-        "download_url": f"/api/export/download/{job_id}?token={signed_token}",
-        "expires_in": 3600,
-    }
-
-
-@router.get("/download/{job_id}")
-async def download_with_signed_token(
-    job_id: str,
-    token: str = Query(...),
-    title: str = Query(default=""),
-    redis=Depends(get_redis),
-):
-    """Download a render using a signed token (no session required)."""
-    from app.config import get_settings
-    cfg = get_settings()
-    secret = cfg.admin_secret_key or "sceneforge-default-signing-key"
-
-    job_id = _verify_job_id(job_id)
-    await verify_signed_url(redis, token, job_id, secret)
-
-    filename = _safe_filename(title, ".mp4") if title else "sceneforge_video.mp4"
-    for name in ("final_video_music.mp4", "final_video.mp4"):
-        r2_url = await get_r2_url(redis, job_id, name)
-        if r2_url:
-            return RedirectResponse(url=r2_url)
-    raise HTTPException(status_code=404, detail="Video not found")
+          {/* New project */}
+          <div className="pt-5 border-t border-white/[0.07] flex items-center justify-between">
+            <p className="text-[13px] text-white/40">Ready for your next video?</p>
+            <button
+              onClick={() => document.dispatchEvent(new CustomEvent('open-new-project-modal'))}
+              className="flex items-center gap-2 px-4 py-2 bg-violet-500/15 border border-violet-500/30 rounded-lg text-violet-300 text-[13px] font-medium hover:bg-violet-500/25 transition-all"
+            >
+              + New project
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
