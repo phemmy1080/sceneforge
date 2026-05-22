@@ -165,7 +165,16 @@ async def start_render(
         try:
             ws_id = await get_workspace_id_for_user(redis, user_id)
             if ws_id:
+                # Block suspended members from rendering
+                suspended = await redis.get(f"workspace:suspended:{ws_id}:{user_id}")
+                if suspended:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Your workspace access has been suspended. Contact the workspace owner."
+                    )
                 await redis.set(f"job:{job_id}:ws_id", ws_id, ex=86400)
+        except HTTPException:
+            raise
         except Exception:
             pass
     if prev_job_id:
