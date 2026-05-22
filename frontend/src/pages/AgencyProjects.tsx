@@ -259,10 +259,11 @@ export function NewProject() {
 export function ProjectDetail() {
   const setStep = useStore((s) => s.setStep);
   const id = useStore((s: any) => s.agencyProjectId);
-  const currentUser = useAuthStore((s: any) => s.user);
-  const wsRole = currentUser?.workspace_role || 'editor';
-  const isOwner = wsRole === 'owner';
-  const isAdmin = wsRole === 'owner' || wsRole === 'admin';
+  const currentUser   = useAuthStore((s: any) => s.user);
+  const wsRole        = currentUser?.workspace_role || 'editor';
+  const isOwner       = wsRole === 'owner';
+  const isAdmin       = wsRole === 'owner' || wsRole === 'admin';
+  const isSuspended   = !!(currentUser?.workspace_suspended);
   const [project, setProject] = useState<Project | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -563,16 +564,15 @@ export function ProjectDetail() {
           {/* Create video — editors must be assigned, owners/admins always can */}
           {(() => {
             const isAssigned = project.assigned_to?.includes(currentUser?.id || '');
-            const canCreate  = isAdmin || isAssigned;
+            const canCreate  = (isAdmin || isAssigned) && !isSuspended;
             return (
               <button
                 onClick={() => {
                   if (!canCreate) return;
-                  // Atomic: sets agencyProjectId + step together, no partial render
                   useStore.getState().startAgencyVideo(id || '');
                 }}
                 disabled={!canCreate}
-                title={!canCreate ? "You are not assigned to this project" : undefined}
+                title={isSuspended ? "Your access is suspended — contact the workspace owner" : !canCreate ? "You are not assigned to this project" : undefined}
                 className={`flex items-center gap-1.5 text-xs font-bold px-3.5 py-1.5 rounded-full transition shadow-md ${
                   canCreate
                     ? "bg-amber-400 hover:bg-amber-300 text-black shadow-amber-400/20"
@@ -756,6 +756,17 @@ ${emailBody}`)}
           </div>
         );
       })()}
+
+      {/* ── Suspension banner ── */}
+      {isSuspended && (
+        <div className="bg-rose-400/[0.07] border border-rose-400/20 rounded-2xl p-4 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-rose-400/15 flex items-center justify-center flex-shrink-0 text-lg">🚫</div>
+          <div>
+            <div className="text-sm font-bold text-rose-300">Your access is suspended</div>
+            <div className="text-xs text-white/40 mt-0.5">You can view this project but cannot create videos or render. Contact the workspace owner to restore access.</div>
+          </div>
+        </div>
+      )}
 
       {/* ── Assignment panel ── */}
       <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-4">
