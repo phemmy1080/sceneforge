@@ -39,7 +39,7 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 })
 
-type Screen = 'landing' | 'login' | 'signup' | 'verify' | 'forgot' | 'app' | 'join'
+type Screen = 'landing' | 'login' | 'signup' | 'verify' | 'forgot' | 'app' | 'join' | 'suspended'
 
 function applyDeepLink(): boolean {
   const params    = new URLSearchParams(window.location.search)
