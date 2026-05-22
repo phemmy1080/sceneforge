@@ -343,8 +343,16 @@ export function ProjectDetail() {
   const [activeScene, setActiveScene] = useState<number | null>(null);
   const [sceneCommentText, setSceneCommentText] = useState("");
   const [members, setMembers] = useState<Member[]>([]);
-  const [assignOpen, setAssignOpen] = useState(false);
-  const [assigning, setAssigning] = useState(false);
+  const [assignOpen, setAssignOpen]   = useState(false);
+  const [assigning, setAssigning]     = useState(false);
+  // Edit project details
+  const [editOpen, setEditOpen]       = useState(false);
+  const [editForm, setEditForm]       = useState({ title: '', client_name: '', platform: '', notes: '' });
+  const [editSaving, setEditSaving]   = useState(false);
+  const [editError, setEditError]     = useState('');
+
+  const LOCKED_STATUSES = ['approved', 'rendering', 'exported'];
+  const canEditDetails = isAdmin && !LOCKED_STATUSES.includes(project?.status || '');
 
   useEffect(() => { if (id && !isSuspended) load(); }, [id]);
 
@@ -514,6 +522,29 @@ export function ProjectDetail() {
     })
   }
 
+  async function openEdit() {
+    setEditForm({
+      title:       project?.title       || '',
+      client_name: project?.client_name || '',
+      platform:    project?.platform    || '',
+      notes:       project?.notes       || '',
+    });
+    setEditError('');
+    setEditOpen(true);
+  }
+
+  async function saveEdit() {
+    if (!editForm.title.trim()) { setEditError('Title is required'); return; }
+    setEditSaving(true); setEditError('');
+    try {
+      const res = await api.put(`/api/agency/projects/${id}`, editForm);
+      setProject(res.data.project);
+      setEditOpen(false);
+    } catch (e: any) {
+      setEditError(e.response?.data?.detail || 'Failed to save');
+    } finally { setEditSaving(false); }
+  }
+
   async function toggleAssign(memberId: string) {
     if (!project) return;
     setAssigning(true);
@@ -602,9 +633,23 @@ export function ProjectDetail() {
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-extrabold text-white tracking-tight">{project.title}</h1>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-extrabold text-white tracking-tight truncate">{project.title}</h1>
+            {canEditDetails && (
+              <button onClick={openEdit}
+                title="Edit project details"
+                className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-white hover:bg-white/[0.07] transition">
+                <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9.5 1.5l2 2-7 7H2.5v-2l7-7z"/>
+                </svg>
+              </button>
+            )}
+          </div>
           <p className="text-white/35 text-sm mt-1">{project.client_name || "No client"} · {project.platform}</p>
+          {!canEditDetails && LOCKED_STATUSES.includes(project.status) && isAdmin && (
+            <p className="text-[11px] text-white/20 mt-1">Project is locked for editing after {project.status}</p>
+          )}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
 
@@ -830,6 +875,58 @@ ${emailBody}`)}
           </div>
         );
       })()}
+
+      {/* ── Edit project details panel ── */}
+      {editOpen && (
+        <div className="bg-white/[0.04] border border-white/[0.1] rounded-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.07]">
+            <div className="text-sm font-bold text-white">Edit project details</div>
+            <button onClick={() => setEditOpen(false)}
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-white hover:bg-white/[0.06] transition text-lg leading-none">×</button>
+          </div>
+          <div className="px-5 py-5 space-y-4">
+            <div>
+              <label className="block text-[11px] font-bold text-white/30 uppercase tracking-widest mb-1.5">Project title *</label>
+              <input type="text" value={editForm.title} placeholder="e.g. AI Trading Shorts — Week 4"
+                onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
+                className="w-full bg-white/[0.06] border border-white/[0.1] rounded-xl px-3.5 py-2.5 text-white text-sm outline-none focus:border-amber-400/50 placeholder:text-white/20 transition" />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-white/30 uppercase tracking-widest mb-1.5">Client name</label>
+              <input type="text" value={editForm.client_name} placeholder="e.g. CryptoNova"
+                onChange={e => setEditForm(f => ({ ...f, client_name: e.target.value }))}
+                className="w-full bg-white/[0.06] border border-white/[0.1] rounded-xl px-3.5 py-2.5 text-white text-sm outline-none focus:border-amber-400/50 placeholder:text-white/20 transition" />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-white/30 uppercase tracking-widest mb-1.5">Platform</label>
+              <select value={editForm.platform} onChange={e => setEditForm(f => ({ ...f, platform: e.target.value }))}
+                className="w-full bg-white/[0.06] border border-white/[0.1] rounded-xl px-3.5 py-2.5 text-white text-sm outline-none focus:border-amber-400/50 transition">
+                <option value="">Select platform</option>
+                {["TikTok","Instagram Reels","YouTube Shorts","Facebook","LinkedIn","Twitter/X","Snapchat"].map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-white/30 uppercase tracking-widest mb-1.5">Notes <span className="normal-case font-normal text-white/20">(brief for editors)</span></label>
+              <textarea rows={3} value={editForm.notes} placeholder="Any context or instructions for the team..."
+                onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
+                className="w-full bg-white/[0.06] border border-white/[0.1] rounded-xl px-3.5 py-2.5 text-white text-sm outline-none focus:border-amber-400/50 placeholder:text-white/20 transition resize-none" />
+            </div>
+            {editError && <p className="text-rose-400 text-xs font-medium">{editError}</p>}
+            <div className="flex gap-3 pt-1">
+              <button onClick={saveEdit} disabled={editSaving}
+                className="flex-1 bg-amber-400 hover:bg-amber-300 text-black font-bold py-2.5 rounded-xl text-sm transition disabled:opacity-50">
+                {editSaving ? "Saving…" : "Save changes"}
+              </button>
+              <button onClick={() => setEditOpen(false)}
+                className="px-5 bg-white/[0.06] border border-white/[0.1] text-white/50 hover:text-white rounded-xl text-sm font-semibold transition">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Assignment panel ── */}
       <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-4">
