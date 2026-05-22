@@ -86,13 +86,29 @@ export function AgencyProjects() {
         </svg>
       </div>
       <div>
-        <h2 className="text-xl font-bold text-white mb-2">Account suspended</h2>
+        <h2 className="text-xl font-bold text-white mb-2">Workspace access suspended</h2>
         <p className="text-white/50 text-sm leading-relaxed">
-          Your workspace access has been suspended by the workspace owner.
-          You cannot view or work on projects until your access is restored.
+          Your access to this agency workspace has been suspended.
+          Contact the workspace owner to restore access.
         </p>
       </div>
-      <p className="text-white/25 text-xs">Contact your workspace owner to resolve this.</p>
+      <div className="flex gap-3 justify-center flex-wrap">
+        {currentUser?.plan && currentUser.plan !== 'none' && (
+          <button
+            onClick={() => {
+              useStore.getState().setAgencyProjectId('');
+              setStep('projects' as any);
+            }}
+            className="text-sm bg-amber-400 hover:bg-amber-300 text-black font-bold px-5 py-2.5 rounded-xl transition">
+            Go to personal workspace
+          </button>
+        )}
+        <button
+          onClick={() => useAuthStore.getState().logout()}
+          className="text-sm border border-white/[0.1] text-white/50 hover:text-white px-5 py-2.5 rounded-xl transition">
+          Sign out
+        </button>
+      </div>
     </div>
   );
 
@@ -788,11 +804,27 @@ ${emailBody}`)}
 
       {/* ── Suspension banner ── */}
       {isSuspended && (
-        <div className="bg-rose-400/[0.07] border border-rose-400/20 rounded-2xl p-4 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-rose-400/15 flex items-center justify-center flex-shrink-0 text-lg">🚫</div>
-          <div>
-            <div className="text-sm font-bold text-rose-300">Your access is suspended</div>
-            <div className="text-xs text-white/40 mt-0.5">You can view this project but cannot create videos or render. Contact the workspace owner to restore access.</div>
+        <div className="bg-rose-400/[0.07] border border-rose-400/20 rounded-2xl p-4 flex items-start gap-3">
+          <div className="w-9 h-9 rounded-full bg-rose-400/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f09595" strokeWidth="1.5" strokeLinecap="round">
+              <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-bold text-rose-300">Agency workspace access suspended</div>
+            <div className="text-xs text-white/40 mt-0.5 mb-3">You can view this project but cannot create videos or render. Contact the workspace owner to restore access.</div>
+            <div className="flex gap-2 flex-wrap">
+              {currentUser?.plan && currentUser.plan !== 'none' && (
+                <button
+                  onClick={() => {
+                    useStore.getState().setAgencyProjectId('');
+                    setStep('projects' as any);
+                  }}
+                  className="text-xs bg-amber-400/15 border border-amber-400/25 text-amber-300 hover:bg-amber-400/20 px-3 py-1.5 rounded-lg transition font-semibold">
+                  Go to personal workspace
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
