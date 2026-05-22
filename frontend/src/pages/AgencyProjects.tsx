@@ -90,11 +90,14 @@ export function AgencyProjects() {
   const canCreate = isAdminOrOwner; // only owner/admin can create new projects
   const canInvite = isAdminOrOwner;
   const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!(currentUser?.workspace_suspended));
   const [filter, setFilter] = useState("all");
-  const [suspendedBlocked, setSuspendedBlocked] = useState(false);
+  // Initialise immediately from cached user — no API wait
+  const [suspendedBlocked, setSuspendedBlocked] = useState(!!(currentUser?.workspace_suspended));
 
   useEffect(() => {
+    // Skip API call entirely — already know they're suspended
+    if (currentUser?.workspace_suspended) { setSuspendedBlocked(true); setLoading(false); return; }
     api.get("/api/agency/projects")
       .then(r => setProjects(r.data.projects))
       .catch(e => {
@@ -105,6 +108,11 @@ export function AgencyProjects() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  // Also react if suspension changes mid-session
+  useEffect(() => {
+    if (currentUser?.workspace_suspended) { setSuspendedBlocked(true); setLoading(false); }
+  }, [currentUser?.workspace_suspended]);
 
   // Editors can only ACTION assigned projects but can VIEW all
   // Backend already filters clients — here we just track which ones are assigned to the editor
@@ -322,7 +330,8 @@ export function ProjectDetail() {
   const isSuspended   = !!(currentUser?.workspace_suspended);
   const [project, setProject] = useState<Project | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Don't start loading if already suspended — show suspended screen immediately
+  const [loading, setLoading] = useState(!isSuspended);
   const [commentText, setCommentText] = useState("");
   const [reviewUrl, setReviewUrl] = useState("");
   const [copied, setCopied] = useState(false);
@@ -337,7 +346,7 @@ export function ProjectDetail() {
   const [assignOpen, setAssignOpen] = useState(false);
   const [assigning, setAssigning] = useState(false);
 
-  useEffect(() => { if (id) load(); }, [id]);
+  useEffect(() => { if (id && !isSuspended) load(); }, [id]);
 
   async function load() {
     try {
