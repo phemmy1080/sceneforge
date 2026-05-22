@@ -533,7 +533,7 @@ export function ProjectDetail() {
     setEditOpen(true);
   }
 
-  async function saveEdit() {
+  async function saveProjectEdit() {
     if (!editForm.title.trim()) { setEditError('Title is required'); return; }
     setEditSaving(true); setEditError('');
     try {
@@ -915,7 +915,7 @@ ${emailBody}`)}
             </div>
             {editError && <p className="text-rose-400 text-xs font-medium">{editError}</p>}
             <div className="flex gap-3 pt-1">
-              <button onClick={saveEdit} disabled={editSaving}
+              <button onClick={saveProjectEdit} disabled={editSaving}
                 className="flex-1 bg-amber-400 hover:bg-amber-300 text-black font-bold py-2.5 rounded-xl text-sm transition disabled:opacity-50">
                 {editSaving ? "Saving…" : "Save changes"}
               </button>
