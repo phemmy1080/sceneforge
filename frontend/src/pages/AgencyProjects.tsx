@@ -19,6 +19,43 @@ interface SceneClip {
   label: string;
 }
 interface BrandKit { id: string; client_name: string; }
+
+export function SuspendedScreen({ currentUser, onGoPersonal, onSignOut }: {
+  currentUser: any;
+  onGoPersonal: () => void;
+  onSignOut: () => void;
+}) {
+  const hasPersonal = currentUser?.plan && currentUser.plan !== 'none';
+  return (
+    <div className="max-w-md mx-auto py-16 text-center space-y-5">
+      <div className="w-16 h-16 rounded-full bg-rose-400/10 border border-rose-400/20 flex items-center justify-center mx-auto">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#e24b4a" strokeWidth="1.5" strokeLinecap="round">
+          <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+        </svg>
+      </div>
+      <div>
+        <h2 className="text-xl font-bold text-white mb-2">Workspace access suspended</h2>
+        <p className="text-white/50 text-sm leading-relaxed">
+          Your access to this agency workspace has been suspended by the owner.
+          You cannot view or work on projects until access is restored.
+        </p>
+        <p className="text-white/25 text-xs mt-2">Contact your workspace owner to resolve this.</p>
+      </div>
+      <div className="flex gap-3 justify-center flex-wrap">
+        {hasPersonal && (
+          <button onClick={onGoPersonal}
+            className="text-sm bg-amber-400 hover:bg-amber-300 text-black font-bold px-5 py-2.5 rounded-xl transition">
+            Go to personal workspace
+          </button>
+        )}
+        <button onClick={onSignOut}
+          className="text-sm border border-white/[0.1] text-white/50 hover:text-white px-5 py-2.5 rounded-xl transition">
+          Sign out
+        </button>
+      </div>
+    </div>
+  );
+}
 interface Member { user_id: string; name: string; email: string; role: string; initials: string; }
 
 const STATUSES = [
@@ -79,37 +116,11 @@ export function AgencyProjects() {
   const filtered      = allFiltered; // all projects visible to everyone for viewing
 
   if (suspendedBlocked) return (
-    <div className="max-w-md mx-auto py-16 text-center space-y-5">
-      <div className="w-16 h-16 rounded-full bg-rose-400/10 border border-rose-400/20 flex items-center justify-center mx-auto">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#e24b4a" strokeWidth="1.5" strokeLinecap="round">
-          <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
-        </svg>
-      </div>
-      <div>
-        <h2 className="text-xl font-bold text-white mb-2">Workspace access suspended</h2>
-        <p className="text-white/50 text-sm leading-relaxed">
-          Your access to this agency workspace has been suspended.
-          Contact the workspace owner to restore access.
-        </p>
-      </div>
-      <div className="flex gap-3 justify-center flex-wrap">
-        {currentUser?.plan && currentUser.plan !== 'none' && (
-          <button
-            onClick={() => {
-              useStore.getState().setAgencyProjectId('');
-              setStep('projects' as any);
-            }}
-            className="text-sm bg-amber-400 hover:bg-amber-300 text-black font-bold px-5 py-2.5 rounded-xl transition">
-            Go to personal workspace
-          </button>
-        )}
-        <button
-          onClick={() => useAuthStore.getState().logout()}
-          className="text-sm border border-white/[0.1] text-white/50 hover:text-white px-5 py-2.5 rounded-xl transition">
-          Sign out
-        </button>
-      </div>
-    </div>
+    <SuspendedScreen
+      currentUser={currentUser}
+      onGoPersonal={() => { useStore.getState().setAgencyProjectId(''); setStep('projects' as any); }}
+      onSignOut={() => useAuthStore.getState().logout()}
+    />
   );
 
   return (
@@ -556,6 +567,15 @@ export function ProjectDetail() {
     </div>
   );
 
+  // Suspended members see the same full screen as the projects list — no inline banner
+  if (isSuspended) return (
+    <SuspendedScreen
+      currentUser={currentUser}
+      onGoPersonal={() => { useStore.getState().setAgencyProjectId(''); setStep('projects' as any); }}
+      onSignOut={() => useAuthStore.getState().logout()}
+    />
+  );
+
   if (!project) return <div className="text-white/40 text-sm p-8">Project not found</div>;
 
   const st = getStatus(project.status);
@@ -801,33 +821,6 @@ ${emailBody}`)}
           </div>
         );
       })()}
-
-      {/* ── Suspension banner ── */}
-      {isSuspended && (
-        <div className="bg-rose-400/[0.07] border border-rose-400/20 rounded-2xl p-4 flex items-start gap-3">
-          <div className="w-9 h-9 rounded-full bg-rose-400/15 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f09595" strokeWidth="1.5" strokeLinecap="round">
-              <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
-            </svg>
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-bold text-rose-300">Agency workspace access suspended</div>
-            <div className="text-xs text-white/40 mt-0.5 mb-3">You can view this project but cannot create videos or render. Contact the workspace owner to restore access.</div>
-            <div className="flex gap-2 flex-wrap">
-              {currentUser?.plan && currentUser.plan !== 'none' && (
-                <button
-                  onClick={() => {
-                    useStore.getState().setAgencyProjectId('');
-                    setStep('projects' as any);
-                  }}
-                  className="text-xs bg-amber-400/15 border border-amber-400/25 text-amber-300 hover:bg-amber-400/20 px-3 py-1.5 rounded-lg transition font-semibold">
-                  Go to personal workspace
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── Assignment panel ── */}
       <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-4">
