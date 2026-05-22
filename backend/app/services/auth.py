@@ -168,6 +168,8 @@ async def get_user_out_with_workspace(redis: aioredis.Redis, user_id: str,
             role = (role_raw if isinstance(role_raw, str) else role_raw.decode()) if role_raw else None
             user_out.workspace_id   = ws_id
             user_out.workspace_role = role
+            suspended_raw = await redis.get(f"workspace:suspended:{ws_id}:{user_id}")
+            user_out.workspace_suspended = bool(suspended_raw)
     except Exception:
         pass
     return user_out
