@@ -55,8 +55,19 @@ export function AgencyProjects() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
+  const [suspendedBlocked, setSuspendedBlocked] = useState(false);
 
-  useEffect(() => { api.get("/api/agency/projects").then(r => setProjects(r.data.projects)).finally(() => setLoading(false)); }, []);
+  useEffect(() => {
+    api.get("/api/agency/projects")
+      .then(r => setProjects(r.data.projects))
+      .catch(e => {
+        if (e?.response?.status === 403 &&
+            e?.response?.data?.detail?.toLowerCase().includes("suspended")) {
+          setSuspendedBlocked(true);
+        }
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   // Editors can only ACTION assigned projects but can VIEW all
   // Backend already filters clients — here we just track which ones are assigned to the editor
@@ -66,6 +77,24 @@ export function AgencyProjects() {
 
   const allFiltered   = filter === "all" ? projects : projects.filter(p => p.status === filter);
   const filtered      = allFiltered; // all projects visible to everyone for viewing
+
+  if (suspendedBlocked) return (
+    <div className="max-w-md mx-auto py-16 text-center space-y-5">
+      <div className="w-16 h-16 rounded-full bg-rose-400/10 border border-rose-400/20 flex items-center justify-center mx-auto">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#e24b4a" strokeWidth="1.5" strokeLinecap="round">
+          <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+        </svg>
+      </div>
+      <div>
+        <h2 className="text-xl font-bold text-white mb-2">Account suspended</h2>
+        <p className="text-white/50 text-sm leading-relaxed">
+          Your workspace access has been suspended by the workspace owner.
+          You cannot view or work on projects until your access is restored.
+        </p>
+      </div>
+      <p className="text-white/25 text-xs">Contact your workspace owner to resolve this.</p>
+    </div>
+  );
 
   return (
     <div className="max-w-4xl space-y-5 pb-8">
