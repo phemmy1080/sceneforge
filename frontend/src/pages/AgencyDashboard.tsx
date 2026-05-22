@@ -61,16 +61,26 @@ export default function AgencyDashboard() {
   const setAgencyProjectId = useStore((s: any) => s.setAgencyProjectId);
   const currentUser = useAuthStore((s: any) => s.user);
   const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!(currentUser?.workspace_suspended));
   const [error, setError] = useState("");
-  const [suspendedBlocked, setSuspendedBlocked] = useState(false);
+  // Derive immediately from cached user — no API round-trip needed
+  const [suspendedBlocked, setSuspendedBlocked] = useState(!!(currentUser?.workspace_suspended));
   const [workspace, setWorkspace] = useState<{ name: string } | null>(null);
 
   // Role — derived once, used everywhere in this component
   const wsRole = currentUser?.workspace_role || (currentUser?.plan === 'agency' ? 'owner' : 'editor');
   const isAdminOrOwner = wsRole === 'owner' || wsRole === 'admin';
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    // Don't bother loading — already know they're suspended
+    if (currentUser?.workspace_suspended) { setSuspendedBlocked(true); setLoading(false); return; }
+    load();
+  }, []);
+
+  // Re-check if suspension state changes while on the dashboard
+  useEffect(() => {
+    if (currentUser?.workspace_suspended) { setSuspendedBlocked(true); setLoading(false); }
+  }, [currentUser?.workspace_suspended]);
 
   async function load() {
     try {
