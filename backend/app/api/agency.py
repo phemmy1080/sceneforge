@@ -481,7 +481,9 @@ async def list_projects(
 ):
     user = await _get_user(authorization, redis)
     ws = await _require_workspace(user.id, redis)
-    role = await svc.get_member_role(redis, ws["id"], user.id)
+    # _require_role checks suspension — suspended members cannot list projects
+    role = await _require_role(ws["id"], user.id, redis,
+                               ("owner", "admin", "editor", "client"))
     projects = await svc.list_projects(redis, ws["id"])
 
     # Clients only see projects they are assigned to
@@ -515,6 +517,9 @@ async def get_project(
 ):
     user = await _get_user(authorization, redis)
     ws = await _require_workspace(user.id, redis)
+    # Check suspension before allowing project access
+    await _require_role(ws["id"], user.id, redis,
+                        ("owner", "admin", "editor", "client"))
     project = await svc.get_project(redis, proj_id)
     if not project or project["ws_id"] != ws["id"]:
         raise HTTPException(404, "Project not found")
