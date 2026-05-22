@@ -5,17 +5,19 @@ import { exportUrl, voiceUrl } from '../lib/api'
 import { Badge, ProgressBar, PageHeader } from '../components/ui'
 
 export default function Export() {
-  const jobId          = useStore((s) => s.jobId)
-  const renderProgress = useStore((s) => s.renderProgress)
-  const renderStage    = useStore((s) => s.renderStage)
-  const renderStatus   = useStore((s) => s.renderStatus)
-  const videoUrl       = useStore((s) => s.videoUrl)
-  const scenes         = useStore((s) => s.scenes)
-  const selectedIdea   = useStore((s) => s.selectedIdea)
-  const activeProjectId = useStore((s) => s.activeProjectId)
-  const projects       = useStore((s) => s.projects)
-  const config         = useStore((s) => s.config)
-  const script         = useStore((s) => s.script)
+  const jobId             = useStore((s) => s.jobId)
+  const renderProgress    = useStore((s) => s.renderProgress)
+  const renderStage       = useStore((s) => s.renderStage)
+  const renderStatus      = useStore((s) => s.renderStatus)
+  const videoUrl          = useStore((s) => s.videoUrl)
+  const scenes            = useStore((s) => s.scenes)
+  const selectedIdea      = useStore((s) => s.selectedIdea)
+  const activeProjectId   = useStore((s) => s.activeProjectId)
+  const projects          = useStore((s) => s.projects)
+  const config            = useStore((s) => s.config)
+  const script            = useStore((s) => s.script)
+  const agencyProjectMeta  = useStore((s: any) => s.agencyProjectMeta)
+  const agencyProjectId   = useStore((s: any) => s.agencyProjectId)
 
   useJobPoller(jobId)
 
@@ -25,7 +27,18 @@ export default function Export() {
 
   const totalDuration = scenes.reduce((s, sc) => s + sc.duration, 0)
   const activeProject = projects.find((p) => p.id === activeProjectId)
-  const projectTitle  = selectedIdea?.title ?? activeProject?.name
+  // Agency export: use meta from the agency project (title + client name)
+  const agencyTitle   = agencyProjectMeta
+    ? `${agencyProjectMeta.title}${agencyProjectMeta.client_name ? ' — ' + agencyProjectMeta.client_name : ''}`
+    : null
+  const projectTitle  = agencyTitle ?? selectedIdea?.title ?? activeProject?.name
+
+  // For caption generator: prefer agency project platform/niche if config is empty
+  const effectiveConfig = {
+    ...config,
+    niche:    config?.niche    || agencyProjectMeta?.client_name || '',
+    platform: config?.platform || '',
+  }
 
   if (!jobId) {
     return (
@@ -116,9 +129,19 @@ export default function Export() {
                 {projectTitle ?? 'Video'} — ready
               </p>
               <div className="flex gap-3 mt-1">
-                <span className="text-[12px] text-white/45"><span className="text-white/70 font-medium">{scenes.length}</span> scenes</span>
-                <span className="text-[12px] text-white/45"><span className="text-white/70 font-medium">{totalDuration}s</span> duration</span>
-                {activeProject?.folder && (
+                {scenes.length > 0 && (
+                  <span className="text-[12px] text-white/45"><span className="text-white/70 font-medium">{scenes.length}</span> scenes</span>
+                )}
+                {totalDuration > 0 && (
+                  <span className="text-[12px] text-white/45"><span className="text-white/70 font-medium">{totalDuration}s</span> duration</span>
+                )}
+                {effectiveConfig?.platform && (
+                  <span className="text-[12px] text-white/45">📱 <span className="text-white/70 font-medium">{effectiveConfig.platform}</span></span>
+                )}
+                {agencyProjectMeta?.client_name && (
+                  <span className="text-[12px] text-white/45">🏷 <span className="text-amber-300/80 font-medium">{agencyProjectMeta.client_name}</span></span>
+                )}
+                {!agencyProjectMeta && activeProject?.folder && (
                   <span className="text-[12px] text-white/45">saved to <span className="text-violet-400">/{activeProject.folder}</span></span>
                 )}
               </div>
@@ -153,6 +176,16 @@ export default function Export() {
                 key={type}
                 href={exportUrl(jobId, type, projectTitle)}
                 download
+                onClick={() => {
+                  // Mark agency project as exported when any file is downloaded
+                  if (agencyProjectId) {
+                    import('../lib/api').then(({ api }) => {
+                      api.put(`/api/agency/projects/${agencyProjectId}`, {
+                        status: 'exported',
+                      }).catch(() => {})
+                    })
+                  }
+                }}
                 className="block bg-[#111118] border border-white/[0.07] rounded-xl p-5 text-center hover:border-white/15 hover:-translate-y-0.5 transition-all duration-150 cursor-pointer"
               >
                 <div className="text-2xl mb-3">{icon}</div>
@@ -198,8 +231,8 @@ export default function Export() {
           {videoUrl && (
             <SharePanel
               videoUrl={videoUrl}
-              niche={config?.niche}
-              platform={config?.platform}
+              niche={effectiveConfig?.niche}
+              platform={effectiveConfig?.platform}
               projectTitle={projectTitle}
               script={script}
             />
