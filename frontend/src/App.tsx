@@ -237,15 +237,27 @@ function Root() {
     })
   }, [isAuthenticated])
 
-  // Watch for suspension — redirect immediately when workspace_suspended becomes true
-  // This fires when /me returns with suspension=true (catches users already logged in)
+  // Watch for suspension — fires when /me returns with workspace_suspended=true
   useEffect(() => {
-    if (!isAuthenticated) return
-    if (currentUser?.workspace_suspended) {
-      // Clear agency context and go to suspended screen
-      useStore.getState().setStep('projects' as any)
-      setScreen('suspended' as Screen)
+    if (!isAuthenticated || !currentUser?.workspace_suspended) return
+    const step = useStore.getState().currentStep
+    const isInAgencyMode = step.startsWith('agency') || step === 'agency-workflow'
+    const hasPersonalPlan = currentUser?.plan && currentUser.plan !== 'free'
+      ? true
+      : !currentUser?.workspace_role || currentUser?.workspace_role === 'owner'
+
+    if (isInAgencyMode) {
+      // They're actively in agency mode — remove them from it
+      useStore.getState().setAgencyProjectId('')
+      if (currentUser?.plan && currentUser.plan !== 'none') {
+        // Has a personal plan — go to personal workspace silently
+        useStore.getState().setStep('projects' as any)
+      } else {
+        // No personal workspace — show the suspended screen
+        setScreen('suspended' as Screen)
+      }
     }
+    // If they're already in personal mode, let them stay — don't disrupt
   }, [currentUser?.workspace_suspended, isAuthenticated])
 
   // Handle ?agency_project=ID deep link from approval notification emails
@@ -326,25 +338,40 @@ function Root() {
   // ── Suspended screen ─────────────────────────────────────────────────────
   if (screen === 'suspended') return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-      <div style={{ maxWidth: '400px', textAlign: 'center' }}>
-        <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'rgba(226,75,74,0.1)', border: '1px solid rgba(226,75,74,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+      <div style={{ maxWidth: '420px', textAlign: 'center' }}>
+        <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'rgba(226,75,74,0.08)', border: '1px solid rgba(226,75,74,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#e24b4a" strokeWidth="1.5" strokeLinecap="round">
             <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
           </svg>
         </div>
-        <h1 style={{ fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: 12 }}>Account suspended</h1>
-        <p style={{ fontSize: 14, color: 'var(--color-text-secondary)', lineHeight: 1.7, marginBottom: 8 }}>
-          Your access to this workspace has been suspended by the workspace owner.
-          You cannot view or work on projects until your access is restored.
+        <h1 style={{ fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: 12 }}>
+          Workspace access suspended
+        </h1>
+        <p style={{ fontSize: 14, color: 'var(--color-text-secondary)', lineHeight: 1.7, marginBottom: 6 }}>
+          Your access to this agency workspace has been suspended by the owner.
+          You cannot view or work on projects until access is restored.
         </p>
         <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginBottom: 28 }}>
           Contact your workspace owner to resolve this.
         </p>
-        <button
-          onClick={() => { logout(); setScreen('login'); }}
-          style={{ fontSize: 13, padding: '8px 20px', borderRadius: 8, border: '0.5px solid var(--color-border-secondary)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
-          Sign out
-        </button>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+          {currentUser?.plan && currentUser.plan !== 'none' && (
+            <button
+              onClick={() => {
+                useStore.getState().setAgencyProjectId('')
+                useStore.getState().setStep('projects' as any)
+                setScreen('app')
+              }}
+              style={{ fontSize: 13, padding: '9px 20px', borderRadius: 8, border: 'none', background: '#c9a84c', color: '#1a0f00', fontWeight: 500, cursor: 'pointer' }}>
+              Go to personal workspace
+            </button>
+          )}
+          <button
+            onClick={() => { logout(); setScreen('login'); }}
+            style={{ fontSize: 13, padding: '9px 20px', borderRadius: 8, border: '0.5px solid var(--color-border-secondary)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
+            Sign out
+          </button>
+        </div>
       </div>
     </div>
   )
