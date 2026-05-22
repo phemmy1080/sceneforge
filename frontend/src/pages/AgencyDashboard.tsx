@@ -88,6 +88,40 @@ export default function AgencyDashboard() {
     }
   }
 
+  if (suspendedBlocked) return (
+    <div className="max-w-md mx-auto py-16 text-center space-y-5">
+      <div className="w-16 h-16 rounded-full bg-rose-400/10 border border-rose-400/20 flex items-center justify-center mx-auto">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#e24b4a" strokeWidth="1.5" strokeLinecap="round">
+          <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+        </svg>
+      </div>
+      <div>
+        <h2 className="text-xl font-bold text-white mb-2">Workspace access suspended</h2>
+        <p className="text-white/50 text-sm leading-relaxed">
+          Your access to this agency workspace has been suspended.<br/>
+          Contact the workspace owner to restore access.
+        </p>
+      </div>
+      <div className="flex gap-3 justify-center flex-wrap">
+        {currentUser?.plan && currentUser.plan !== 'none' && (
+          <button
+            onClick={() => {
+              useStore.getState().setAgencyProjectId('');
+              useStore.getState().setStep('projects' as any);
+            }}
+            className="text-sm bg-amber-400 hover:bg-amber-300 text-black font-bold px-5 py-2.5 rounded-xl transition">
+            Go to personal workspace
+          </button>
+        )}
+        <button
+          onClick={() => useAuthStore.getState().logout()}
+          className="text-sm border border-white/[0.1] text-white/50 hover:text-white px-5 py-2.5 rounded-xl transition">
+          Sign out
+        </button>
+      </div>
+    </div>
+  );
+
   if (loading) return (
     <div className="flex items-center justify-center h-64">
       <div className="w-5 h-5 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
