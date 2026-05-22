@@ -540,8 +540,22 @@ async def update_project(
     if not project or project["ws_id"] != ws["id"]:
         raise HTTPException(404, "Project not found")
     await _require_role(ws["id"], user.id, redis, ("owner", "admin", "editor"))
-    data = {k: v for k, v in req.model_dump().items() if v is not None}
-    updated = await svc.update_project(redis, proj_id, data)
+
+    # Determine which fields the caller is trying to change
+    payload = {k: v for k, v in req.model_dump().items() if v is not None}
+    edit_fields = {k for k in payload if k in {"title","client_name","platform","notes","brand_kit_id"}}
+
+    if edit_fields:
+        # Block detail edits once the client has approved or rendering has started
+        locked_statuses = {"approved", "rendering", "exported"}
+        if project.get("status") in locked_statuses:
+            raise HTTPException(
+                400,
+                f"Project cannot be edited after it has been {project['status']}. "
+                "Reset the project status to edit it."
+            )
+
+    updated = await svc.update_project(redis, proj_id, payload)
     return {"project": updated}
 
 
