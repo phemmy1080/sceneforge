@@ -63,6 +63,7 @@ export default function AgencyDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [suspendedBlocked, setSuspendedBlocked] = useState(false);
   const [workspace, setWorkspace] = useState<{ name: string } | null>(null);
 
   // Role — derived once, used everywhere in this component
@@ -82,8 +83,14 @@ export default function AgencyDashboard() {
       setData(dashRes.data);
       setError("");
     } catch (e: any) {
-      if (e.response?.status === 403) setError("no_workspace");
-      else setError(e.response?.data?.detail || "Failed to load");
+      const detail = e.response?.data?.detail || "";
+      if (e.response?.status === 403 && detail.toLowerCase().includes("suspended")) {
+        setSuspendedBlocked(true);
+      } else if (e.response?.status === 403) {
+        setError("no_workspace");
+      } else {
+        setError(detail || "Failed to load");
+      }
     } finally {
       setLoading(false);
     }
