@@ -13,6 +13,7 @@ export interface User {
   created_at: string
   workspace_id?: string | null
   workspace_role?: string | null
+  workspace_suspended?: boolean
 }
 
 interface AuthState {
