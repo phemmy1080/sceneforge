@@ -224,14 +224,29 @@ function Root() {
   const authToken       = useAuthStore((s: any) => s.token)
   const logout          = useAuthStore((s) => s.logout)
 
-  // On first load, if authenticated but workspace fields are missing, refresh /me
+  // Always refresh /me on load — picks up suspension, role changes, workspace changes
+  // without this, a suspended user keeps stale workspace_suspended=false from localStorage
   useEffect(() => {
-    if (isAuthenticated && authToken && !currentUser?.workspace_id && !currentUser?.workspace_role) {
-      import('./lib/api').then(({ getMe }) => {
-        getMe().then(me => setAuth(me, authToken)).catch(() => {})
-      })
-    }
+    if (!isAuthenticated || !authToken) return
+    import('./lib/api').then(({ getMe }) => {
+      getMe()
+        .then(me => setAuth(me, authToken))
+        .catch(() => {
+          // If /me fails with 401, the token is invalid — log out
+        })
+    })
   }, [isAuthenticated])
+
+  // Watch for suspension — redirect immediately when workspace_suspended becomes true
+  // This fires when /me returns with suspension=true (catches users already logged in)
+  useEffect(() => {
+    if (!isAuthenticated) return
+    if (currentUser?.workspace_suspended) {
+      // Clear agency context and go to suspended screen
+      useStore.getState().setStep('projects' as any)
+      setScreen('suspended' as Screen)
+    }
+  }, [currentUser?.workspace_suspended, isAuthenticated])
 
   // Handle ?agency_project=ID deep link from approval notification emails
   useEffect(() => {
@@ -307,6 +322,32 @@ function Root() {
       />
     )
   }
+
+  // ── Suspended screen ─────────────────────────────────────────────────────
+  if (screen === 'suspended') return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+      <div style={{ maxWidth: '400px', textAlign: 'center' }}>
+        <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'rgba(226,75,74,0.1)', border: '1px solid rgba(226,75,74,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#e24b4a" strokeWidth="1.5" strokeLinecap="round">
+            <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+          </svg>
+        </div>
+        <h1 style={{ fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: 12 }}>Account suspended</h1>
+        <p style={{ fontSize: 14, color: 'var(--color-text-secondary)', lineHeight: 1.7, marginBottom: 8 }}>
+          Your access to this workspace has been suspended by the workspace owner.
+          You cannot view or work on projects until your access is restored.
+        </p>
+        <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginBottom: 28 }}>
+          Contact your workspace owner to resolve this.
+        </p>
+        <button
+          onClick={() => { logout(); setScreen('login'); }}
+          style={{ fontSize: 13, padding: '8px 20px', borderRadius: 8, border: '0.5px solid var(--color-border-secondary)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
+          Sign out
+        </button>
+      </div>
+    </div>
+  )
 
   // ── Auth screens ──────────────────────────────────────────────────────────
   if (screen === 'landing') return <Landing onLogin={() => setScreen('login')} onSignup={() => setScreen('signup')} />
