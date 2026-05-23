@@ -187,6 +187,11 @@ async def start_render(
     pool = await arq.create_pool(
         arq.connections.RedisSettings.from_dsn(settings.redis_url)
     )
+    # Store agency_proj_id so worker can load brand kit
+    agency_proj_id = getattr(req, "agency_project_id", None)
+    if agency_proj_id:
+        await redis.set(f"job:{job_id}:agency_proj_id", agency_proj_id, ex=86400 * 7)
+
     # Store scenes so the SceneEditor can reload them if the session is lost
     await redis.set(
         f"job:{job_id}:scenes",
