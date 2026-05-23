@@ -4,7 +4,31 @@ import { getNiches, type Niche } from '../lib/api'
 import { Button, Card, CardTitle, Chip, Select, TextInput, PageHeader } from '../components/ui'
 
 const STYLES = ['Educational', 'Viral / Hook-first', 'Storytelling', 'Listicle', 'Documentary', 'Tutorial', 'Opinion / Hot take']
-const PLATFORMS = ['TikTok (9:16, 60s)', 'YouTube Shorts (9:16, 60s)', 'Instagram Reels (9:16, 30s)', 'YouTube (16:9, 3–10 min)', 'LinkedIn (1:1, 60s)']
+// Platform list — values match brand kit exactly
+const PLATFORMS = [
+  'TikTok',
+  'Instagram Reels',
+  'YouTube Shorts',
+  'YouTube',
+  'Facebook',
+  'LinkedIn',
+  'Twitter/X',
+  'Snapchat',
+  'Pinterest',
+]
+
+// Descriptive hints shown below the platform selector
+const PLATFORM_HINTS: Record<string, string> = {
+  'TikTok':          '9:16 · up to 60s · vertical',
+  'Instagram Reels': '9:16 · up to 30s · vertical',
+  'YouTube Shorts':  '9:16 · up to 60s · vertical',
+  'YouTube':         '16:9 · 3–10 min · landscape',
+  'Facebook':        '16:9 · up to 60s · landscape',
+  'LinkedIn':        '1:1 · up to 60s · square',
+  'Twitter/X':       '16:9 · up to 30s · landscape',
+  'Snapchat':        '9:16 · up to 15s · vertical',
+  'Pinterest':       '2:3 · up to 60s · portrait',
+}
 const TONES = ['Energetic & punchy', 'Calm & informative', 'Conversational', 'Professional', 'Humorous', 'Inspirational']
 
 export default function Setup() {
@@ -157,6 +181,9 @@ export default function Setup() {
         <CardTitle>Platform and details</CardTitle>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Select label="Target platform" value={config.platform} onChange={(v) => setConfig({ platform: v })} options={PLATFORMS} />
+          {config.platform && PLATFORM_HINTS[config.platform] && (
+            <p className="text-[11px] text-white/30 -mt-2 ml-1">{PLATFORM_HINTS[config.platform]}</p>
+          )}
           <Select label="Tone" value={config.tone} onChange={(v) => setConfig({ tone: v })} options={TONES} />
           <TextInput label="Target audience" value={config.audience} onChange={(v) => setConfig({ audience: v })} placeholder="e.g. beginner investors aged 20-35" />
           <TextInput label="Extra context (optional)" value={config.context} onChange={(v) => setConfig({ context: v })} placeholder="Any specific angle or topic focus..." />
