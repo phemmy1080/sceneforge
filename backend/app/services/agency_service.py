@@ -381,14 +381,6 @@ async def get_brand_kit(redis: aioredis.Redis, kit_id: str) -> Optional[dict]:
     return json.loads(raw) if raw else None
 
 
-async def get_brand_kit(redis: aioredis.Redis, kit_id: str) -> Optional[dict]:
-    """Get a single brand kit by ID."""
-    raw = await redis.get(f"brand_kit:{kit_id}")
-    if not raw:
-        return None
-    return json.loads(raw) if isinstance(raw, str) else json.loads(raw.decode())
-
-
 async def list_brand_kits(redis: aioredis.Redis, ws_id: str) -> list[dict]:
     kit_ids = await redis.smembers(_kits_key(ws_id))
     kits = []
