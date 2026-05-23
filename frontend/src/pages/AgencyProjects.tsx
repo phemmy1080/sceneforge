@@ -355,7 +355,15 @@ export function ProjectDetail() {
   const LOCKED_STATUSES = ['approved', 'rendering', 'exported'];
   const canEditDetails = isAdmin && !LOCKED_STATUSES.includes(project?.status || '');
 
-  useEffect(() => { if (id && !isSuspended) load(); }, [id]);
+  useEffect(() => {
+    if (id && !isSuspended) {
+      load();
+      // Eagerly load kits so the edit dropdown is instant when opened
+      api.get('/api/agency/brand-kits')
+        .then(r => setEditKits(r.data.brand_kits || []))
+        .catch(() => {});
+    }
+  }, [id]);
 
   async function load() {
     try {
@@ -535,7 +543,7 @@ export function ProjectDetail() {
     setEditOpen(true);
     // Load brand kits for the selector
     api.get('/api/agency/brand-kits')
-      .then(r => setEditKits(r.data.kits || []))
+      .then(r => setEditKits(r.data.brand_kits || []))
       .catch(() => {});
   }
 
