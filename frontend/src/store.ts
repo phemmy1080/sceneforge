@@ -9,6 +9,11 @@ export interface ProjectConfig {
   niche: string; style: string; platform: string
   tone: string; audience: string; context: string
   ideaHints: string; ideaTags: string[]
+  // Agency / premium fields
+  objective?: string
+  duration_hint?: number
+  scene_count_hint?: number
+  client_brief?: string
 }
 
 export interface VoiceConfig {
@@ -104,6 +109,7 @@ interface AppState {
   setJobId: (id: string) => void
   setRenderProgress: (progress: number, stage: string, status: AppState['renderStatus']) => void
   setVideoUrl: (url: string) => void
+  getIdeasRequest: () => Record<string, any>
   getRenderRequest: () => RenderRequest
   loadProjectsFromBackend: () => Promise<void>
   syncLocalProjectsToBackend: () => Promise<void>
@@ -155,8 +161,11 @@ export const useStore = create<AppState>()(
           currentStep: 'agency-workflow' as AppStep,
           agencyWorkflowStep: subStep || 'setup',
           ...(sceneIndex !== undefined ? { activeSceneIndex: sceneIndex } : {}),
-          // Reset workflow state for fresh start (only when going to setup)
-          ...(!subStep || subStep === 'setup' ? CLEAR_WORKFLOW : {}),
+          // Reset workflow + config when starting fresh so personal settings don't bleed in
+          ...(!subStep || subStep === 'setup' ? {
+            ...CLEAR_WORKFLOW,
+            config: DEFAULT_CONFIG,   // clear any personal/stale niche & config
+          } : {}),
         }),
 
         // Jump directly to Export with an existing completed render — no setup needed
@@ -191,7 +200,7 @@ export const useStore = create<AppState>()(
 
           // Clear agency context when going to personal steps
           if (personalSteps.includes(step as string)) {
-            set({ currentStep: step, agencyProjectId: '', agencyWorkflowStep: 'setup', agencyProjectMeta: null })
+            set({ currentStep: step, agencyProjectId: '', agencyWorkflowStep: 'setup', agencyProjectMeta: null, config: DEFAULT_CONFIG })
           } else {
             set({ currentStep: step })
           }
@@ -435,6 +444,23 @@ export const useStore = create<AppState>()(
               job_id: jobId || undefined,
               step: 'export',
             }).catch(() => {})
+          }
+        },
+
+        getIdeasRequest: () => {
+          const { config } = get()
+          return {
+            niche:            config.niche,
+            style:            config.style,
+            platform:         config.platform,
+            tone:             config.tone || '',
+            audience:         config.audience || '',
+            context:          config.context || '',
+            idea_tags:        config.ideaTags || [],
+            objective:        config.objective || '',
+            duration_hint:    config.duration_hint ?? 60,
+            scene_count_hint: config.scene_count_hint ?? 8,
+            client_brief:     config.client_brief || '',
           }
         },
 
