@@ -208,23 +208,17 @@ async def invite_member(
 
     token = await svc.create_invite(redis, ws["id"], user.id, req.email, req.role)
 
-    # Send invite email
+    # Send invite email using branded template
     try:
-        from app.services.email import _send
+        from app.services.email import send_invite
         invite_url = f"https://scenraforge.com/join?token={token}"
-        html = f"""
-        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#0a0a0f;color:#f0f0ff;padding:32px;border-radius:16px">
-          <div style="font-size:22px;font-weight:800;margin-bottom:8px">Scene<span style="color:#c9a84c">Forge</span></div>
-          <h2 style="font-size:18px;font-weight:700;margin:24px 0 8px">You've been invited</h2>
-          <p style="color:rgba(255,255,255,0.6);font-size:14px;line-height:1.6;margin:0 0 24px">
-            <strong style="color:#f0f0ff">{user.full_name}</strong> has invited you to join
-            <strong style="color:#f0f0ff">{ws["name"]}</strong> on SceneForge as an <strong style="color:#c9a84c">{req.role}</strong>.
-          </p>
-          <a href="{invite_url}" style="display:inline-block;background:#c9a84c;color:#000;font-weight:700;font-size:14px;padding:12px 28px;border-radius:10px;text-decoration:none">Accept invite</a>
-          <p style="color:rgba(255,255,255,0.3);font-size:12px;margin-top:24px">This link expires in 7 days.</p>
-        </div>"""
-        text = f"{user.full_name} invited you to join {ws['name']} on SceneForge. Accept here: {invite_url}"
-        await _send(req.email, f"You're invited to {ws['name']} on SceneForge", html, text)
+        asyncio.create_task(send_invite(
+            to_email=req.email,
+            inviter_name=user.full_name,
+            workspace_name=ws["name"],
+            role=req.role,
+            invite_url=invite_url,
+        ))
     except Exception as e:
         logger.warning("Invite email failed: %s", e)
 
@@ -609,7 +603,33 @@ async def update_project(
                 "Reset the project status to edit it."
             )
 
+    prev_assigned = set(project.get("assigned_to") or [])
     updated = await svc.update_project(redis, proj_id, payload)
+
+    # Notify newly assigned members
+    new_assigned = set(updated.get("assigned_to") or [])
+    newly_added  = new_assigned - prev_assigned
+    if newly_added:
+        try:
+            from app.services.email import send_project_assigned
+            project_url = f"https://scenraforge.com/?agency_project={proj_id}"
+            for uid in newly_added:
+                raw_u = await redis.get(f"user:{uid}")
+                if not raw_u: continue
+                member = json.loads(raw_u)
+                asyncio.create_task(send_project_assigned(
+                    to_email=member.get("email", ""),
+                    member_name=member.get("full_name", "there"),
+                    assigner_name=user.full_name,
+                    workspace_name=ws["name"],
+                    project_title=updated.get("title", "Project"),
+                    client_name=updated.get("client_name", ""),
+                    platform=updated.get("platform", ""),
+                    project_url=project_url,
+                ))
+        except Exception as e:
+            logger.warning("Assignment notification failed: %s", e)
+
     return {"project": updated}
 
 
@@ -773,6 +793,29 @@ async def suspend_member(
         raise HTTPException(400, "Cannot suspend workspace owner")
     await svc.suspend_member(redis, ws["id"], member_id, req.suspended)
     action = "suspended" if req.suspended else "unsuspended"
+
+    # Notify the affected member by email
+    try:
+        from app.services.email import send_member_suspended, send_member_unsuspended
+        raw_m = await redis.get(f"user:{member_id}")
+        if raw_m:
+            member = json.loads(raw_m)
+            if req.suspended:
+                asyncio.create_task(send_member_suspended(
+                    to_email=member.get("email", ""),
+                    member_name=member.get("full_name", "there"),
+                    workspace_name=ws["name"],
+                ))
+            else:
+                asyncio.create_task(send_member_unsuspended(
+                    to_email=member.get("email", ""),
+                    member_name=member.get("full_name", "there"),
+                    workspace_name=ws["name"],
+                    dashboard_url="https://scenraforge.com",
+                ))
+    except Exception as e:
+        logger.warning("Suspend notification failed: %s", e)
+
     return {"message": f"Member {action}"}
 
 
