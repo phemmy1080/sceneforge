@@ -98,6 +98,21 @@ async def start_render(
         if raw_user:
             user_plan = _json.loads(raw_user).get("plan", "free")
 
+        # Agency workspace members inherit workspace plan for all limits
+        # so editors on free personal plans get agency-tier render limits
+        try:
+            from app.services.agency_service import get_workspace_id_for_user
+            _ws_id_for_plan = await get_workspace_id_for_user(redis, user_id)
+            if _ws_id_for_plan:
+                _ws_raw = await redis.get(f"workspace:{_ws_id_for_plan}")
+                if _ws_raw:
+                    _ws_plan = _json.loads(_ws_raw).get("plan", user_plan)
+                    _RANK = {"free": 0, "pro": 1, "studio": 2, "agency": 3}
+                    if _RANK.get(_ws_plan, 0) > _RANK.get(user_plan, 0):
+                        user_plan = _ws_plan
+        except Exception:
+            pass
+
         limits = get_limits(user_plan)
 
         # Scene count limit (skip for re-renders)
