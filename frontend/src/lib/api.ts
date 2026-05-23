@@ -132,6 +132,10 @@ export interface GenerateIdeasRequest {
   audience: string
   context: string
   idea_tags?: string[]
+  objective?: string
+  duration_hint?: number
+  scene_count_hint?: number
+  client_brief?: string
 }
 
 export interface GenerateScriptRequest {
