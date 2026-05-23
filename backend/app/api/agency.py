@@ -211,7 +211,7 @@ async def invite_member(
     # Send invite email
     try:
         from app.services.email import _send
-        invite_url = f"https://sceneraforge.com/join?token={token}"
+        invite_url = f"https://scenraforge.com/join?token={token}"
         html = f"""
         <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#0a0a0f;color:#f0f0ff;padding:32px;border-radius:16px">
           <div style="font-size:22px;font-weight:800;margin-bottom:8px">Scene<span style="color:#c9a84c">Forge</span></div>
@@ -837,7 +837,7 @@ async def create_review_link(
     await _require_role(ws["id"], user.id, redis, ("owner", "admin", "editor"))
 
     review = await svc.create_review_link(redis, ws["id"], proj_id, user.id)
-    review_url = f"https://sceneraforge.com/review/{review['token']}"
+    review_url = f"https://scenraforge.com/review/{review['token']}"
 
     # bump project to client_review status
     await svc.update_project_status(redis, ws["id"], proj_id, user.id, "client_review")
