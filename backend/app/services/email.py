@@ -465,18 +465,19 @@ async def send_invite(
     """Invite a new team member to the workspace."""
     subject = "You have been invited to join " + workspace_name + " on SceneForge"
     role_cap = role.capitalize()
+    article = 'an' if role_cap.lower() in ('admin', 'editor', 'owner') else 'a'
     body = (
         '<div style="text-align:center;margin-bottom:28px">'
         '<div style="font-size:48px;margin-bottom:12px">\U0001f44b</div>'
         '<h2 style="margin:0 0 10px;font-size:20px;font-weight:700;color:#fff">You\'re invited!</h2>'
         '<p style="margin:0;font-size:14px;color:rgba(255,255,255,0.55);line-height:1.7">'
         '<strong style="color:#fff">' + inviter_name + '</strong> has invited you to join '
-        '<strong style="color:#fff">' + workspace_name + '</strong> on SceneForge as a '
+        '<strong style="color:#fff">' + workspace_name + '</strong> on SceneForge as ' + article + ' '
         '<span style="color:#A78BFA;font-weight:700">' + role_cap + '</span>.</p></div>'
         '<div style="background:rgba(167,139,250,0.06);border:1px solid rgba(167,139,250,0.15);'
         'border-radius:12px;padding:16px 20px;margin-bottom:24px">'
         '<p style="margin:0;font-size:13px;color:rgba(255,255,255,0.5);line-height:1.6">'
-        'As a <strong style="color:#A78BFA">' + role_cap + '</strong> you can collaborate on '
+        'As ' + article + ' <strong style="color:#A78BFA">' + role_cap + '</strong> you can collaborate on '
         'video projects, review scenes, and work alongside the team.</p></div>'
         '<div style="text-align:center;margin-bottom:24px">'
         '<a href="' + invite_url + '" style="display:inline-block;background:#c9a84c;'
@@ -489,7 +490,7 @@ async def send_invite(
     text = (
         "Hi!\n\n"
         + inviter_name + " has invited you to join " + workspace_name
-        + " on SceneForge as a " + role_cap + ".\n\n"
+        + " on SceneForge as " + article + " " + role_cap + ".\n\n"
         "Accept your invite here: " + invite_url + "\n\n"
         "This link expires in 7 days.\n\n\u2014 SceneForge"
     )
