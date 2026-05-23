@@ -163,6 +163,7 @@ class UploadScriptResponse(BaseModel):
     estimated_duration_seconds: int
     voiceover_path: Optional[str] = None
     upload_id: Optional[str] = None
+    agency_project_id: Optional[str] = None  # set when rendering for an agency project
 
 
 # ─── Extended idea request with user prompt ───────────────────────────────────
