@@ -30,7 +30,11 @@ settings = get_settings()
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 async def _get_user_plan(redis, authorization: Optional[str]) -> str:
-    """Resolve user plan from JWT → Redis. Defaults to 'free'."""
+    """
+    Resolve effective plan for limits/feature gating.
+    Agency workspace members inherit the workspace plan so they get
+    agency-tier scene limits even if their personal plan is free.
+    """
     try:
         token = (authorization or "").removeprefix("Bearer ").strip()
         if not token:
@@ -39,9 +43,31 @@ async def _get_user_plan(redis, authorization: Optional[str]) -> str:
         if not user_id:
             return "free"
         import json as _json
+
+        # Read user record
         raw = await redis.get(f"user:{user_id}")
+        user_plan = "free"
         if raw:
-            return _json.loads(raw).get("plan", "free")
+            user_plan = _json.loads(raw).get("plan", "free")
+
+        # Check if user belongs to a workspace — if so, use workspace plan
+        # so agency editors get agency-tier limits, not their personal plan
+        try:
+            from app.services.agency_service import get_workspace_id_for_user
+            ws_id = await get_workspace_id_for_user(redis, user_id)
+            if ws_id:
+                ws_raw = await redis.get(f"workspace:{ws_id}")
+                if ws_raw:
+                    ws = _json.loads(ws_raw)
+                    ws_plan = ws.get("plan", user_plan)
+                    # Effective plan = best of user plan and workspace plan
+                    PLAN_RANK = {"free": 0, "pro": 1, "studio": 2, "agency": 3}
+                    if PLAN_RANK.get(ws_plan, 0) > PLAN_RANK.get(user_plan, 0):
+                        return ws_plan
+        except Exception:
+            pass  # workspace lookup failure is non-fatal
+
+        return user_plan
     except Exception as e:
         logger.warning("Plan resolution failed (defaulting to free): %s", e)
     return "free"
