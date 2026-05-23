@@ -297,7 +297,7 @@ export function NewProject() {
           <label className="block text-[11px] font-bold text-white/40 uppercase tracking-widest mb-1.5">Platform</label>
           <select {...F("platform")}
             className="w-full bg-white/[0.06] border border-white/[0.1] rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-amber-400/50 transition">
-            {["TikTok", "Instagram Reels", "YouTube Shorts", "LinkedIn", "Twitter/X"].map(p =>
+            {["TikTok", "Instagram Reels", "YouTube Shorts", "YouTube", "Facebook", "LinkedIn", "Twitter/X", "Snapchat", "Pinterest"].map(p =>
               <option key={p} value={p}>{p}</option>)}
           </select>
         </div>
@@ -347,9 +347,10 @@ export function ProjectDetail() {
   const [assigning, setAssigning]     = useState(false);
   // Edit project details
   const [editOpen, setEditOpen]       = useState(false);
-  const [editForm, setEditForm]       = useState({ title: '', client_name: '', platform: '', notes: '' });
+  const [editForm, setEditForm]       = useState({ title: '', client_name: '', platform: '', notes: '', brand_kit_id: '' });
   const [editSaving, setEditSaving]   = useState(false);
   const [editError, setEditError]     = useState('');
+  const [editKits, setEditKits]       = useState<BrandKit[]>([]);
 
   const LOCKED_STATUSES = ['approved', 'rendering', 'exported'];
   const canEditDetails = isAdmin && !LOCKED_STATUSES.includes(project?.status || '');
@@ -524,13 +525,18 @@ export function ProjectDetail() {
 
   async function openEdit() {
     setEditForm({
-      title:       project?.title       || '',
-      client_name: project?.client_name || '',
-      platform:    project?.platform    || '',
-      notes:       project?.notes       || '',
+      title:        project?.title        || '',
+      client_name:  project?.client_name  || '',
+      platform:     project?.platform     || '',
+      notes:        project?.notes        || '',
+      brand_kit_id: (project as any)?.brand_kit_id || '',
     });
     setEditError('');
     setEditOpen(true);
+    // Load brand kits for the selector
+    api.get('/api/agency/brand-kits')
+      .then(r => setEditKits(r.data.kits || []))
+      .catch(() => {});
   }
 
   async function saveProjectEdit() {
@@ -902,9 +908,17 @@ ${emailBody}`)}
               <select value={editForm.platform} onChange={e => setEditForm(f => ({ ...f, platform: e.target.value }))}
                 className="w-full bg-white/[0.06] border border-white/[0.1] rounded-xl px-3.5 py-2.5 text-white text-sm outline-none focus:border-amber-400/50 transition">
                 <option value="">Select platform</option>
-                {["TikTok","Instagram Reels","YouTube Shorts","Facebook","LinkedIn","Twitter/X","Snapchat"].map(p => (
+                {["TikTok","Instagram Reels","YouTube Shorts","YouTube","Facebook","LinkedIn","Twitter/X","Snapchat","Pinterest"].map(p => (
                   <option key={p} value={p}>{p}</option>
                 ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-white/30 uppercase tracking-widest mb-1.5">Brand kit</label>
+              <select value={editForm.brand_kit_id} onChange={e => setEditForm(f => ({ ...f, brand_kit_id: e.target.value }))}
+                className="w-full bg-white/[0.06] border border-white/[0.1] rounded-xl px-3.5 py-2.5 text-white text-sm outline-none focus:border-amber-400/50 transition">
+                <option value="">— None —</option>
+                {editKits.map(k => <option key={k.id} value={k.id}>{k.client_name}</option>)}
               </select>
             </div>
             <div>
