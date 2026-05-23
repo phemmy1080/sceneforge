@@ -206,11 +206,11 @@ export default function Setup() {
             {OBJECTIVES.map(o => (
               <button key={o.key}
                 onClick={() => setObjective(objective === o.key ? '' : o.key)}
-                className={\`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition \${
+                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition \${
                   objective === o.key
                     ? 'bg-amber-400/15 border-amber-400/30 text-amber-300'
                     : 'bg-white/[0.04] border-white/[0.1] text-white/50 hover:border-white/[0.2] hover:text-white/80'
-                }\`}>
+                }`}>
                 <span>{o.icon}</span>{o.label}
               </button>
             ))}
@@ -270,11 +270,11 @@ export default function Setup() {
             <div className="flex flex-wrap gap-2">
               {suggestions.map((s) => (
                 <button key={s} onClick={() => addTag(s)} disabled={ideaTags.includes(s)}
-                  className={\`text-[11.5px] px-3 py-1 rounded-full border transition-all \${
+                  className={`text-[11.5px] px-3 py-1 rounded-full border transition-all \${
                     ideaTags.includes(s)
                       ? 'border-violet-500/30 bg-violet-500/10 text-violet-400/50 cursor-default'
                       : 'border-white/10 bg-white/3 text-white/45 hover:border-violet-400/40 hover:text-violet-300 hover:bg-violet-500/10'
-                  }\`}>+ {s}</button>
+                  }`}>+ {s}</button>
               ))}
             </div>
           </div>
@@ -301,11 +301,11 @@ export default function Setup() {
           {DURATIONS.map(d => (
             <button key={d.value}
               onClick={() => selectDuration(d.value)}
-              className={\`text-sm font-semibold px-4 py-2 rounded-xl border transition \${
+              className={`text-sm font-semibold px-4 py-2 rounded-xl border transition \${
                 duration === d.value
                   ? 'bg-amber-400/15 border-amber-400/30 text-amber-300'
                   : 'bg-white/[0.04] border-white/[0.1] text-white/50 hover:border-white/[0.2] hover:text-white/80'
-              }\`}>
+              }`}>
               {d.label}
               {d.value > 0 && <span className="text-[10px] font-normal ml-1 opacity-60">~{d.scenes} scenes</span>}
             </button>
@@ -329,11 +329,11 @@ export default function Setup() {
             <div className="flex gap-1.5">
               {[3,4,5,6,7,8,9,10,12].map(n => (
                 <button key={n} onClick={() => { setSceneCount(n); setConfig({ scene_count_hint: n }) }}
-                  className={\`w-8 h-8 rounded-lg text-xs font-semibold border transition \${
+                  className={`w-8 h-8 rounded-lg text-xs font-semibold border transition \${
                     sceneCount === n
                       ? 'bg-violet-500/20 border-violet-400/30 text-violet-300'
                       : 'bg-white/[0.04] border-white/[0.08] text-white/40 hover:border-white/20 hover:text-white/70'
-                  }\`}>{n}</button>
+                  }`}>{n}</button>
               ))}
             </div>
           </div>
@@ -362,7 +362,7 @@ export default function Setup() {
             rows={5}
             value={clientBrief}
             onChange={e => setClientBrief(e.target.value)}
-            placeholder={\`Paste the full client brief here — product details, key messages, target customer, dos & don'ts, references, campaign context...\n\nThe AI will follow these instructions when writing the script.\`}
+            placeholder={`Paste the full client brief here — product details, key messages, target customer, dos & don'ts, references, campaign context...\n\nThe AI will follow these instructions when writing the script.`}
             className={INP + " resize-none"}
           />
           <p className="text-[11px] text-white/25 mt-2 leading-relaxed">
