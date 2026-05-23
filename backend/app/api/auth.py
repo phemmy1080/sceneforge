@@ -351,6 +351,20 @@ async def get_plan_features(
             if raw:
                 user_plan = _json.loads(raw).get("plan", "free")
 
+            # Check workspace plan — agency members get workspace-tier limits
+            try:
+                from app.services.agency_service import get_workspace_id_for_user
+                ws_id = await get_workspace_id_for_user(redis, user_id)
+                if ws_id:
+                    ws_raw = await redis.get(f"workspace:{ws_id}")
+                    if ws_raw:
+                        ws_plan = _json.loads(ws_raw).get("plan", user_plan)
+                        PLAN_RANK = {"free": 0, "pro": 1, "studio": 2, "agency": 3}
+                        if PLAN_RANK.get(ws_plan, 0) > PLAN_RANK.get(user_plan, 0):
+                            user_plan = ws_plan
+            except Exception:
+                pass
+
     limits = get_limits(user_plan)
     return {
         "plan": user_plan,
