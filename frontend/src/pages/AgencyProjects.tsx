@@ -297,8 +297,19 @@ export function NewProject() {
           <label className="block text-[11px] font-bold text-white/40 uppercase tracking-widest mb-1.5">Platform</label>
           <select {...F("platform")}
             className="w-full bg-white/[0.06] border border-white/[0.1] rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-amber-400/50 transition">
-            {["TikTok", "Instagram Reels", "YouTube Shorts", "YouTube", "Facebook", "LinkedIn", "Twitter/X", "Snapchat", "Pinterest"].map(p =>
-              <option key={p} value={p}>{p}</option>)}
+            {[
+                  ["TikTok",          "TikTok (9:16 · 60s)"],
+                  ["Instagram Reels", "Instagram Reels (9:16 · 30s)"],
+                  ["YouTube Shorts",  "YouTube Shorts (9:16 · 60s)"],
+                  ["YouTube",         "YouTube (16:9 · 3-10 min)"],
+                  ["Facebook",        "Facebook (16:9 · 60s)"],
+                  ["LinkedIn",        "LinkedIn (1:1 · 60s)"],
+                  ["Twitter/X",       "Twitter/X (16:9 · 30s)"],
+                  ["Snapchat",        "Snapchat (9:16 · 15s)"],
+                  ["Pinterest",       "Pinterest (2:3 · 60s)"],
+                ].map(([val, label]) => (
+                  <option key={val} value={val}>{label}</option>
+                ))}
           </select>
         </div>
 
@@ -916,8 +927,18 @@ ${emailBody}`)}
               <select value={editForm.platform} onChange={e => setEditForm(f => ({ ...f, platform: e.target.value }))}
                 className="w-full bg-white/[0.06] border border-white/[0.1] rounded-xl px-3.5 py-2.5 text-white text-sm outline-none focus:border-amber-400/50 transition">
                 <option value="">Select platform</option>
-                {["TikTok","Instagram Reels","YouTube Shorts","YouTube","Facebook","LinkedIn","Twitter/X","Snapchat","Pinterest"].map(p => (
-                  <option key={p} value={p}>{p}</option>
+                {[
+                  ["TikTok",          "TikTok (9:16 · 60s)"],
+                  ["Instagram Reels", "Instagram Reels (9:16 · 30s)"],
+                  ["YouTube Shorts",  "YouTube Shorts (9:16 · 60s)"],
+                  ["YouTube",         "YouTube (16:9 · 3-10 min)"],
+                  ["Facebook",        "Facebook (16:9 · 60s)"],
+                  ["LinkedIn",        "LinkedIn (1:1 · 60s)"],
+                  ["Twitter/X",       "Twitter/X (16:9 · 30s)"],
+                  ["Snapchat",        "Snapchat (9:16 · 15s)"],
+                  ["Pinterest",       "Pinterest (2:3 · 60s)"],
+                ].map(([val, label]) => (
+                  <option key={val} value={val}>{label}</option>
                 ))}
               </select>
             </div>
