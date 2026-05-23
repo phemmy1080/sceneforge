@@ -427,3 +427,182 @@ async def send_client_changes_requested(
         + f"Open project to review notes: {project_url}\n\n\u2014 SceneForge"
     )
     await _send(to_email, subject, html, text)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Team member notifications
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _team_template(body_html: str) -> str:
+    return (
+        '<!DOCTYPE html><html><head><meta charset="utf-8"></head>'
+        '<body style="margin:0;padding:0;background:#080810;font-family:Arial,sans-serif;color:#F0F0FF">'
+        '<table width="100%" cellpadding="0" cellspacing="0" style="background:#080810;padding:40px 0">'
+        '<tr><td align="center">'
+        '<table width="520" cellpadding="0" cellspacing="0" style="background:#111118;border-radius:16px;'
+        'border:1px solid rgba(255,255,255,0.08);overflow:hidden">'
+        '<tr><td style="background:linear-gradient(135deg,#0a0a1a,#1a1028);padding:24px 40px;text-align:center">'
+        '<h1 style="margin:0;font-size:22px;font-weight:800;color:#fff">Scene'
+        '<span style="color:#A78BFA">Forge</span></h1>'
+        '<p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.4)">Agency workspace</p>'
+        '</td></tr>'
+        '<tr><td style="padding:32px 40px">' + body_html + '</td></tr>'
+        '<tr><td style="padding:14px 40px;border-top:1px solid rgba(255,255,255,0.06);text-align:center">'
+        '<p style="margin:0;font-size:11px;color:rgba(255,255,255,0.2)">'
+        'SceneForge Agency &middot; Workspace notification</p>'
+        '</td></tr>'
+        '</table></td></tr></table></body></html>'
+    )
+
+
+async def send_invite(
+    to_email: str,
+    inviter_name: str,
+    workspace_name: str,
+    role: str,
+    invite_url: str,
+) -> None:
+    """Invite a new team member to the workspace."""
+    subject = "You have been invited to join " + workspace_name + " on SceneForge"
+    role_cap = role.capitalize()
+    body = (
+        '<div style="text-align:center;margin-bottom:28px">'
+        '<div style="font-size:48px;margin-bottom:12px">\U0001f44b</div>'
+        '<h2 style="margin:0 0 10px;font-size:20px;font-weight:700;color:#fff">You\'re invited!</h2>'
+        '<p style="margin:0;font-size:14px;color:rgba(255,255,255,0.55);line-height:1.7">'
+        '<strong style="color:#fff">' + inviter_name + '</strong> has invited you to join '
+        '<strong style="color:#fff">' + workspace_name + '</strong> on SceneForge as a '
+        '<span style="color:#A78BFA;font-weight:700">' + role_cap + '</span>.</p></div>'
+        '<div style="background:rgba(167,139,250,0.06);border:1px solid rgba(167,139,250,0.15);'
+        'border-radius:12px;padding:16px 20px;margin-bottom:24px">'
+        '<p style="margin:0;font-size:13px;color:rgba(255,255,255,0.5);line-height:1.6">'
+        'As a <strong style="color:#A78BFA">' + role_cap + '</strong> you can collaborate on '
+        'video projects, review scenes, and work alongside the team.</p></div>'
+        '<div style="text-align:center;margin-bottom:24px">'
+        '<a href="' + invite_url + '" style="display:inline-block;background:#c9a84c;'
+        'color:#1a0f00;font-size:14px;font-weight:700;padding:14px 36px;'
+        'border-radius:12px;text-decoration:none">Accept invite \u2192</a></div>'
+        '<p style="text-align:center;margin:0;font-size:12px;color:rgba(255,255,255,0.25)">'
+        'This invite expires in 7 days.</p>'
+    )
+    html = _team_template(body)
+    text = (
+        "Hi!\n\n"
+        + inviter_name + " has invited you to join " + workspace_name
+        + " on SceneForge as a " + role_cap + ".\n\n"
+        "Accept your invite here: " + invite_url + "\n\n"
+        "This link expires in 7 days.\n\n\u2014 SceneForge"
+    )
+    await _send(to_email, subject, html, text)
+
+
+async def send_project_assigned(
+    to_email: str,
+    member_name: str,
+    assigner_name: str,
+    workspace_name: str,
+    project_title: str,
+    client_name: str,
+    platform: str,
+    project_url: str,
+) -> None:
+    """Notify an editor they have been assigned to a project."""
+    subject = "You have been assigned to a project in " + workspace_name
+    platform_str = (" on " + platform) if platform else ""
+    client_str   = (" for " + client_name) if client_name else ""
+    body = (
+        '<div style="text-align:center;margin-bottom:28px">'
+        '<div style="font-size:48px;margin-bottom:12px">\U0001f4cb</div>'
+        '<h2 style="margin:0 0 10px;font-size:20px;font-weight:700;color:#fff">New project assigned</h2>'
+        '<p style="margin:0;font-size:14px;color:rgba(255,255,255,0.55);line-height:1.7">'
+        'Hi <strong style="color:#fff">' + member_name + '</strong>, '
+        '<strong style="color:#fff">' + assigner_name + '</strong> has assigned you to a project '
+        'in <strong style="color:#fff">' + workspace_name + '</strong>.</p></div>'
+        '<div style="background:rgba(201,168,76,0.06);border:1px solid rgba(201,168,76,0.2);'
+        'border-radius:12px;padding:16px 20px;margin-bottom:24px">'
+        '<p style="margin:0 0 4px;font-size:11px;font-weight:700;color:rgba(201,168,76,0.6);'
+        'text-transform:uppercase;letter-spacing:.08em">Project</p>'
+        '<p style="margin:0;font-size:16px;font-weight:700;color:#fff">' + project_title + '</p>'
+        '<p style="margin:4px 0 0;font-size:13px;color:rgba(255,255,255,0.4)">'
+        + client_str + platform_str + '</p></div>'
+        '<div style="text-align:center;margin-bottom:24px">'
+        '<a href="' + project_url + '" style="display:inline-block;background:#c9a84c;'
+        'color:#1a0f00;font-size:14px;font-weight:700;padding:14px 32px;'
+        'border-radius:12px;text-decoration:none">Open project \u2192</a></div>'
+        '<p style="text-align:center;margin:0;font-size:12px;color:rgba(255,255,255,0.25)">'
+        'Log in to SceneForge to view the brief and start creating.</p>'
+    )
+    html = _team_template(body)
+    text = (
+        "Hi " + member_name + ",\n\n"
+        + assigner_name + " has assigned you to \""
+        + project_title + "\"" + client_str + platform_str
+        + " in " + workspace_name + ".\n\n"
+        "Open the project: " + project_url + "\n\n\u2014 SceneForge"
+    )
+    await _send(to_email, subject, html, text)
+
+
+async def send_member_suspended(
+    to_email: str,
+    member_name: str,
+    workspace_name: str,
+) -> None:
+    """Notify a team member their workspace access has been suspended."""
+    subject = "Your access to " + workspace_name + " has been suspended"
+    body = (
+        '<div style="text-align:center;margin-bottom:28px">'
+        '<div style="font-size:48px;margin-bottom:12px">\U0001f6ab</div>'
+        '<h2 style="margin:0 0 10px;font-size:20px;font-weight:700;color:#fff">Access suspended</h2>'
+        '<p style="margin:0;font-size:14px;color:rgba(255,255,255,0.55);line-height:1.7">'
+        'Hi <strong style="color:#fff">' + member_name + '</strong>, your access to '
+        '<strong style="color:#fff">' + workspace_name + '</strong> on SceneForge '
+        'has been suspended by the workspace owner.</p></div>'
+        '<div style="background:rgba(226,75,74,0.06);border:1px solid rgba(226,75,74,0.2);'
+        'border-radius:12px;padding:14px 18px;margin-bottom:24px">'
+        '<p style="margin:0;font-size:13px;color:rgba(255,255,255,0.5);line-height:1.6">'
+        'You cannot access the workspace until your access is restored. '
+        'Please contact the workspace owner to resolve this.</p></div>'
+        '<p style="text-align:center;margin:0;font-size:12px;color:rgba(255,255,255,0.25)">'
+        'If you believe this is an error, reply to this email.</p>'
+    )
+    html = _team_template(body)
+    text = (
+        "Hi " + member_name + ",\n\n"
+        "Your access to " + workspace_name + " on SceneForge has been suspended "
+        "by the workspace owner.\n\n"
+        "Please contact the workspace owner to resolve this.\n\n\u2014 SceneForge"
+    )
+    await _send(to_email, subject, html, text)
+
+
+async def send_member_unsuspended(
+    to_email: str,
+    member_name: str,
+    workspace_name: str,
+    dashboard_url: str,
+) -> None:
+    """Notify a team member their workspace access has been restored."""
+    subject = "Your access to " + workspace_name + " has been restored"
+    body = (
+        '<div style="text-align:center;margin-bottom:28px">'
+        '<div style="font-size:48px;margin-bottom:12px">\u2705</div>'
+        '<h2 style="margin:0 0 10px;font-size:20px;font-weight:700;color:#fff">Access restored</h2>'
+        '<p style="margin:0;font-size:14px;color:rgba(255,255,255,0.55);line-height:1.7">'
+        'Hi <strong style="color:#fff">' + member_name + '</strong>, your access to '
+        '<strong style="color:#fff">' + workspace_name + '</strong> on SceneForge '
+        'has been fully restored. You can log in and continue working.</p></div>'
+        '<div style="text-align:center;margin-bottom:24px">'
+        '<a href="' + dashboard_url + '" style="display:inline-block;background:#4ade80;'
+        'color:#052e16;font-size:14px;font-weight:700;padding:14px 32px;'
+        'border-radius:12px;text-decoration:none">Go to workspace \u2192</a></div>'
+        '<p style="text-align:center;margin:0;font-size:12px;color:rgba(255,255,255,0.25)">'
+        'Contact the workspace owner if you have any questions.</p>'
+    )
+    html = _team_template(body)
+    text = (
+        "Hi " + member_name + ",\n\n"
+        "Your access to " + workspace_name + " on SceneForge has been restored.\n\n"
+        "Log in here: " + dashboard_url + "\n\n\u2014 SceneForge"
+    )
+    await _send(to_email, subject, html, text)
