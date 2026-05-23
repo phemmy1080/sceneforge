@@ -94,28 +94,43 @@ def _clean_json(raw: str) -> str:
 async def generate_ideas(req: GenerateIdeasRequest, plan: str = "free") -> list[IdeaItem]:
     client, model = _client_and_model(plan)
 
-    hints_section = ""
+    # Build enriched context section
+    extra_parts = []
     if req.idea_tags:
-        hints_section = f"""
-User has requested ideas around these specific topics (prioritise these):
-{chr(10).join(f"- {t}" for t in req.idea_tags)}
-Generate ideas that directly address these topics. Fill remaining slots with related ideas.
-"""
-    elif req.context:
-        hints_section = f"\nFocus area: {req.context}"
+        extra_parts.append(
+            "Prioritise ideas around these topics:\n" +
+            "\n".join(f"- {t}" for t in req.idea_tags)
+        )
+    if req.objective:
+        extra_parts.append(f"Campaign objective: {req.objective}")
+    if getattr(req, "client_brief", "").strip():
+        extra_parts.append(
+            "Client brief (follow these instructions carefully):\n" +
+            req.client_brief.strip()
+        )
+    elif getattr(req, "context", "").strip():
+        extra_parts.append(f"Additional context: {req.context}")
 
-    prompt = f"""Generate exactly 6 viral content ideas for a {req.style} {req.niche} video.
+    hints_section = ("\n\n" + "\n\n".join(extra_parts)) if extra_parts else ""
+
+    # Duration / scene guidance
+    dur = getattr(req, "duration_hint", 60) or 60
+    scenes = getattr(req, "scene_count_hint", 8) or 8
+    duration_note = f"Target duration: {dur}s with ~{scenes} scenes. "
+
+    prompt = f"""Generate exactly 6 content ideas for a {req.style} video in the {req.niche} industry/niche.
 
 Platform: {req.platform}
-Audience: {req.audience or "general"}
-Tone: {req.tone}{hints_section}
+Audience: {req.audience or "general audience"}
+Tone: {req.tone}
+{duration_note}{hints_section}
 
 Return ONLY a valid JSON array of 6 objects — no explanation, no markdown:
 [{{"title": "...", "hook": "...", "angle": "..."}}]
 
 - title: compelling video title (max 60 chars)
-- hook: opening line that grabs attention (max 80 chars)
-- angle: unique approach or angle (max 60 chars)"""
+- hook: opening line that grabs attention in the first 2 seconds (max 80 chars)
+- angle: unique creative approach (max 60 chars)"""
 
     response = await client.chat.completions.create(
         model=model,
