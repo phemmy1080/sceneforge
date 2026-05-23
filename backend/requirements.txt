@@ -35,3 +35,4 @@ orjson==3.10.7
 slowapi>=0.1.9
 
 # cache-bust-2026-05-07
+Pillow>=10.0.0
