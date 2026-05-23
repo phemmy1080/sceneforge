@@ -97,7 +97,8 @@ async def render_video(ctx, job_id: str, payload: dict):
                 visual = await get_visual_for_scene(
                     scene=scene,
                     output_dir=str(output_dir),
-                    source=req.visual_source,
+                    source=("custom" if getattr(scene, "custom_image_url", None) else req.visual_source),
+                    custom_image_url=getattr(scene, "custom_image_url", None),
                     user_plan=_visual_user_plan,
                 )
                 visual_files.append(visual)
@@ -167,6 +168,59 @@ async def render_video(ctx, job_id: str, payload: dict):
                                        wm_result.stderr.decode()[:200])
         except Exception as e:
             logger.warning("Watermark step failed (non-fatal): %s", e)
+
+        # ── Stage 3c: Brand kit — intro, outro, logo watermark ─────────────────
+        await _set_progress(redis, job_id, "Applying brand kit...", 87)
+        try:
+            # Load brand kit via agency project
+            brand_kit = None
+            agency_proj_id = await redis.get(f"job:{job_id}:agency_proj_id")
+            if agency_proj_id:
+                agency_proj_id = agency_proj_id.decode() if isinstance(agency_proj_id, bytes) else agency_proj_id
+                from app.services.agency_service import get_project, get_brand_kit
+                agency_proj = await get_project(redis, agency_proj_id)
+                if agency_proj and agency_proj.get("brand_kit_id"):
+                    brand_kit = await get_brand_kit(redis, agency_proj["brand_kit_id"])
+
+            if brand_kit:
+                current_final = result.get("final_path") or result.get("output_path", "")
+                out_dir = str(output_dir)
+
+                # 1. Prepend intro clip
+                intro_url = brand_kit.get("intro_url", "").strip()
+                if intro_url and current_final and os.path.exists(current_final):
+                    intro_out = str(Path(out_dir) / "final_with_intro.mp4")
+                    current_final = await prepend_intro(current_final, intro_url, intro_out)
+
+                # 2. Append outro clip
+                outro_url = brand_kit.get("outro_url", "").strip()
+                if outro_url and current_final and os.path.exists(current_final):
+                    outro_out = str(Path(out_dir) / "final_with_outro.mp4")
+                    current_final = await append_outro(current_final, outro_url, outro_out)
+
+                # 3. Overlay logo watermark
+                logo_url   = brand_kit.get("logo_url", "").strip()
+                wm_pos     = brand_kit.get("watermark_position", "").strip()
+                if logo_url and wm_pos and current_final and os.path.exists(current_final):
+                    wm_out = str(Path(out_dir) / "final_with_watermark.mp4")
+                    current_final = await overlay_logo_watermark(
+                        current_final, logo_url, wm_pos, wm_out,
+                        opacity=0.25, scale=0.12
+                    )
+
+                # Update result with brand-kitted final path
+                if current_final != (result.get("final_path") or result.get("output_path", "")):
+                    # Rename to the expected final filename
+                    final_name = str(Path(out_dir) / "final_video.mp4")
+                    if current_final != final_name:
+                        import shutil
+                        shutil.copy2(current_final, final_name)
+                        current_final = final_name
+                    result["final_path"] = current_final
+                    logger.info("Brand kit applied — intro=%s outro=%s watermark=%s",
+                                bool(intro_url), bool(outro_url), bool(wm_pos))
+        except Exception as e:
+            logger.warning("Brand kit application failed (non-fatal): %s", e)
 
         # ── Stage 4: CapCut draft ─────────────────────────────────────────────
         await _set_progress(redis, job_id, "Generating CapCut package...", 88)
