@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useStore } from '../store'
+import { usePlanLimits } from '../hooks/usePlanLimits'
 import { useAuthStore } from '../authStore'
 import { getTokenBalance, startRender, type TokenBalance } from '../lib/api'
 import { Button, Card, CardTitle, Chip, PageHeader } from '../components/ui'
@@ -30,8 +31,9 @@ const TRANSITION_OPTIONS = [
 ]
 
 export default function VoiceVisuals() {
-  const user              = useAuthStore((s) => s.user)
-  const userPlan          = user?.plan || 'free'
+  const user              = useAuthStore((s: any) => s.user)
+  // Use plan-limits hook so workspace plan is factored in for agency members
+  const { plan: userPlan, isFree } = usePlanLimits()
   const canUseDalle       = userPlan === 'pro' || userPlan === 'studio' || userPlan === 'agency'
   const voiceConfig       = useStore((s) => s.voiceConfig)
   const setVoiceConfig    = useStore((s) => s.setVoiceConfig)
