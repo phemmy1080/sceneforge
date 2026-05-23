@@ -571,3 +571,129 @@ async def render_full_pipeline(
         "final_path": final_path,
         "scene_paths": scene_outputs,
     }
+
+# ── Brand kit — intro / outro / logo watermark ────────────────────────────────
+
+async def download_clip(url: str, dest: str) -> bool:
+    """Download a video/image from URL to dest. Returns True on success."""
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(url, follow_redirects=True)
+            resp.raise_for_status()
+        with open(dest, "wb") as f:
+            f.write(resp.content)
+        return True
+    except Exception as e:
+        logger.warning("Brand kit clip download failed (%s): %s", url, e)
+        return False
+
+
+async def prepend_intro(main_video: str, intro_url: str, output_path: str) -> str:
+    """Prepend brand intro clip to main video. Returns output_path on success, main_video on fail."""
+    intro_path = output_path.replace(".mp4", "_intro_src.mp4")
+    if not await download_clip(intro_url, intro_path):
+        return main_video
+    concat_list = output_path.replace(".mp4", "_intro_list.txt")
+    try:
+        # Normalise intro to match main video specs
+        intro_norm = output_path.replace(".mp4", "_intro_norm.mp4")
+        await normalize_scene(intro_path, intro_norm)
+        with open(concat_list, "w") as f:
+            f.write(f"file '{os.path.abspath(intro_norm)}'\n")
+            f.write(f"file '{os.path.abspath(main_video)}'\n")
+        await run_ffmpeg([
+            "ffmpeg", "-y",
+            "-f", "concat", "-safe", "0", "-i", concat_list,
+            "-c", "copy", "-movflags", "+faststart",
+            output_path,
+        ])
+        logger.info("Brand intro prepended → %s", Path(output_path).name)
+        return output_path
+    except Exception as e:
+        logger.warning("Intro prepend failed (non-fatal): %s", e)
+        return main_video
+    finally:
+        for p in [intro_path, concat_list, output_path.replace(".mp4","_intro_norm.mp4")]:
+            try: Path(p).unlink(missing_ok=True)
+            except: pass
+
+
+async def append_outro(main_video: str, outro_url: str, output_path: str) -> str:
+    """Append brand outro clip to main video. Returns output_path on success, main_video on fail."""
+    outro_path = output_path.replace(".mp4", "_outro_src.mp4")
+    if not await download_clip(outro_url, outro_path):
+        return main_video
+    concat_list = output_path.replace(".mp4", "_outro_list.txt")
+    try:
+        outro_norm = output_path.replace(".mp4", "_outro_norm.mp4")
+        await normalize_scene(outro_path, outro_norm)
+        with open(concat_list, "w") as f:
+            f.write(f"file '{os.path.abspath(main_video)}'\n")
+            f.write(f"file '{os.path.abspath(outro_norm)}'\n")
+        await run_ffmpeg([
+            "ffmpeg", "-y",
+            "-f", "concat", "-safe", "0", "-i", concat_list,
+            "-c", "copy", "-movflags", "+faststart",
+            output_path,
+        ])
+        logger.info("Brand outro appended → %s", Path(output_path).name)
+        return output_path
+    except Exception as e:
+        logger.warning("Outro append failed (non-fatal): %s", e)
+        return main_video
+    finally:
+        for p in [outro_path, concat_list, output_path.replace(".mp4","_outro_norm.mp4")]:
+            try: Path(p).unlink(missing_ok=True)
+            except: pass
+
+
+async def overlay_logo_watermark(
+    main_video: str,
+    logo_url: str,
+    position: str,   # "top-left"|"top-right"|"bottom-left"|"bottom-right"|"center"
+    output_path: str,
+    opacity: float = 0.25,
+    scale: float = 0.12,       # logo width as fraction of video width
+) -> str:
+    """Overlay brand logo as watermark. Returns output_path on success, main_video on fail."""
+    import mimetypes
+    ext = Path(logo_url).suffix or ".png"
+    logo_path = output_path.replace(".mp4", f"_logo{ext}")
+    if not await download_clip(logo_url, logo_path):
+        return main_video
+
+    # Position map — pad=20px from edges
+    POS = {
+        "top-left":     "x=20:y=20",
+        "top-right":    "x=W-w-20:y=20",
+        "bottom-left":  "x=20:y=H-h-20",
+        "bottom-right": "x=W-w-20:y=H-h-20",
+        "center":       "x=(W-w)/2:y=(H-h)/2",
+    }
+    pos_expr = POS.get(position, POS["top-right"])
+    scale_filter = f"scale=iw*{scale}:-1"
+    overlay_filter = (
+        f"[1:v]format=rgba,{scale_filter},colorchannelmixer=aa={opacity}[logo];"
+        f"[0:v][logo]overlay={pos_expr}"
+    )
+
+    try:
+        await run_ffmpeg([
+            "ffmpeg", "-y",
+            "-i", main_video,
+            "-i", logo_path,
+            "-filter_complex", overlay_filter,
+            "-c:a", "copy",
+            "-movflags", "+faststart",
+            output_path,
+        ])
+        logger.info("Brand watermark applied (%s, %.0f%% opacity) → %s",
+                    position, opacity * 100, Path(output_path).name)
+        return output_path
+    except Exception as e:
+        logger.warning("Logo watermark failed (non-fatal): %s", e)
+        return main_video
+    finally:
+        try: Path(logo_path).unlink(missing_ok=True)
+        except: pass
