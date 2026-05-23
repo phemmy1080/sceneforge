@@ -37,8 +37,13 @@ class GenerateIdeasRequest(BaseModel):
     tone: str = Field(default="Energetic & punchy")
     audience: str = Field(default="general audience")
     context: str = Field(default="")
-    idea_tags: list[str] = Field(default_factory=list)  # user-supplied topic hints
-    prompt: str = Field(default="", description="User-typed topic or direction for ideas")
+    idea_tags: list[str] = Field(default_factory=list)
+    prompt: str = Field(default="")
+    # Agency / premium fields
+    objective: str = Field(default="")           # campaign goal
+    duration_hint: int = Field(default=60)       # target video duration in seconds
+    scene_count_hint: int = Field(default=8)     # target number of scenes
+    client_brief: str = Field(default="")        # full client brief text
 
 
 class IdeaItem(BaseModel):
