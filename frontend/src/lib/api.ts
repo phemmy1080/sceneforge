@@ -163,6 +163,7 @@ export interface RenderRequest {
   motion?: string               // "auto" | "kenburns_in" | "kenburns_out" | "pan_left" | "pan_right" | "none"
   transition?: string           // "fade" | "blur" | "none"
   transition_duration?: number
+  agency_project_id?: string  // set when rendering for an agency project
 }
 
 export interface JobStatus {
