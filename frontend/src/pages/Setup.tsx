@@ -80,13 +80,19 @@ export default function Setup() {
   const setStep          = useStore((s) => s.setStep)
   const markStepComplete = useStore((s) => s.markStepComplete)
   const agencyProjectId  = useStore((s: any) => s.agencyProjectId)
+  const currentStep      = useStore((s) => s.currentStep)
   const currentUser      = useAuthStore((s: any) => s.user)
-  const isAgencyMode     = !!(agencyProjectId || currentUser?.workspace_role)
+  // Agency mode = actively working on an agency project (not just being a member)
+  const isAgencyMode     = !!agencyProjectId || currentStep === 'agency-workflow'
 
   const [ideaInput, setIdeaInput]     = useState(config.ideaHints || '')
   const [ideaTags, setIdeaTags]       = useState<string[]>(config.ideaTags || [])
-  const [objective, setObjective]     = useState<string>(config.objective || '')
-  const [duration, setDuration]       = useState<number>(config.duration_hint || 60)
+  const [objective, setObjective]         = useState<string>(config.objective || '')
+  const [customObjective, setCustomObjective] = useState<string>(
+    config.objective && !OBJECTIVES.find(o => o.key === config.objective)
+      ? config.objective : ''
+  )
+  const [duration, setDuration]           = useState<number>(config.duration_hint || 60)
   const [sceneCount, setSceneCount]   = useState<number>(config.scene_count_hint || 8)
   const [clientBrief, setClientBrief] = useState<string>(config.client_brief || '')
   const [customDuration, setCustomDuration] = useState<string>('')
@@ -165,7 +171,8 @@ export default function Setup() {
   function handleContinue() {
     setConfig({
       ideaHints: ideaInput, ideaTags,
-      objective, duration_hint: duration,
+      objective: objective === 'custom' ? customObjective : objective,
+      duration_hint: duration,
       scene_count_hint: sceneCount,
       client_brief: clientBrief,
     })
@@ -214,6 +221,28 @@ export default function Setup() {
                 <span>{o.icon}</span>{o.label}
               </button>
             ))}
+          </div>
+          {/* Free-text custom objective */}
+          <div className="mt-3 flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setObjective(objective === 'custom' ? '' : 'custom')}
+              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition ${
+                objective === 'custom'
+                  ? 'bg-amber-400/15 border-amber-400/30 text-amber-300'
+                  : 'bg-white/[0.04] border-white/[0.1] text-white/50 hover:border-white/[0.2] hover:text-white/80'
+              }`}>
+              ✎ Other
+            </button>
+            {objective === 'custom' && (
+              <input
+                type="text"
+                value={customObjective}
+                onChange={e => setCustomObjective(e.target.value)}
+                placeholder="Describe your campaign goal…"
+                autoFocus
+                className="flex-1 min-w-[200px] bg-white/[0.05] border border-white/[0.1] rounded-xl px-3 py-1.5 text-white text-sm outline-none focus:border-amber-400/50 placeholder:text-white/20 transition"
+              />
+            )}
           </div>
         </Card>
       )}
