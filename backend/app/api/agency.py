@@ -211,7 +211,7 @@ async def invite_member(
     # Send invite email
     try:
         from app.services.email import _send
-        invite_url = f"https://scenraforge.com/join?token={token}"
+        invite_url = f"https://sceneraforge.com/join?token={token}"
         html = f"""
         <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#0a0a0f;color:#f0f0ff;padding:32px;border-radius:16px">
           <div style="font-size:22px;font-weight:800;margin-bottom:8px">Scene<span style="color:#c9a84c">Forge</span></div>
@@ -358,6 +358,56 @@ async def upload_scene_image(
     return {"image_url": url}
 
 
+def _extract_brand_colours(raw_bytes: bytes, n: int = 5) -> list[str]:
+    """
+    Extract the top N dominant colours from a logo image using PIL median-cut quantisation.
+    Skips near-white (backgrounds), near-transparent, and near-black (outlines) pixels.
+    Returns hex strings e.g. ['#0D1B2A', '#00C8FF', '#F7C948'].
+    Falls back to [] on any error so it never crashes the upload.
+    """
+    try:
+        from PIL import Image
+        import io as _io
+        from collections import Counter as _Counter
+
+        img = Image.open(_io.BytesIO(raw_bytes)).convert("RGBA")
+        img.thumbnail((120, 120), Image.LANCZOS)
+        pixels = list(img.getdata())
+
+        meaningful = []
+        for r, g, b, a in pixels:
+            if a < 80: continue
+            if r > 230 and g > 230 and b > 230: continue
+            if r < 15  and g < 15  and b < 15:  continue
+            meaningful.append((r, g, b))
+
+        if len(meaningful) < 10:
+            return []
+
+        tmp = Image.new("RGB", (len(meaningful), 1))
+        tmp.putdata(meaningful)
+        quant = tmp.quantize(colors=max(n * 2, 10), method=Image.Quantize.MEDIANCUT)
+        palette_raw = quant.getpalette()
+        counts = _Counter(list(quant.getdata()))
+
+        num_cols = len(palette_raw) // 3
+        scored = sorted(range(num_cols), key=lambda i: counts.get(i, 0), reverse=True)
+
+        colours, seen = [], []
+        for idx in scored:
+            r, g, b = palette_raw[idx*3], palette_raw[idx*3+1], palette_raw[idx*3+2]
+            if any(abs(r-cr) + abs(g-cg) + abs(b-cb) < 60 for cr, cg, cb in seen):
+                continue
+            colours.append(f"#{r:02X}{g:02X}{b:02X}")
+            seen.append((r, g, b))
+            if len(colours) >= n:
+                break
+        return colours
+    except Exception as _e:
+        logger.warning("Colour extraction failed (non-fatal): %s", _e)
+        return []
+
+
 @router.post("/brand-kits/logo")
 async def upload_brand_logo(
     file: UploadFile = _File(...),
@@ -398,8 +448,12 @@ async def upload_brand_logo(
         logo_url = f"data:{ct};base64,{base64.b64encode(raw).decode()}"
         logger.warning("R2 not enabled — logo stored as data URL for ws=%s", ws["id"])
 
-    logger.info("Brand logo uploaded | ws=%s | url=%s", ws["id"], logo_url)
-    return {"logo_url": logo_url}
+    # Extract dominant colours from the uploaded logo
+    colours: list[str] = []
+    if ct != "image/svg+xml":   # SVG is XML — can't raster-sample it
+        colours = _extract_brand_colours(raw)
+    logger.info("Brand logo uploaded | ws=%s | url=%s | colours=%s", ws["id"], logo_url, colours)
+    return {"logo_url": logo_url, "colours": colours}
 
 
 @router.get("/brand-kits")
@@ -783,7 +837,7 @@ async def create_review_link(
     await _require_role(ws["id"], user.id, redis, ("owner", "admin", "editor"))
 
     review = await svc.create_review_link(redis, ws["id"], proj_id, user.id)
-    review_url = f"https://scenraforge.com/review/{review['token']}"
+    review_url = f"https://sceneraforge.com/review/{review['token']}"
 
     # bump project to client_review status
     await svc.update_project_status(redis, ws["id"], proj_id, user.id, "client_review")
