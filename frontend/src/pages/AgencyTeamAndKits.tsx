@@ -589,10 +589,11 @@ function BrandKitForm({ kit, onSaved, onCancel }: { kit: BrandKit | null; onSave
     watermark_position: (kit as any)?.watermark_position  || "",
   });
   const [saving, setSaving]       = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError]         = useState("");
-  const [preview, setPreview]     = useState(kit?.logo_url || "");
-  const fileRef                   = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading]             = useState(false);
+  const [error, setError]                     = useState("");
+  const [preview, setPreview]                 = useState(kit?.logo_url || "");
+  const [extractedColours, setExtractedColours] = useState<string[]>([]);
+  const fileRef                               = useRef<HTMLInputElement>(null);
 
   const F = (k: string) => ({
     value: form[k as keyof typeof form] as string,
@@ -603,15 +604,22 @@ function BrandKitForm({ kit, onSaved, onCancel }: { kit: BrandKit | null; onSave
     const allowed = ["image/png","image/jpeg","image/jpg","image/webp","image/svg+xml","image/gif"];
     if (!allowed.includes(file.type)) { setError("Use PNG, JPG, WebP or SVG"); return; }
     if (file.size > 5 * 1024 * 1024)  { setError("Logo must be under 5 MB"); return; }
-    setUploading(true); setError("");
+    setUploading(true); setError(""); setExtractedColours([]);
     const fd = new FormData();
     fd.append("file", file);
     try {
       const res = await api.post("/api/agency/brand-kits/logo", fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      setForm(f => ({ ...f, logo_url: res.data.logo_url }));
-      setPreview(res.data.logo_url);
+      const { logo_url, colours } = res.data;
+      setPreview(logo_url);
+      setForm(f => ({
+        ...f,
+        logo_url,
+        // Auto-fill brand colours only if the field is currently empty
+        ...(colours?.length && !f.colors.trim() ? { colors: colours.join(", ") } : {}),
+      }));
+      if (colours?.length) setExtractedColours(colours);
     } catch (e: any) {
       setError(e.response?.data?.detail || "Upload failed");
     } finally { setUploading(false); }
@@ -711,6 +719,23 @@ function BrandKitForm({ kit, onSaved, onCancel }: { kit: BrandKit | null; onSave
                 {form.colors.split(",").map((c:string) => c.trim()).filter(Boolean).map((c:string, i:number) => (
                   <div key={i} style={{ background: c }} className="w-6 h-6 rounded-md border border-white/10" title={c} />
                 ))}
+              </div>
+            )}
+
+            {/* Extracted colours hint — shown when logo was scanned but field already had values */}
+            {extractedColours.length > 0 && form.colors.trim() && form.colors !== extractedColours.join(", ") && (
+              <div className="mt-2 bg-amber-400/[0.07] border border-amber-400/15 rounded-xl px-3 py-2 flex items-center gap-2 flex-wrap">
+                <div className="flex gap-1 flex-shrink-0">
+                  {extractedColours.map((c, i) => (
+                    <div key={i} style={{ background: c }} className="w-5 h-5 rounded-md border border-white/10" title={c} />
+                  ))}
+                </div>
+                <span className="text-[11px] text-amber-300/70 flex-1 min-w-0">Colours detected from logo</span>
+                <button type="button"
+                  onClick={() => setForm(f => ({ ...f, colors: extractedColours.join(", ") }))}
+                  className="text-[11px] font-semibold text-amber-300 hover:text-amber-200 transition flex-shrink-0">
+                  Apply →
+                </button>
               </div>
             )}
           </div>
