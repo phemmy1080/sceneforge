@@ -218,7 +218,7 @@ async def invite_member(
           <h2 style="font-size:18px;font-weight:700;margin:24px 0 8px">You've been invited</h2>
           <p style="color:rgba(255,255,255,0.6);font-size:14px;line-height:1.6;margin:0 0 24px">
             <strong style="color:#f0f0ff">{user.full_name}</strong> has invited you to join
-            <strong style="color:#f0f0ff">{ws["name"]}</strong> on SceneForge as a <strong style="color:#c9a84c">{req.role}</strong>.
+            <strong style="color:#f0f0ff">{ws["name"]}</strong> on SceneForge as an <strong style="color:#c9a84c">{req.role}</strong>.
           </p>
           <a href="{invite_url}" style="display:inline-block;background:#c9a84c;color:#000;font-weight:700;font-size:14px;padding:12px 28px;border-radius:10px;text-decoration:none">Accept invite</a>
           <p style="color:rgba(255,255,255,0.3);font-size:12px;margin-top:24px">This link expires in 7 days.</p>
