@@ -439,7 +439,7 @@ export const useStore = create<AppState>()(
         },
 
         getRenderRequest: (): RenderRequest => {
-          const { scenes, voiceConfig, config, selectedIdea, uploadedVoicePath, projects, activeProjectId } = get()
+          const { scenes, voiceConfig, config, selectedIdea, uploadedVoicePath, projects, activeProjectId, agencyProjectId } = get()
           const activeProject = projects.find(p => p.id === activeProjectId)
           return {
             scenes,
@@ -452,6 +452,8 @@ export const useStore = create<AppState>()(
             platform: config.platform,
             uploaded_voice_path: uploadedVoicePath ?? null,
             project_id: activeProjectId ?? undefined,
+            // Pass agency project ID so worker can load brand kit
+            agency_project_id: agencyProjectId || undefined,
             motion:     voiceConfig.motion      ?? 'auto',
             transition: voiceConfig.transition  ?? 'fade',
             transition_duration: 0.4,
