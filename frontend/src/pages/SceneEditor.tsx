@@ -47,7 +47,8 @@ export default function SceneEditor() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const uploadingForScene = useRef<number | null>(null)
 
-  const agencyProjectId = useStore((s: any) => s.agencyProjectId)
+  const agencyProjectId  = useStore((s: any) => s.agencyProjectId)
+  const [savingBack, setSavingBack] = useState(false)
   const user = useAuthStore((s: any) => s.user)
   const [selectedVisualId, setSelectedVisualId] = useState<string | null>(null)
 
@@ -108,6 +109,29 @@ export default function SceneEditor() {
     setStep('voice')
   }
 
+  async function saveAndReturnToProject() {
+    if (!agencyProjectId) return
+    setSavingBack(true)
+    try {
+      // Find the last render job for this project so we can save scenes back
+      const projRes = await api.get(`/api/agency/projects/${agencyProjectId}`)
+      const jobIds: string[] = projRes.data.project?.render_job_ids || []
+      if (jobIds.length > 0) {
+        const lastJobId = jobIds[jobIds.length - 1]
+        // Flush current store scenes back to Redis
+        const currentScenes = useStore.getState().scenes
+        await api.put(`/api/render/scenes/${lastJobId}`, { scenes: currentScenes })
+      }
+    } catch (e) {
+      console.warn('Scene save failed (non-fatal):', e)
+    } finally {
+      setSavingBack(false)
+    }
+    // Navigate back to the agency project page
+    // Navigate back to the project detail page
+    useStore.getState().setStep('agency-detail' as any)
+  }
+
   if (scenes.length === 0) {
     return (
       <div className="py-20 text-center">
@@ -157,9 +181,27 @@ export default function SceneEditor() {
               {canAddScene(scenes.length) ? '+ Add scene' : '🔒 Upgrade to add more'}
             </Button>
           </div>
-          <Button variant="primary" size="sm" onClick={handleContinue}>
-            Next: Voice & visuals →
-          </Button>
+          {agencyProjectId ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={saveAndReturnToProject}
+                disabled={savingBack}
+                className="text-sm font-semibold px-4 py-2 rounded-xl bg-amber-400/15 border border-amber-400/25 text-amber-300 hover:bg-amber-400/20 transition disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {savingBack
+                  ? <><div className="w-3 h-3 border border-amber-400/50 border-t-transparent rounded-full animate-spin" />Saving…</>
+                  : <>✓ Save & return to project</>
+                }
+              </button>
+              <Button variant="primary" size="sm" onClick={handleContinue}>
+                Next: Voice & visuals →
+              </Button>
+            </div>
+          ) : (
+            <Button variant="primary" size="sm" onClick={handleContinue}>
+              Next: Voice & visuals →
+            </Button>
+          )}
         </div>
       </div>
 
