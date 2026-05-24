@@ -223,11 +223,22 @@ async def start_render(
 
 
 
+class RenderSceneRequest(BaseModel):
+    scene: Optional[dict] = None          # updated scene fields
+    visual_source: Optional[str] = None
+    custom_image_url: Optional[str] = None
+    voice_name: Optional[str] = None
+    voice_speed: Optional[float] = None
+    subtitle_style: Optional[str] = None
+    platform: Optional[str] = None
+    motion: Optional[str] = None
+
+
 @router.post("/scenes/{job_id}/{scene_index}")
 async def rerender_scene(
     job_id: str,
     scene_index: int,
-    req: "RenderSceneRequest",
+    req: RenderSceneRequest,
     authorization: Optional[str] = Header(None),
 ):
     """
@@ -377,16 +388,6 @@ async def rerender_scene(
     finally:
         await redis.aclose()
 
-
-class RenderSceneRequest(BaseModel):
-    scene: Optional[dict] = None          # updated scene fields
-    visual_source: Optional[str] = None
-    custom_image_url: Optional[str] = None
-    voice_name: Optional[str] = None
-    voice_speed: Optional[float] = None
-    subtitle_style: Optional[str] = None
-    platform: Optional[str] = None
-    motion: Optional[str] = None
 
 
 @router.get("/scenes/{job_id}")
