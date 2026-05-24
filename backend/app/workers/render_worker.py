@@ -326,6 +326,20 @@ async def render_video(ctx, job_id: str, payload: dict):
                 logger.error("Render complete email failed: %s", e)
 
         # ── Done ──────────────────────────────────────────────────────────────
+        # Store individual scene URLs for partial re-render
+        scene_urls: list[str] = []
+        for i in range(len(req.scenes)):
+            padded = str(i + 1).zfill(2)
+            key = f"scene_{padded}.mp4"
+            if key in r2_urls:
+                scene_urls.append(r2_urls[key])
+        if scene_urls:
+            await redis.set(
+                f"job:{job_id}:scene_urls",
+                json.dumps(scene_urls),
+                ex=86400 * 7
+            )
+
         final_result = {
             "status":           "complete",
             "stage":            "Done",
@@ -333,6 +347,7 @@ async def render_video(ctx, job_id: str, payload: dict):
             "job_id":           job_id,
             "video_url":        video_url,
             "r2_urls":          r2_urls,
+            "scene_urls":       scene_urls,
             "scene_count":      len(req.scenes),
             "total_duration":   sum(s.duration for s in req.scenes),
             "tokens_remaining": tokens_remaining,
