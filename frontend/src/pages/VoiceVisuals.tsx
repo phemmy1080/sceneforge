@@ -275,20 +275,28 @@ export default function VoiceVisuals() {
         <div className="mb-4 bg-[#111118] border border-white/[0.07] rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[11px] font-semibold text-white/40 uppercase tracking-widest">
-              Token balance
+              {tokenBalance.is_agency ? 'Agency pool balance' : 'Token balance'}
             </span>
             <span className="text-[13px] font-bold text-white">
-              {tokenBalance.tokens_remaining}
-              <span className="text-white/35 font-normal"> / {tokenBalance.tokens_total}</span>
+              {tokenBalance.tokens_remaining.toLocaleString()}
+              {!tokenBalance.is_agency && (
+                <span className="text-white/35 font-normal"> / {tokenBalance.tokens_total.toLocaleString()}</span>
+              )}
+              {tokenBalance.is_agency && (
+                <span className="text-[10px] font-normal text-violet-300/60 ml-1.5">shared pool</span>
+              )}
             </span>
           </div>
           <div className="h-1.5 bg-white/[0.07] rounded-full overflow-hidden mb-2">
             <div
               className="h-full rounded-full transition-all"
               style={{
-                width: `${Math.min(100, Math.round((tokenBalance.tokens_remaining / tokenBalance.tokens_total) * 100))}%`,
+                width: tokenBalance.is_agency
+                  ? `${Math.min(100, Math.round((tokenBalance.tokens_remaining / Math.max(tokenBalance.tokens_remaining, 5000)) * 100))}%`
+                  : `${Math.min(100, Math.round((tokenBalance.tokens_remaining / tokenBalance.tokens_total) * 100))}%`,
                 background: tokenBalance.tokens_remaining < 200 ? '#FF6B6B'
-                          : tokenBalance.tokens_remaining < 500 ? '#F59E0B' : '#2DD4BF',
+                          : tokenBalance.tokens_remaining < 500 ? '#F59E0B'
+                          : tokenBalance.is_agency ? '#A78BFA' : '#2DD4BF',
               }}
             />
           </div>
