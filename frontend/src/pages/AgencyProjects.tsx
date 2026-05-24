@@ -353,6 +353,8 @@ export function ProjectDetail() {
   const [sceneClips, setSceneClips] = useState<SceneClip[]>([]);
   const [activeScene, setActiveScene] = useState<number | null>(null);
   const [sceneCommentText, setSceneCommentText] = useState("");
+  const [rerenderingScene, setRerenderingScene] = useState<number | null>(null);
+  const [patchedVideoUrl, setPatchedVideoUrl] = useState<string>("");
   const [members, setMembers] = useState<Member[]>([]);
   const [assignOpen, setAssignOpen]   = useState(false);
   const [assigning, setAssigning]     = useState(false);
@@ -498,6 +500,45 @@ export function ProjectDetail() {
       setComments(c => [...c, res.data.comment]);
       setCommentText("");
     } catch {}
+  }
+
+  // Re-render a single scene without a full re-render
+  async function rerenderScene(sceneIndex: number) {
+    if (!project?.render_job_ids?.length) {
+      alert('No previous render found. Please do a full render first.');
+      return;
+    }
+    const lastJobId = project.render_job_ids[project.render_job_ids.length - 1];
+
+    // Load the current scene data from Redis
+    let sceneData: any = null;
+    try {
+      const scenesRes = await api.get(`/api/render/scenes/${lastJobId}`);
+      sceneData = scenesRes.data.scenes?.[sceneIndex];
+    } catch {}
+
+    if (!sceneData) {
+      alert('Scene data not found. Please do a full render first.');
+      return;
+    }
+
+    setRerenderingScene(sceneIndex);
+    try {
+      const res = await api.post(`/api/render/scenes/${lastJobId}/${sceneIndex}`, {
+        scene: sceneData,
+        visual_source: 'pexels_video',
+        subtitle_style: 'viral',
+        platform: project.platform || 'TikTok',
+        motion: 'auto',
+      });
+      setPatchedVideoUrl(res.data.video_url);
+      // Reload scene clips with new video
+      await loadSceneClips(lastJobId);
+    } catch (e: any) {
+      alert(e.response?.data?.detail || 'Scene re-render failed');
+    } finally {
+      setRerenderingScene(null);
+    }
   }
 
   // Jump straight into the SceneEditor at a specific scene index
@@ -1240,19 +1281,46 @@ ${emailBody}`)}
           {activeScene !== null && (
             <div className="border-t border-white/[0.06]">
               <div className="p-4">
+                {/* Patched video success banner */}
+                {patchedVideoUrl && (
+                  <div className="mb-3 bg-violet-400/[0.07] border border-violet-400/20 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
+                    <div className="w-7 h-7 rounded-full bg-violet-400/15 flex items-center justify-center flex-shrink-0 text-sm">✓</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-bold text-violet-300">Scene patched — new video ready</div>
+                      <div className="text-[11px] text-white/35 mt-0.5">Only that scene was re-rendered. Full video updated.</div>
+                    </div>
+                    <a href={patchedVideoUrl} target="_blank" rel="noreferrer"
+                      className="text-xs bg-violet-400/15 border border-violet-400/25 text-violet-300 hover:bg-violet-400/20 px-3 py-1.5 rounded-lg transition font-semibold flex-shrink-0">
+                      Download
+                    </a>
+                    <button onClick={() => setPatchedVideoUrl("")}
+                      className="text-white/25 hover:text-white/50 transition text-lg leading-none flex-shrink-0">×</button>
+                  </div>
+                )}
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                   <span className="text-xs font-semibold text-amber-300">Scene {activeScene + 1} selected</span>
                   <div className="ml-auto flex items-center gap-2">
-                    {/* Edit this scene — jumps into SceneEditor at this index */}
+                    {/* Edit and re-render scene buttons */}
                     {(() => {
                       const isAssigned = project.assigned_to?.includes(currentUser?.id || '');
                       if (isAdmin || isAssigned) return (
-                        <button
-                          onClick={() => editScene(activeScene)}
-                          className="flex items-center gap-1.5 text-[11px] bg-amber-400/15 border border-amber-400/25 text-amber-300 hover:bg-amber-400/20 px-2.5 py-1 rounded-lg transition font-semibold">
-                          ✎ Edit scene {activeScene + 1}
-                        </button>
+                        <>
+                          <button
+                            onClick={() => editScene(activeScene)}
+                            className="flex items-center gap-1.5 text-[11px] bg-amber-400/15 border border-amber-400/25 text-amber-300 hover:bg-amber-400/20 px-2.5 py-1 rounded-lg transition font-semibold">
+                            ✎ Edit scene {activeScene + 1}
+                          </button>
+                          <button
+                            onClick={() => rerenderScene(activeScene)}
+                            disabled={rerenderingScene === activeScene}
+                            className="flex items-center gap-1.5 text-[11px] bg-violet-400/15 border border-violet-400/25 text-violet-300 hover:bg-violet-400/20 px-2.5 py-1 rounded-lg transition font-semibold disabled:opacity-50">
+                            {rerenderingScene === activeScene
+                              ? <><div className="w-3 h-3 border border-violet-400/50 border-t-transparent rounded-full animate-spin"/>Re-rendering…</>
+                              : <>↻ Re-render scene {activeScene + 1}</>
+                            }
+                          </button>
+                        </>
                       );
                       return null;
                     })()}
