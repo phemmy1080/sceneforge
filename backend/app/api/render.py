@@ -252,7 +252,7 @@ async def rerender_scene(
     from pathlib import Path as _Path
     from app.services.ffmpeg import render_scene, normalize_scene, run_ffmpeg
     from app.services.visuals import get_visual_for_scene, VisualSource
-    from app.services.voice import synthesise_speech
+    from app.services.voice import synthesize_scene as _synthesize_scene
     from app.services.storage import upload_file, r2_enabled, _public_url
     from app.models.schemas import Scene, VisualSource as VS
 
@@ -293,12 +293,11 @@ async def rerender_scene(
             is_img = visual_file.media_type == "image"
 
             # ── Step 2: Synthesise voice ────────────────────────────────────
-            audio_path = str(work_dir / "audio.mp3")
-            await synthesise_speech(
-                text=scene.text,
+            audio_path = await _synthesize_scene(
+                scene=scene,
                 voice_name=req.voice_name or "alloy",
+                output_dir=str(work_dir),
                 speed=req.voice_speed or 1.0,
-                output_path=audio_path,
             )
 
             # ── Step 3: Render the single scene ────────────────────────────
@@ -344,7 +343,7 @@ async def rerender_scene(
             norm_clips: list[str] = []
             for i, clip in enumerate(clips):
                 norm = str(work_dir / f"norm_{i:02d}.mp4")
-                await normalize_scene(clip, norm)
+                await normalize_scene(clip, norm, platform=req.platform)
                 norm_clips.append(norm)
 
             # Concat list
