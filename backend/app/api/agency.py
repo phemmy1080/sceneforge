@@ -176,7 +176,7 @@ async def get_dashboard(
 ):
     user = await _get_user(authorization, redis)
     ws = await _require_workspace(user.id, redis)
-    data = await svc.get_dashboard(redis, ws["id"])
+    data = await svc.get_dashboard(redis, ws["id"], user_id=user.id)
     return data
 
 
