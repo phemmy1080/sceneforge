@@ -355,6 +355,7 @@ export function ProjectDetail() {
   const [sceneCommentText, setSceneCommentText] = useState("");
   const [rerenderingScene, setRerenderingScene] = useState<number | null>(null);
   const [patchedVideoUrl, setPatchedVideoUrl] = useState<string>("");
+  const [jobCreatedBy, setJobCreatedBy]       = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [assignOpen, setAssignOpen]   = useState(false);
   const [assigning, setAssigning]     = useState(false);
@@ -367,6 +368,10 @@ export function ProjectDetail() {
 
   const LOCKED_STATUSES = ['approved', 'rendering', 'exported'];
   const canEditDetails = isAdmin && !LOCKED_STATUSES.includes(project?.status || '');
+  // Owner/admin can only edit scenes/video if they created the render job or are an editor assigned to it
+  const canEditVideo = isAdmin
+    ? (!jobCreatedBy || jobCreatedBy === currentUser?.id)
+    : (project?.assigned_to?.includes(currentUser?.id || '') ?? false);
 
   useEffect(() => {
     if (id && !isSuspended) {
@@ -405,7 +410,15 @@ export function ProjectDetail() {
     } finally { setLoading(false); }
   }
 
+  async function loadSceneCreator(jobId: string) {
+    try {
+      const res = await api.get(`/api/render/job-creator/${jobId}`);
+      setJobCreatedBy(res.data.created_by || null);
+    } catch { setJobCreatedBy(null); }
+  }
+
   async function loadSceneClips(jobId: string) {
+    loadSceneCreator(jobId).catch(() => {});
     if (!jobId) return;
     try {
       let res;
@@ -1304,7 +1317,7 @@ ${emailBody}`)}
                     {/* Edit and re-render scene buttons */}
                     {(() => {
                       const isAssigned = project.assigned_to?.includes(currentUser?.id || '');
-                      if (isAdmin || isAssigned) return (
+                      if (canEditVideo) return (
                         <>
                           <button
                             onClick={() => editScene(activeScene)}
