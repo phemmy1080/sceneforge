@@ -403,6 +403,36 @@ async def get_job_creator(job_id: str):
     finally:
         await redis.aclose()
 
+
+@router.put("/scenes/{job_id}")
+async def save_job_scenes(
+    job_id: str,
+    body: dict,
+    authorization: Optional[str] = Header(None),
+):
+    """Persist updated scene data back to Redis so partial re-renders use fresh data."""
+    import json as _json
+    redis = await _get_redis()
+    try:
+        token = (authorization or "").removeprefix("Bearer ").strip()
+        user_id = auth_service.verify_token(token) if token else None
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+        scenes = body.get("scenes")
+        if not scenes or not isinstance(scenes, list):
+            raise HTTPException(status_code=400, detail="scenes array required")
+
+        await redis.set(
+            f"job:{job_id}:scenes",
+            _json.dumps(scenes),
+            ex=86400 * 7,
+        )
+        logger.info("Scenes saved | job=%s | count=%d | user=%s", job_id, len(scenes), user_id)
+        return {"saved": True, "count": len(scenes)}
+    finally:
+        await redis.aclose()
+
 @router.get("/scenes/{job_id}")
 async def get_job_scenes(job_id: str):
     """Return the scenes that were used in a render job."""
