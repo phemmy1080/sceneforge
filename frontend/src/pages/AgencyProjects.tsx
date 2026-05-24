@@ -523,16 +523,30 @@ export function ProjectDetail() {
     }
     const lastJobId = project.render_job_ids[project.render_job_ids.length - 1];
 
-    // Load the current scene data from Redis
-    let sceneData: any = null;
-    try {
-      const scenesRes = await api.get(`/api/render/scenes/${lastJobId}`);
-      sceneData = scenesRes.data.scenes?.[sceneIndex];
-    } catch {}
+    // Prefer fresh scenes from Zustand store (editor may have updated them)
+    // Fall back to Redis if store is empty
+    const storeScenes = useStore.getState().scenes;
+    let sceneData: any = storeScenes?.[sceneIndex] ?? null;
 
     if (!sceneData) {
-      alert('Scene data not found. Please do a full render first.');
+      // Store is empty — try Redis
+      try {
+        const scenesRes = await api.get(`/api/render/scenes/${lastJobId}`);
+        sceneData = scenesRes.data.scenes?.[sceneIndex];
+      } catch {}
+    }
+
+    if (!sceneData) {
+      alert('Scene data not found. Click "Edit scene" first, make your changes, click "Save & return to project", then re-render.');
       return;
+    }
+
+    // Before re-rendering, persist current store scenes to Redis so the
+    // partial re-render endpoint has the latest data for all scenes
+    if (storeScenes?.length) {
+      try {
+        await api.put(`/api/render/scenes/${lastJobId}`, { scenes: storeScenes });
+      } catch { /* non-fatal */ }
     }
 
     setRerenderingScene(sceneIndex);
