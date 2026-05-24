@@ -14,10 +14,17 @@ interface Member {
 interface ActivityEvent {
   id: string; action: string; detail: Record<string, string>; ts: string;
 }
+interface SceneReview {
+  project_id: string; project_title: string; client_name: string;
+  count: number;
+  comments: { scene_index: number; text: string; author: string }[];
+}
+
 interface DashboardData {
   active_projects: number; pending_approvals: number;
   team_members: number; pool_tokens: number;
   recent_projects: Project[]; recent_activity: ActivityEvent[]; members: Member[];
+  scenes_needing_review?: SceneReview[];
 }
 
 const STATUS: Record<string, { label: string; color: string; dot: string }> = {
@@ -169,6 +176,42 @@ export default function AgencyDashboard() {
           </div>
         ))}
       </div>
+
+      {/* ── Scenes needing adjustment ── */}
+      {(data.scenes_needing_review?.length ?? 0) > 0 && (
+        <div className="bg-amber-400/[0.06] border border-amber-400/20 rounded-2xl p-4 mb-2">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-6 h-6 rounded-full bg-amber-400/15 flex items-center justify-center text-sm">✎</div>
+            <div className="text-sm font-bold text-amber-300">
+              {data.scenes_needing_review!.reduce((t, p) => t + p.count, 0)} scene{data.scenes_needing_review!.reduce((t, p) => t + p.count, 0) !== 1 ? 's' : ''} need{data.scenes_needing_review!.reduce((t, p) => t + p.count, 0) === 1 ? 's' : ''} your attention
+            </div>
+          </div>
+          <div className="space-y-2">
+            {data.scenes_needing_review!.map(proj => (
+              <div key={proj.project_id} className="bg-white/[0.04] border border-white/[0.07] rounded-xl p-3">
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <div>
+                    <span className="text-xs font-semibold text-white">{proj.project_title}</span>
+                    {proj.client_name && <span className="text-xs text-white/35 ml-1.5">· {proj.client_name}</span>}
+                  </div>
+                  <span className="text-[11px] bg-amber-400/15 text-amber-300 border border-amber-400/20 px-2 py-0.5 rounded-full font-medium flex-shrink-0">
+                    {proj.count} scene{proj.count !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  {proj.comments.slice(0, 3).map((c, i) => (
+                    <div key={i} className="flex items-start gap-1.5 text-[11px] text-white/45">
+                      <span className="text-amber-400/60 flex-shrink-0">Scene {c.scene_index + 1}:</span>
+                      <span className="line-clamp-1">{c.text}</span>
+                    </div>
+                  ))}
+                  {proj.comments.length > 3 && <div className="text-[11px] text-white/30">+{proj.comments.length - 3} more comments</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
