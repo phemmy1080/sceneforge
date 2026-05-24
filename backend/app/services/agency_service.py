@@ -577,7 +577,7 @@ async def submit_review_decision(redis: aioredis.Redis, token: str,
         client_name   = review.get("client_name") or "Your client"
         project_title = project.get("title", "your project") if project else "your project"
         # Link straight to the project detail page
-        project_url = f"https://sceneraforge.com/?agency_project={proj_id}"
+        project_url = f"https://scenraforge.com/?agency_project={proj_id}"
 
         if owner_email:
             if decision == "approved":
@@ -714,7 +714,7 @@ async def get_activity(redis: aioredis.Redis, ws_id: str, limit: int = 50) -> li
 
 # ── Dashboard summary ─────────────────────────────────────────────────────────
 
-async def get_dashboard(redis: aioredis.Redis, ws_id: str) -> dict:
+async def get_dashboard(redis: aioredis.Redis, ws_id: str, user_id: str = "") -> dict:
     projects = await list_projects(redis, ws_id)
     members  = await get_workspace_members(redis, ws_id)
     activity = await get_activity(redis, ws_id, 20)
@@ -723,12 +723,41 @@ async def get_dashboard(redis: aioredis.Redis, ws_id: str) -> dict:
     active       = [p for p in projects if p["status"] not in ("exported",)]
     pending_appr = [p for p in projects if p["status"] == "client_review"]
 
+    # Scenes needing adjustment: projects where an unresolved scene comment exists
+    # for the projects assigned to this user
+    scenes_needing_review: list[dict] = []
+    if user_id:
+        for proj in projects:
+            # Only look at projects the editor is assigned to
+            if user_id not in proj.get("assigned_to", []):
+                continue
+            # Only if project has been reviewed (has comments)
+            comments_raw = await redis.lrange(_comments_key(proj["id"]), 0, -1)
+            scene_comments = []
+            for r in comments_raw:
+                c = json.loads(r)
+                if c.get("scene_index") is not None and not c.get("resolved", False):
+                    scene_comments.append({
+                        "scene_index": c["scene_index"],
+                        "text": c.get("text", ""),
+                        "author": c.get("author_name", "Reviewer"),
+                    })
+            if scene_comments:
+                scenes_needing_review.append({
+                    "project_id":    proj["id"],
+                    "project_title": proj.get("title", "Untitled"),
+                    "client_name":   proj.get("client_name", ""),
+                    "comments":      scene_comments,
+                    "count":         len(scene_comments),
+                })
+
     return {
-        "active_projects":   len(active),
-        "pending_approvals": len(pending_appr),
-        "team_members":      len(members),
-        "pool_tokens":       pool,
-        "recent_projects":   projects[:5],
-        "recent_activity":   activity[:10],
-        "members":           members,
+        "active_projects":       len(active),
+        "pending_approvals":     len(pending_appr),
+        "team_members":          len(members),
+        "pool_tokens":           pool,
+        "recent_projects":       projects[:5],
+        "recent_activity":       activity[:10],
+        "members":               members,
+        "scenes_needing_review": scenes_needing_review,
     }
