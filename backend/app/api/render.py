@@ -221,6 +221,174 @@ async def start_render(
     return RenderJobResponse(job_id=job_id, status="queued")
 
 
+
+
+@router.post("/scenes/{job_id}/{scene_index}")
+async def rerender_scene(
+    job_id: str,
+    scene_index: int,
+    req: "RenderSceneRequest",
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Re-render a single scene and splice it back into the existing video.
+    Much faster than a full re-render — only processes one scene.
+    Returns { video_url, scene_url, job_id }.
+    """
+    import tempfile, os, shutil, uuid as _uuid, httpx, asyncio as _asyncio
+    from pathlib import Path as _Path
+    from app.services.ffmpeg import render_scene, normalize_scene, run_ffmpeg
+    from app.services.visuals import get_visual_for_scene, VisualSource
+    from app.services.voice import synthesise_speech
+    from app.services.storage import upload_file, r2_enabled, _public_url
+    from app.models.schemas import Scene, VisualSource as VS
+
+    redis = await _get_redis()
+    try:
+        token  = (authorization or "").removeprefix("Bearer ").strip()
+        user_id = auth_service.verify_token(token) if token else None
+
+        # Load existing scene URLs
+        raw_urls = await redis.get(f"job:{job_id}:scene_urls")
+        if not raw_urls:
+            raise HTTPException(404, "Scene URLs not found — run a full render first")
+        scene_urls: list[str] = json.loads(raw_urls)
+
+        if scene_index < 0 or scene_index >= len(scene_urls):
+            raise HTTPException(400, f"Scene index {scene_index} out of range (0-{len(scene_urls)-1})")
+
+        # Load original scenes from Redis
+        raw_scenes = await redis.get(f"job:{job_id}:scenes")
+        if not raw_scenes:
+            raise HTTPException(404, "Original scenes not found")
+        all_scenes = json.loads(raw_scenes)
+
+        # Merge updated scene data from request
+        scene_data = all_scenes[scene_index]
+        if req.scene:
+            scene_data.update(req.scene)
+        scene = Scene(**scene_data)
+
+        work_dir = _Path(tempfile.mkdtemp(prefix=f"scene_patch_{job_id}_"))
+        try:
+            # ── Step 1: Get visual ──────────────────────────────────────────
+            visual_file = await get_visual_for_scene(
+                scene, str(work_dir),
+                source=VS(req.visual_source or "pexels_video"),
+                custom_image_url=req.custom_image_url,
+            )
+            is_img = visual_file.media_type == "image"
+
+            # ── Step 2: Synthesise voice ────────────────────────────────────
+            audio_path = str(work_dir / "audio.mp3")
+            await synthesise_speech(
+                text=scene.text,
+                voice_name=req.voice_name or "alloy",
+                speed=req.voice_speed or 1.0,
+                output_path=audio_path,
+            )
+
+            # ── Step 3: Render the single scene ────────────────────────────
+            scene_out = str(work_dir / f"scene_{scene_index:02d}_new.mp4")
+            await render_scene(
+                scene=scene,
+                visual_path=visual_file.path,
+                audio_path=audio_path,
+                output_path=scene_out,
+                subtitle_style=req.subtitle_style or "viral",
+                is_image=is_img,
+                platform=req.platform or "TikTok",
+                motion=req.motion or "auto",
+                scene_index=scene_index,
+            )
+
+            # ── Step 4: Upload new scene clip to R2 ────────────────────────
+            new_scene_url = scene_urls[scene_index]  # default to old
+            if r2_enabled():
+                key = f"renders/{job_id}/scene_{scene_index:02d}_patched.mp4"
+                new_scene_url = await upload_file(scene_out, key)
+
+            # ── Step 5: Download all scenes and splice ─────────────────────
+            updated_urls = scene_urls.copy()
+            updated_urls[scene_index] = new_scene_url
+
+            # Download each scene clip
+            clips: list[str] = []
+            async with httpx.AsyncClient(timeout=60) as client:
+                for i, url in enumerate(updated_urls):
+                    clip_path = str(work_dir / f"clip_{i:02d}.mp4")
+                    if i == scene_index:
+                        # Use the freshly rendered clip
+                        shutil.copy(scene_out, clip_path)
+                    else:
+                        resp = await client.get(url)
+                        resp.raise_for_status()
+                        with open(clip_path, "wb") as cf:
+                            cf.write(resp.content)
+                    clips.append(clip_path)
+
+            # Normalise all clips to same specs
+            norm_clips: list[str] = []
+            for i, clip in enumerate(clips):
+                norm = str(work_dir / f"norm_{i:02d}.mp4")
+                await normalize_scene(clip, norm)
+                norm_clips.append(norm)
+
+            # Concat list
+            concat_list = str(work_dir / "concat.txt")
+            with open(concat_list, "w") as f:
+                for nc in norm_clips:
+                    f.write(f"file '{os.path.abspath(nc)}'\n")
+
+            final_out = str(work_dir / "final_patched.mp4")
+            await run_ffmpeg([
+                "ffmpeg", "-y",
+                "-f", "concat", "-safe", "0", "-i", concat_list,
+                "-c", "copy", "-movflags", "+faststart",
+                final_out,
+            ])
+
+            # ── Step 6: Upload patched video ───────────────────────────────
+            video_url = ""
+            if r2_enabled():
+                vid_key = f"renders/{job_id}/final_video_patched.mp4"
+                video_url = await upload_file(final_out, vid_key)
+            else:
+                # Fallback: serve directly from worker
+                video_url = f"{os.environ.get('WORKER_BASE_URL','')}/renders/{job_id}/final_video_patched.mp4"
+
+            # Update stored scene URLs and scenes in Redis
+            updated_scenes = all_scenes.copy()
+            updated_scenes[scene_index] = scene_data
+            await redis.set(f"job:{job_id}:scene_urls", json.dumps(updated_urls), ex=86400 * 7)
+            await redis.set(f"job:{job_id}:scenes",     json.dumps(updated_scenes), ex=86400 * 7)
+
+            logger.info("Partial re-render complete — job=%s scene=%d url=%s", job_id, scene_index, video_url)
+            return {
+                "video_url":  video_url,
+                "scene_url":  new_scene_url,
+                "job_id":     job_id,
+                "scene_index": scene_index,
+            }
+
+        finally:
+            shutil.rmtree(str(work_dir), ignore_errors=True)
+
+    finally:
+        await redis.aclose()
+
+
+class RenderSceneRequest(BaseModel):
+    scene: Optional[dict] = None          # updated scene fields
+    visual_source: Optional[str] = None
+    custom_image_url: Optional[str] = None
+    voice_name: Optional[str] = None
+    voice_speed: Optional[float] = None
+    subtitle_style: Optional[str] = None
+    platform: Optional[str] = None
+    motion: Optional[str] = None
+
+
 @router.get("/scenes/{job_id}")
 async def get_job_scenes(job_id: str):
     """Return the scenes that were used in a render job."""
