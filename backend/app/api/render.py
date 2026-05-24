@@ -207,6 +207,7 @@ async def start_render(
     agency_proj_id = getattr(req, "agency_project_id", None)
     if agency_proj_id:
         await redis.set(f"job:{job_id}:agency_proj_id", agency_proj_id, ex=86400 * 7)
+        await redis.set(f"job:{job_id}:created_by", user_id, ex=86400 * 7)
 
     # Store scenes so the SceneEditor can reload them if the session is lost
     await redis.set(
@@ -390,6 +391,18 @@ async def rerender_scene(
         await redis.aclose()
 
 
+
+
+@router.get("/job-creator/{job_id}")
+async def get_job_creator(job_id: str):
+    """Return the user_id of whoever submitted this render job."""
+    redis = await _get_redis()
+    try:
+        raw = await redis.get(f"job:{job_id}:created_by")
+        created_by = raw.decode() if isinstance(raw, bytes) else (raw or "")
+        return {"job_id": job_id, "created_by": created_by}
+    finally:
+        await redis.aclose()
 
 @router.get("/scenes/{job_id}")
 async def get_job_scenes(job_id: str):
