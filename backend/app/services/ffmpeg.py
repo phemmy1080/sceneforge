@@ -20,7 +20,11 @@ PLATFORM_DIMS: dict[str, tuple[int, int]] = {
     "youtube":           (1920, 1080),
     "youtube_landscape": (1920, 1080),
     "linkedin":          (1080, 1080),
-    "facebook":          (1080, 1080),
+    "facebook":          (1920, 1080),
+    "twitter":           (1920, 1080),
+    "twitter_x":         (1920, 1080),
+    "snapchat":          (1080, 1920),
+    "pinterest":         (1000, 1500),
 }
 
 def _dims(platform: str | None) -> tuple[int, int]:
@@ -89,17 +93,33 @@ async def run_ffmpeg(cmd: list[str]) -> None:
 
 
 # ── Normalize ─────────────────────────────────────────────────────────────────
-async def normalize_scene(input_path: str, output_path: str) -> str:
+async def normalize_scene(
+    input_path: str,
+    output_path: str,
+    platform: str | None = None,
+) -> str:
+    """Re-encode a clip to a consistent spec for concatenation.
+    Forces exact target resolution with scale+crop so all clips match.
+    """
+    w, h = _dims(platform)
+    # scale-to-fill: scale so the SMALLER dimension matches target, then crop centre
+    vf = (
+        f"scale=w={w}:h={h}:force_original_aspect_ratio=increase,"
+        f"crop={w}:{h},"
+        f"setsar=1"
+    )
     await run_ffmpeg([
         "ffmpeg", "-y",
         "-i", input_path,
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "-threads", "2",
+        "-vf", vf,
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "26", "-threads", "2",
+        "-r", "30",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
         "-avoid_negative_ts", "make_zero",
         "-fflags", "+genpts",
-        "-async", "1",    # resample audio to fix drift
-        "-vsync", "cfr",  # constant frame rate
+        "-async", "1",
+        "-vsync", "cfr",
         output_path,
     ])
     return output_path
@@ -256,6 +276,7 @@ async def concat_scenes(
     output_path: str,
     transition: str = "fade",   # "fade" | "blur" | "none"
     transition_duration: float = 0.4,
+    platform: str | None = None,
 ) -> str:
     """
     Concatenate scene files with optional xfade transitions between them.
@@ -270,7 +291,7 @@ async def concat_scenes(
     for i, sf in enumerate(scene_files):
         norm_path = str(output_dir / f"norm_{i+1:02d}.mp4")
         logger.info("Normalising scene %d/%d…", i + 1, len(scene_files))
-        await normalize_scene(sf, norm_path)
+        await normalize_scene(sf, norm_path, platform=platform)
         normalized.append(norm_path)
 
     n = len(normalized)
@@ -558,6 +579,7 @@ async def render_full_pipeline(
             scene_outputs, final_path,
             transition=transition,
             transition_duration=transition_duration,
+            platform=platform,
         )
 
     if resolved_music:
@@ -598,7 +620,7 @@ async def prepend_intro(main_video: str, intro_url: str, output_path: str) -> st
     try:
         # Normalise intro to match main video specs
         intro_norm = output_path.replace(".mp4", "_intro_norm.mp4")
-        await normalize_scene(intro_path, intro_norm)
+        await normalize_scene(intro_path, intro_norm, platform=platform)
         with open(concat_list, "w") as f:
             f.write(f"file '{os.path.abspath(intro_norm)}'\n")
             f.write(f"file '{os.path.abspath(main_video)}'\n")
@@ -627,7 +649,7 @@ async def append_outro(main_video: str, outro_url: str, output_path: str) -> str
     concat_list = output_path.replace(".mp4", "_outro_list.txt")
     try:
         outro_norm = output_path.replace(".mp4", "_outro_norm.mp4")
-        await normalize_scene(outro_path, outro_norm)
+        await normalize_scene(outro_path, outro_norm, platform=platform)
         with open(concat_list, "w") as f:
             f.write(f"file '{os.path.abspath(main_video)}'\n")
             f.write(f"file '{os.path.abspath(outro_norm)}'\n")
