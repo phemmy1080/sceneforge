@@ -358,6 +358,12 @@ export function ProjectDetail() {
   const [patchedVideoUrl, setPatchedVideoUrl] = useState<string>("");
   const [jobCreatedBy, setJobCreatedBy]       = useState<string | null>(null);
   const [updatedScenes, setUpdatedScenes]     = useState<Set<number>>(new Set());
+  const [toast, setToast]                    = useState<{ type: 'success'|'error'; msg: string } | null>(null);
+
+  function showToast(type: 'success'|'error', msg: string) {
+    setToast({ type, msg });
+    setTimeout(() => setToast(null), 5000);
+  }
   const [members, setMembers] = useState<Member[]>([]);
   const [assignOpen, setAssignOpen]   = useState(false);
   const [assigning, setAssigning]     = useState(false);
@@ -520,7 +526,7 @@ export function ProjectDetail() {
   // Re-render a single scene without a full re-render
   async function rerenderScene(sceneIndex: number) {
     if (!project?.render_job_ids?.length) {
-      alert('No previous render found. Please do a full render first.');
+      showToast('error', 'No previous render found. Please do a full render first.');
       return;
     }
     const lastJobId = project.render_job_ids[project.render_job_ids.length - 1];
@@ -539,7 +545,7 @@ export function ProjectDetail() {
     }
 
     if (!sceneData) {
-      alert('Scene data not found. Click "Edit scene" first, make your changes, click "Save & return to project", then re-render.');
+      showToast('error', 'Scene data not found. Edit the scene first, click "Save & return to project", then re-render.');
       return;
     }
 
@@ -585,10 +591,11 @@ export function ProjectDetail() {
       // Mark this scene as updated (for owner badge)
       setUpdatedScenes(prev => new Set(prev).add(sceneIndex));
 
+      showToast('success', `Scene ${sceneIndex + 1} re-rendered successfully. Full video updated.`);
       // Also reload to pick up the full updated video
       await loadSceneClips(lastJobId);
     } catch (e: any) {
-      alert(e.response?.data?.detail || 'Scene re-render failed');
+      showToast('error', e.response?.data?.detail || 'Scene re-render failed');
     } finally {
       setRerenderingScene(null);
     }
@@ -744,6 +751,18 @@ export function ProjectDetail() {
     <div className="max-w-3xl space-y-5 pb-8">
 
       {/* Back */}
+      {/* ── Toast notification ── */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 z-50 max-w-sm flex items-start gap-3 px-4 py-3 rounded-2xl shadow-2xl border text-sm font-medium animate-in slide-in-from-bottom-2 ${
+          toast.type === 'success'
+            ? 'bg-[#0d1a12] border-green-400/30 text-green-300'
+            : 'bg-[#1a0d0d] border-rose-400/30 text-rose-300'
+        }`}>
+          <span className="text-base flex-shrink-0 mt-0.5">{toast.type === 'success' ? '✓' : '✕'}</span>
+          <span className="flex-1 leading-relaxed">{toast.msg}</span>
+          <button onClick={() => setToast(null)} className="flex-shrink-0 opacity-50 hover:opacity-100 transition text-lg leading-none ml-1">×</button>
+        </div>
+      )}
       <button onClick={() => setStep('agency-projects' as any)}
         className="flex items-center gap-1.5 text-white/30 hover:text-white text-sm transition">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 3L5 7l4 4"/></svg>
