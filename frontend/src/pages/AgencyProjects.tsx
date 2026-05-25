@@ -577,16 +577,15 @@ export function ProjectDetail() {
         ));
       }
 
-      // Post a system comment so editor can note the change and owner can review
+      // Post a system comment — fire-and-forget, never blocks or shows errors
       const updateNote = `Scene ${sceneIndex + 1} has been updated and re-rendered.`;
-      try {
-        const cmtRes = await api.post(`/api/agency/projects/${id}/comments`, {
-          text: updateNote,
-          scene_index: sceneIndex,
-          is_scene_update: true,
-        });
-        setComments(prev => [cmtRes.data.comment, ...prev]);
-      } catch { /* non-fatal */ }
+      api.post(`/api/agency/projects/${id}/comments`, {
+        text: updateNote,
+        scene_index: sceneIndex,
+        is_scene_update: true,
+      }).then(r => {
+        if (r.data?.comment) setComments(prev => [r.data.comment, ...prev]);
+      }).catch(() => { /* non-fatal — comment failure never surfaces to user */ });
 
       // Mark this scene as updated (for owner badge)
       setUpdatedScenes(prev => new Set(prev).add(sceneIndex));
@@ -595,7 +594,11 @@ export function ProjectDetail() {
       // Also reload to pick up the full updated video
       await loadSceneClips(lastJobId);
     } catch (e: any) {
-      showToast('error', e.response?.data?.detail || 'Scene re-render failed');
+      const isNetwork = !e.response && (e.code === 'ERR_NETWORK' || e.message?.includes('Network'));
+      const msg = isNetwork
+        ? 'Network error — the re-render may still be processing. Check back in a moment.'
+        : (e.response?.data?.detail || 'Scene re-render failed. Please try again.');
+      showToast('error', msg);
     } finally {
       setRerenderingScene(null);
     }
