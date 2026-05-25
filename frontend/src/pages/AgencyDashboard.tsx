@@ -18,6 +18,7 @@ interface SceneReview {
   project_id: string; project_title: string; client_name: string;
   count: number;
   comments: { scene_index: number; text: string; author: string }[];
+  scenes?: { scene_index: number; text: string; author: string }[];
 }
 
 interface DashboardData {
@@ -217,7 +218,7 @@ export default function AgencyDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
         {/* ── Scenes updated by editors — awaiting owner/admin review ── */}
-      {isAdmin && (data.scenes_updated?.length ?? 0) > 0 && (
+      {isAdminOrOwner && (data.scenes_updated?.length ?? 0) > 0 && (
         <div className="bg-green-400/[0.05] border border-green-400/20 rounded-2xl p-4 mb-2">
           <div className="flex items-center gap-2 mb-3">
             <div className="w-6 h-6 rounded-full bg-green-400/15 flex items-center justify-center text-sm">↻</div>
