@@ -440,11 +440,13 @@ export function ProjectDetail() {
 
       // If we have patched URLs, build clips directly from them
       if (patchedUrls.length > 0) {
-        const clips: SceneClip[] = patchedUrls.map((url, i) => ({
-          index: i,
-          url: url + cacheBust,
-          label: `Scene ${i + 1}`,
-        }));
+        const clips: SceneClip[] = patchedUrls
+          .filter(url => url && url.startsWith('http'))
+          .map((url, i) => ({
+            index: i,
+            url: url + cacheBust,
+            label: `Scene ${i + 1}`,
+          }));
         setSceneClips(clips);
         return;
       }
@@ -589,15 +591,27 @@ export function ProjectDetail() {
 
       // Update the scene clip URL immediately with cache-busting version
       const ts = Date.now();
+      // Update the scene clip immediately — use a unique versioned URL
+      // so the video element key changes and React forces a full reload
       const newSceneUrl = res.data.scene_url
         ? `${res.data.scene_url}?v=${ts}`
         : null;
       if (newSceneUrl) {
-        setSceneClips(prev => prev.map(c =>
-          c.index === sceneIndex
-            ? { ...c, url: newSceneUrl, version: ts }
-            : c
-        ));
+        setSceneClips(prev => {
+          const updated = prev.map(c =>
+            c.index === sceneIndex
+              ? { ...c, url: newSceneUrl, version: ts }
+              : c
+          );
+          return updated;
+        });
+        // If this was the active scene, scroll it into view
+        if (activeScene === sceneIndex) {
+          setTimeout(() => {
+            const vid = document.querySelector('video[src*="patched"]') as HTMLVideoElement;
+            if (vid) vid.load();
+          }, 100);
+        }
       }
 
       // Post a system comment — fire-and-forget, never blocks or shows errors
@@ -1351,7 +1365,11 @@ ${emailBody}`)}
                   <video
                     key={clip.url}
                     src={clip.url}
-                    className="w-full aspect-video bg-black object-cover"
+                    className={`w-full bg-black object-cover ${(() => {
+                      const p = (project.platform || '').toLowerCase();
+                      return p.includes('tiktok') || p.includes('shorts') || p.includes('reels') || p.includes('snapchat') || p.includes('pinterest')
+                        ? 'aspect-[9/16]' : p.includes('linkedin') ? 'aspect-square' : 'aspect-video';
+                    })()}`}
                     muted
                     playsInline
                     preload="metadata"
@@ -1436,14 +1454,23 @@ ${emailBody}`)}
                   </div>
                 </div>
 
-                {/* Full video player */}
-                <video
-                  key={sceneClips[activeScene]?.url}
-                  src={sceneClips[activeScene]?.url}
-                  controls
-                  className="w-full rounded-xl bg-black mb-4"
-                  style={{ maxHeight: 280 }}
-                />
+                {/* Full video player — aspect ratio from platform */}
+                {(() => {
+                  const platform = (project.platform || '').toLowerCase();
+                  const isPortrait = platform.includes('tiktok') || platform.includes('shorts') ||
+                    platform.includes('reels') || platform.includes('snapchat') || platform.includes('pinterest');
+                  const isSquare = platform.includes('linkedin') || platform.includes('facebook');
+                  const aspectClass = isPortrait ? 'aspect-[9/16]' : isSquare ? 'aspect-square' : 'aspect-video';
+                  return (
+                    <video
+                      key={sceneClips[activeScene]?.url}
+                      src={sceneClips[activeScene]?.url}
+                      controls
+                      className={`w-full rounded-xl bg-black mb-4 ${aspectClass}`}
+                      style={{ maxHeight: isPortrait ? 420 : 280, objectFit: 'contain' }}
+                    />
+                  );
+                })()}
 
                 {/* Existing scene comments */}
                 {comments.filter(c => c.scene_index === activeScene).length > 0 && (
