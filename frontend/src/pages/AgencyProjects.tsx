@@ -358,7 +358,8 @@ export function ProjectDetail() {
   const [rerenderingScene, setRerenderingScene] = useState<number | null>(null);
   const [patchedVideoUrl, setPatchedVideoUrl] = useState<string>("");
   const [jobCreatedBy, setJobCreatedBy]       = useState<string | null>(null);
-  const [updatedScenes, setUpdatedScenes]     = useState<Set<number>>(new Set());
+  const [updatedScenes, setUpdatedScenes]       = useState<Set<number>>(new Set());
+  const [pendingEditScenes, setPendingEditScenes] = useState<Set<number>>(new Set());
   const [toast, setToast]                    = useState<{ type: 'success'|'error'; msg: string } | null>(null);
 
   function showToast(type: 'success'|'error', msg: string) {
@@ -413,6 +414,12 @@ export function ProjectDetail() {
       if (jobIds.length > 0) {
         loadSceneClips(jobIds[jobIds.length - 1]);
       }
+      // Restore pending edit badges from sessionStorage
+      try {
+        const stored = JSON.parse(sessionStorage.getItem('sf_pending_edits') || '{}')
+        const pending: number[] = stored[id] || []
+        if (pending.length > 0) setPendingEditScenes(new Set(pending))
+      } catch {}
       // Note: if render_job_ids is empty, scene review is simply hidden
       // Don't try store jobId — it belongs to whatever project was last rendered
       // which could be a completely different project → causes "Job not found" errors
@@ -620,6 +627,19 @@ export function ProjectDetail() {
       setUpdatedScenes(prev => new Set(prev).add(sceneIndex));
 
       showToast('success', `Scene ${sceneIndex + 1} re-rendered successfully. Full video updated.`);
+      // Clear pending edit badge for this scene
+      setPendingEditScenes(prev => { const n = new Set(prev); n.delete(sceneIndex); return n; });
+      try {
+        const stored = JSON.parse(sessionStorage.getItem('sf_pending_edits') || '{}')
+        stored[id] = (stored[id] || []).filter((i: number) => i !== sceneIndex)
+        sessionStorage.setItem('sf_pending_edits', JSON.stringify(stored))
+      } catch {}
+      // Persist updated pending list back to sessionStorage
+      try {
+        const stored = JSON.parse(sessionStorage.getItem('sf_pending_edits') || '{}')
+        stored[id] = (stored[id] || []).filter((i: number) => i !== sceneIndex)
+        sessionStorage.setItem('sf_pending_edits', JSON.stringify(stored))
+      } catch {}
       // Reload with cache bust so browser fetches fresh clips from R2
       await loadSceneClips(lastJobId, true);
     } catch (e: any) {
@@ -1371,12 +1391,17 @@ ${emailBody}`)}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
                   <div className="absolute bottom-0 left-0 right-0 px-2.5 pb-2 flex items-center justify-between">
                     <span className="text-xs font-semibold text-white/90">{clip.label}</span>
-                    {hasUpdate && (
+                    {hasUpdate && !pendingEditScenes.has(clip.index) && (
                       <span className="text-[10px] bg-green-400/20 border border-green-400/30 text-green-300 px-1.5 py-0.5 rounded-full font-semibold">
                         ↻ Updated
                       </span>
                     )}
-                    {!hasUpdate && sceneCmts.length > 0 && (
+                    {pendingEditScenes.has(clip.index) && (
+                      <span className="text-[10px] bg-orange-400/20 border border-orange-400/30 text-orange-300 px-1.5 py-0.5 rounded-full font-semibold">
+                        ✎ Edited · needs re-render
+                      </span>
+                    )}
+                    {!hasUpdate && !pendingEditScenes.has(clip.index) && sceneCmts.length > 0 && (
                       <span className="text-[10px] bg-amber-400/20 border border-amber-400/30 text-amber-300 px-1.5 py-0.5 rounded-full font-semibold">
                         {sceneCmts.length} note{sceneCmts.length !== 1 ? "s" : ""}
                       </span>
