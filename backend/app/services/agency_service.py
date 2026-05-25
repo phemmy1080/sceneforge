@@ -600,7 +600,8 @@ async def submit_review_decision(redis: aioredis.Redis, token: str,
 
 async def add_comment(redis: aioredis.Redis, proj_id: str, author_id: str,
                       author_name: str, scene_index: Optional[int],
-                      text: str, is_client: bool = False) -> dict:
+                      text: str, is_client: bool = False,
+                      is_scene_update: bool = False) -> dict:
     comment = {
         "id":           str(uuid.uuid4()),
         "proj_id":      proj_id,
@@ -786,3 +787,4 @@ async def get_dashboard(redis: aioredis.Redis, ws_id: str, user_id: str = "") ->
         "scenes_needing_review": scenes_needing_review,
         "scenes_updated":        scenes_updated,
     }
+# cache-bust-2026-05-25-0528
