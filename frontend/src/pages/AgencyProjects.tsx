@@ -18,6 +18,7 @@ interface SceneClip {
   index: number;
   url: string;
   label: string;
+  version?: number;  // incremented on re-render to force video reload
 }
 interface BrandKit { id: string; client_name: string; }
 
@@ -425,8 +426,9 @@ export function ProjectDetail() {
     } catch { setJobCreatedBy(null); }
   }
 
-  async function loadSceneClips(jobId: string) {
+  async function loadSceneClips(jobId: string, bustCache = false) {
     loadSceneCreator(jobId).catch(() => {});
+    const cacheBust = bustCache ? `?v=${Date.now()}` : '';
     if (!jobId) return;
     try {
       let res;
@@ -452,7 +454,7 @@ export function ProjectDetail() {
         const pad = String(i).padStart(2, '0');
         const key = `scene_${pad}.mp4`;
         if (r2[key]) {
-          clips.push({ index: i - 1, url: r2[key], label: `Scene ${i}` });
+          clips.push({ index: i - 1, url: r2[key] + cacheBust, label: `Scene ${i}` });
           i++;
         } else { break; }
       }
@@ -461,7 +463,7 @@ export function ProjectDetail() {
       if (clips.length === 0) {
         i = 1;
         while (r2[`scene_${i}.mp4`]) {
-          clips.push({ index: i - 1, url: r2[`scene_${i}.mp4`], label: `Scene ${i}` });
+          clips.push({ index: i - 1, url: r2[`scene_${i}.mp4`] + cacheBust, label: `Scene ${i}` });
           i++;
         }
       }
@@ -568,11 +570,15 @@ export function ProjectDetail() {
       });
       setPatchedVideoUrl(res.data.video_url);
 
-      // Update the scene clip URL in state immediately — no full reload needed
-      if (res.data.scene_url) {
+      // Update the scene clip URL immediately with cache-busting version
+      const ts = Date.now();
+      const newSceneUrl = res.data.scene_url
+        ? `${res.data.scene_url}?v=${ts}`
+        : null;
+      if (newSceneUrl) {
         setSceneClips(prev => prev.map(c =>
           c.index === sceneIndex
-            ? { ...c, url: res.data.scene_url }
+            ? { ...c, url: newSceneUrl, version: ts }
             : c
         ));
       }
@@ -591,8 +597,8 @@ export function ProjectDetail() {
       setUpdatedScenes(prev => new Set(prev).add(sceneIndex));
 
       showToast('success', `Scene ${sceneIndex + 1} re-rendered successfully. Full video updated.`);
-      // Also reload to pick up the full updated video
-      await loadSceneClips(lastJobId);
+      // Reload with cache bust so browser fetches fresh clips from R2
+      await loadSceneClips(lastJobId, true);
     } catch (e: any) {
       const isNetwork = !e.response && (e.code === 'ERR_NETWORK' || e.message?.includes('Network'));
       const msg = isNetwork
@@ -1318,7 +1324,7 @@ ${emailBody}`)}
               const hasUpdate  = sceneCmts.some(c => c.is_scene_update);
               const isActive = activeScene === clip.index;
               return (
-                <div key={clip.index}
+                <div key={clip.url}
                   onClick={() => setActiveScene(isActive ? null : clip.index)}
                   className={`relative rounded-xl overflow-hidden cursor-pointer border transition-all ${
                     isActive
@@ -1326,6 +1332,7 @@ ${emailBody}`)}
                       : "border-white/[0.08] hover:border-white/[0.2]"
                   }`}>
                   <video
+                    key={clip.url}
                     src={clip.url}
                     className="w-full aspect-video bg-black object-cover"
                     muted
