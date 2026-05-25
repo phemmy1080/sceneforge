@@ -608,7 +608,8 @@ async def add_comment(redis: aioredis.Redis, proj_id: str, author_id: str,
         "author_name":  author_name,
         "scene_index":  scene_index,
         "text":         text,
-        "is_client":    is_client,
+        "is_client":        is_client,
+        "is_scene_update":  is_scene_update,
         "resolved":     False,
         "created_at":   _now(),
     }
@@ -751,6 +752,29 @@ async def get_dashboard(redis: aioredis.Redis, ws_id: str, user_id: str = "") ->
                     "count":         len(scene_comments),
                 })
 
+    # Count scenes marked as updated (is_scene_update=True, not yet resolved)
+    # These need owner/admin review
+    scenes_updated: list[dict] = []
+    for proj in projects:
+        comments_raw = await redis.lrange(_comments_key(proj["id"]), 0, -1)
+        update_comments = []
+        for r in comments_raw:
+            c = json.loads(r)
+            if c.get("is_scene_update") and not c.get("resolved", False):
+                update_comments.append({
+                    "scene_index": c["scene_index"],
+                    "text":        c.get("text", ""),
+                    "author":      c.get("author_name", "Editor"),
+                })
+        if update_comments:
+            scenes_updated.append({
+                "project_id":    proj["id"],
+                "project_title": proj.get("title", "Untitled"),
+                "client_name":   proj.get("client_name", ""),
+                "count":         len(update_comments),
+                "scenes":        update_comments,
+            })
+
     return {
         "active_projects":       len(active),
         "pending_approvals":     len(pending_appr),
@@ -760,4 +784,5 @@ async def get_dashboard(redis: aioredis.Redis, ws_id: str, user_id: str = "") ->
         "recent_activity":       activity[:10],
         "members":               members,
         "scenes_needing_review": scenes_needing_review,
+        "scenes_updated":        scenes_updated,
     }
