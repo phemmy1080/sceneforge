@@ -431,24 +431,41 @@ export function ProjectDetail() {
     const cacheBust = bustCache ? `?v=${Date.now()}` : '';
     if (!jobId) return;
     try {
+      // ── Step 1: Try scenes endpoint first — has patched URLs from partial re-renders ──
+      let patchedUrls: string[] = [];
+      try {
+        const scenesRes = await api.get(`/api/render/scenes/${jobId}`);
+        patchedUrls = scenesRes.data.scene_urls || [];
+      } catch { /* 404 = no scenes saved yet, fall through to status */ }
+
+      // If we have patched URLs, build clips directly from them
+      if (patchedUrls.length > 0) {
+        const clips: SceneClip[] = patchedUrls.map((url, i) => ({
+          index: i,
+          url: url + cacheBust,
+          label: `Scene ${i + 1}`,
+        }));
+        setSceneClips(clips);
+        return;
+      }
+
+      // ── Step 2: Fall back to render status r2_urls (original render) ──
       let res;
       try {
         res = await api.get(`/api/render/status/${jobId}`);
       } catch (fetchErr: any) {
-        // 404 = job expired from Redis (24hr TTL) — silently ignore, no scene review
         if (fetchErr?.response?.status === 404) return;
         throw fetchErr;
       }
-      // Job queued/processing — result not ready yet
       if (!res.data?.result) return;
       const data = res.data;
       const r2 = data.result?.r2_urls || {};
       const workerBase = (data.result?.video_url || '')
-        .replace(/\/renders\/.*$/, ''); // e.g. https://worker.../renders/JOB/final.mp4 → base
+        .replace(/\/renders\/.*$/, '');
 
       const clips: SceneClip[] = [];
 
-      // Primary: R2 URLs — scene_01.mp4 … (1-based, zero-padded from FFmpeg)
+      // Padded keys: scene_01.mp4 …
       let i = 1;
       while (i <= 50) {
         const pad = String(i).padStart(2, '0');
@@ -459,7 +476,7 @@ export function ProjectDetail() {
         } else { break; }
       }
 
-      // Fallback A: unpadded scene_1.mp4 keys (older renders)
+      // Fallback A: unpadded keys (older renders)
       if (clips.length === 0) {
         i = 1;
         while (r2[`scene_${i}.mp4`]) {
@@ -468,7 +485,7 @@ export function ProjectDetail() {
         }
       }
 
-      // Fallback B: build URLs from worker base if R2 not enabled
+      // Fallback B: worker base URLs
       if (clips.length === 0 && workerBase) {
         const sceneCount = data.result?.scene_count || 0;
         for (let j = 1; j <= sceneCount; j++) {
