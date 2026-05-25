@@ -112,23 +112,29 @@ export default function SceneEditor() {
   async function saveAndReturnToProject() {
     if (!agencyProjectId) return
     setSavingBack(true)
+    const editedSceneIndex = useStore.getState().activeSceneIndex ?? -1
     try {
-      // Find the last render job for this project so we can save scenes back
       const projRes = await api.get(`/api/agency/projects/${agencyProjectId}`)
       const jobIds: string[] = projRes.data.project?.render_job_ids || []
       if (jobIds.length > 0) {
         const lastJobId = jobIds[jobIds.length - 1]
-        // Flush current store scenes back to Redis
         const currentScenes = useStore.getState().scenes
         await api.put(`/api/render/scenes/${lastJobId}`, { scenes: currentScenes })
+        // Flag this scene as pending re-render so project page can show badge
+        try {
+          const stored = JSON.parse(sessionStorage.getItem('sf_pending_edits') || '{}')
+          stored[agencyProjectId] = stored[agencyProjectId] || []
+          if (editedSceneIndex >= 0 && !stored[agencyProjectId].includes(editedSceneIndex)) {
+            stored[agencyProjectId].push(editedSceneIndex)
+          }
+          sessionStorage.setItem('sf_pending_edits', JSON.stringify(stored))
+        } catch {}
       }
     } catch (e) {
       console.warn('Scene save failed (non-fatal):', e)
     } finally {
       setSavingBack(false)
     }
-    // Navigate back to the agency project page
-    // Navigate back to the project detail page
     useStore.getState().setStep('agency-detail' as any)
   }
 
