@@ -440,13 +440,11 @@ export function ProjectDetail() {
 
       // If we have patched URLs, build clips directly from them
       if (patchedUrls.length > 0) {
-        const clips: SceneClip[] = patchedUrls
-          .filter(url => url && url.startsWith('http'))
-          .map((url, i) => ({
-            index: i,
-            url: url + cacheBust,
-            label: `Scene ${i + 1}`,
-          }));
+        const clips: SceneClip[] = patchedUrls.map((url, i) => ({
+          index: i,
+          url: (url || '') + cacheBust,
+          label: `Scene ${i + 1}`,
+        })).filter(c => c.url.startsWith('http'));  // keep index integrity by mapping first
         setSceneClips(clips);
         return;
       }
@@ -605,13 +603,7 @@ export function ProjectDetail() {
           );
           return updated;
         });
-        // If this was the active scene, scroll it into view
-        if (activeScene === sceneIndex) {
-          setTimeout(() => {
-            const vid = document.querySelector('video[src*="patched"]') as HTMLVideoElement;
-            if (vid) vid.load();
-          }, 100);
-        }
+
       }
 
       // Post a system comment — fire-and-forget, never blocks or shows errors
@@ -1461,10 +1453,13 @@ ${emailBody}`)}
                     platform.includes('reels') || platform.includes('snapchat') || platform.includes('pinterest');
                   const isSquare = platform.includes('linkedin') || platform.includes('facebook');
                   const aspectClass = isPortrait ? 'aspect-[9/16]' : isSquare ? 'aspect-square' : 'aspect-video';
+                  // Find clip by index (not array position — index may not equal position after filtering)
+                  const activeClip = sceneClips.find(c => c.index === activeScene);
+                  if (!activeClip?.url) return null;
                   return (
                     <video
-                      key={sceneClips[activeScene]?.url}
-                      src={sceneClips[activeScene]?.url}
+                      key={activeClip.url}
+                      src={activeClip.url}
                       controls
                       className={`w-full rounded-xl bg-black mb-4 ${aspectClass}`}
                       style={{ maxHeight: isPortrait ? 420 : 280, objectFit: 'contain' }}
