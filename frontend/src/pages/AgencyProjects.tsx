@@ -11,6 +11,7 @@ interface Project {
 interface Comment {
   id: string; author_name: string; author_id: string; scene_index: number | null;
   text: string; is_client: boolean; resolved: boolean; created_at: string;
+  is_scene_update?: boolean;
   edited?: boolean; edited_at?: string;
 }
 interface SceneClip {
@@ -356,6 +357,7 @@ export function ProjectDetail() {
   const [rerenderingScene, setRerenderingScene] = useState<number | null>(null);
   const [patchedVideoUrl, setPatchedVideoUrl] = useState<string>("");
   const [jobCreatedBy, setJobCreatedBy]       = useState<string | null>(null);
+  const [updatedScenes, setUpdatedScenes]     = useState<Set<number>>(new Set());
   const [members, setMembers] = useState<Member[]>([]);
   const [assignOpen, setAssignOpen]   = useState(false);
   const [assigning, setAssigning]     = useState(false);
@@ -559,7 +561,31 @@ export function ProjectDetail() {
         motion: 'auto',
       });
       setPatchedVideoUrl(res.data.video_url);
-      // Reload scene clips with new video
+
+      // Update the scene clip URL in state immediately — no full reload needed
+      if (res.data.scene_url) {
+        setSceneClips(prev => prev.map(c =>
+          c.index === sceneIndex
+            ? { ...c, url: res.data.scene_url }
+            : c
+        ));
+      }
+
+      // Post a system comment so editor can note the change and owner can review
+      const updateNote = `Scene ${sceneIndex + 1} has been updated and re-rendered.`;
+      try {
+        const cmtRes = await api.post(`/api/agency/projects/${id}/comments`, {
+          text: updateNote,
+          scene_index: sceneIndex,
+          is_scene_update: true,
+        });
+        setComments(prev => [cmtRes.data.comment, ...prev]);
+      } catch { /* non-fatal */ }
+
+      // Mark this scene as updated (for owner badge)
+      setUpdatedScenes(prev => new Set(prev).add(sceneIndex));
+
+      // Also reload to pick up the full updated video
       await loadSceneClips(lastJobId);
     } catch (e: any) {
       alert(e.response?.data?.detail || 'Scene re-render failed');
@@ -1266,7 +1292,8 @@ ${emailBody}`)}
           {/* Scene grid */}
           <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
             {sceneClips.map(clip => {
-              const sceneCmts = comments.filter(c => c.scene_index === clip.index && !c.resolved);
+              const sceneCmts  = comments.filter(c => c.scene_index === clip.index && !c.resolved);
+              const hasUpdate  = sceneCmts.some(c => c.is_scene_update);
               const isActive = activeScene === clip.index;
               return (
                 <div key={clip.index}
@@ -1288,7 +1315,12 @@ ${emailBody}`)}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
                   <div className="absolute bottom-0 left-0 right-0 px-2.5 pb-2 flex items-center justify-between">
                     <span className="text-xs font-semibold text-white/90">{clip.label}</span>
-                    {sceneCmts.length > 0 && (
+                    {hasUpdate && (
+                      <span className="text-[10px] bg-green-400/20 border border-green-400/30 text-green-300 px-1.5 py-0.5 rounded-full font-semibold">
+                        ↻ Updated
+                      </span>
+                    )}
+                    {!hasUpdate && sceneCmts.length > 0 && (
                       <span className="text-[10px] bg-amber-400/20 border border-amber-400/30 text-amber-300 px-1.5 py-0.5 rounded-full font-semibold">
                         {sceneCmts.length} note{sceneCmts.length !== 1 ? "s" : ""}
                       </span>
@@ -1374,16 +1406,19 @@ ${emailBody}`)}
                       Notes on scene {activeScene + 1}
                     </div>
                     {comments.filter(c => c.scene_index === activeScene).map(c => (
-                      <div key={c.id} className={`flex gap-2.5 group ${c.resolved ? "opacity-35" : ""}`}>
+                      <div key={c.id} className={`flex gap-2.5 group ${c.resolved ? "opacity-35" : ""} ${c.is_scene_update ? "bg-green-400/[0.04] border border-green-400/15 rounded-xl px-2.5 py-2 -mx-1" : ""}`}>
                         <div className={`w-6 h-6 rounded-full text-[10px] font-bold flex items-center justify-center flex-shrink-0 ${
-                          c.is_client ? "bg-violet-400/20 text-violet-300" : "bg-white/[0.08] text-white/50"
+                          c.is_scene_update ? "bg-green-400/20 text-green-300"
+                          : c.is_client ? "bg-violet-400/20 text-violet-300"
+                          : "bg-white/[0.08] text-white/50"
                         }`}>
                           {c.author_name.slice(0, 2).toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="text-[11px] font-semibold text-white/70">{c.author_name}</span>
-                            {c.is_client && <span className="text-[10px] text-violet-400">Client</span>}
+                            {c.is_scene_update && <span className="text-[10px] text-green-400 font-semibold">↻ Updated</span>}
+                            {!c.is_scene_update && c.is_client && <span className="text-[10px] text-violet-400">Client</span>}
                             {c.resolved && <span className="text-[10px] text-white/20">Resolved</span>}
                             {c.edited && <span className="text-[10px] text-white/20 italic">edited</span>}
                           </div>
