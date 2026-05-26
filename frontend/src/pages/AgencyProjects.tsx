@@ -594,23 +594,17 @@ export function ProjectDetail() {
       });
       setPatchedVideoUrl(res.data.video_url);
 
-      // Update the scene clip URL immediately with cache-busting version
+      // Update the scene clip URL immediately — unique ?v=ts key forces React to remount video element
       const ts = Date.now();
-      // Update the scene clip immediately — use a unique versioned URL
-      // so the video element key changes and React forces a full reload
       const newSceneUrl = res.data.scene_url
         ? `${res.data.scene_url}?v=${ts}`
         : null;
       if (newSceneUrl) {
-        setSceneClips(prev => {
-          const updated = prev.map(c =>
-            c.index === sceneIndex
-              ? { ...c, url: newSceneUrl, version: ts }
-              : c
-          );
-          return updated;
-        });
-
+        setSceneClips(prev => prev.map(c =>
+          c.index === sceneIndex
+            ? { ...c, url: newSceneUrl, version: ts }
+            : c
+        ));
       }
 
       // Post a system comment — fire-and-forget, never blocks or shows errors
@@ -634,14 +628,9 @@ export function ProjectDetail() {
         stored[id] = (stored[id] || []).filter((i: number) => i !== sceneIndex)
         sessionStorage.setItem('sf_pending_edits', JSON.stringify(stored))
       } catch {}
-      // Persist updated pending list back to sessionStorage
-      try {
-        const stored = JSON.parse(sessionStorage.getItem('sf_pending_edits') || '{}')
-        stored[id] = (stored[id] || []).filter((i: number) => i !== sceneIndex)
-        sessionStorage.setItem('sf_pending_edits', JSON.stringify(stored))
-      } catch {}
-      // Reload with cache bust so browser fetches fresh clips from R2
-      await loadSceneClips(lastJobId, true);
+      // DO NOT reload from Redis here — the setSceneClips above already has the fresh URL
+      // from the re-render response. Calling loadSceneClips would overwrite with Redis which
+      // may still have the old URL or return the same URL without forcing a browser reload.
     } catch (e: any) {
       const isNetwork = !e.response && (e.code === 'ERR_NETWORK' || e.message?.includes('Network'));
       const msg = isNetwork
