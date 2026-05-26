@@ -302,6 +302,7 @@ async def rerender_scene(
 
             # ── Step 3: Render the single scene ────────────────────────────
             scene_out = str(work_dir / f"scene_{scene_index:02d}_new.mp4")
+            is_custom = bool(getattr(scene, "custom_image_url", None) or req.custom_image_url)
             await render_scene(
                 scene=scene,
                 visual_path=visual_file.path,
@@ -312,6 +313,7 @@ async def rerender_scene(
                 platform=req.platform or "TikTok",
                 motion=req.motion or "auto",
                 scene_index=scene_index,
+                is_custom_image=is_custom,
             )
 
             # ── Step 4: Upload new scene clip to R2 ────────────────────────
@@ -435,14 +437,22 @@ async def save_job_scenes(
 
 @router.get("/scenes/{job_id}")
 async def get_job_scenes(job_id: str):
-    """Return the scenes that were used in a render job."""
+    """Return the scenes and current clip URLs for a render job.
+    scene_urls reflects any partial re-renders — always use these over
+    the original r2_urls from the status endpoint.
+    """
     redis = await _get_redis()
     try:
         raw = await redis.get(f"job:{job_id}:scenes")
         if not raw:
             raise HTTPException(404, "Scenes not found for this job")
         scenes = json.loads(raw)
-        return {"scenes": scenes}
+
+        # Also return the current per-scene clip URLs (updated on partial re-renders)
+        raw_urls = await redis.get(f"job:{job_id}:scene_urls")
+        scene_urls: list[str] = json.loads(raw_urls) if raw_urls else []
+
+        return {"scenes": scenes, "scene_urls": scene_urls}
     finally:
         await redis.aclose()
 
