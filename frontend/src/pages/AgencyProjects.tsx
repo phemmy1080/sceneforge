@@ -22,6 +22,25 @@ interface SceneClip {
 }
 interface BrandKit { id: string; client_name: string; }
 
+// Module-level patch store — persists across component mounts, navigation, and React re-renders.
+// Key: "{jobId}:{sceneIndex}" → patched scene URL (with ?v=ts for cache-busting)
+const _scenePatches = new Map<string, string>();
+
+function getPatchKey(jobId: string, index: number) { return `${jobId}:${index}`; }
+function setScenePatch(jobId: string, index: number, url: string) {
+  _scenePatches.set(getPatchKey(jobId, index), url);
+  // Also persist to sessionStorage for browser refresh
+  try {
+    const key = `sf_scene_urls:${jobId}`;
+    const arr = JSON.parse(sessionStorage.getItem(key) || '[]');
+    arr[index] = url.split('?')[0]; // store base URL without ?v=ts
+    sessionStorage.setItem(key, JSON.stringify(arr));
+  } catch {}
+}
+function getScenePatch(jobId: string, index: number): string | undefined {
+  return _scenePatches.get(getPatchKey(jobId, index));
+}
+
 export function SuspendedScreen({ currentUser, onGoPersonal, onSignOut }: {
   currentUser: any;
   onGoPersonal: () => void;
@@ -443,12 +462,19 @@ export function ProjectDetail() {
     lastJobIdRef.current = jobId;
     if (!jobId) return;
 
-    // ── Instant seed from sessionStorage (survives refresh & navigation) ──
+    // ── Seed module Map from sessionStorage (for browser refresh) ──
     try {
       const cached = JSON.parse(sessionStorage.getItem(`sf_scene_urls:${jobId}`) || 'null');
       if (cached && Array.isArray(cached) && cached.length > 0) {
+        // Populate module Map so getScenePatch works immediately
+        cached.forEach((url: string, i: number) => {
+          if (url && url.startsWith('http') && !getScenePatch(jobId, i)) {
+            _scenePatches.set(getPatchKey(jobId, i), url);
+          }
+        });
+        // Show immediately from sessionStorage while Redis loads
         const clips: SceneClip[] = cached.map((url: string, i: number) => ({
-          index: i, url: url || '', label: `Scene ${i + 1}`,
+          index: i, url: getScenePatch(jobId, i) || url || '', label: `Scene ${i + 1}`,
         })).filter((c: SceneClip) => c.url.startsWith('http'));
         if (clips.length > 0) setSceneClips(clips);
       }
@@ -463,11 +489,12 @@ export function ProjectDetail() {
       } catch { /* 404 = no scenes saved yet, fall through to status */ }
 
       if (patchedUrls.length > 0) {
-        // Save to sessionStorage so browser refresh restores patched URLs
+        // Save to sessionStorage for browser refresh persistence
         try { sessionStorage.setItem(`sf_scene_urls:${jobId}`, JSON.stringify(patchedUrls)); } catch {}
         const clips: SceneClip[] = patchedUrls.map((url, i) => ({
           index: i,
-          url: url || '',
+          // Module-level patch takes priority — has ?v=ts cache-buster from this session
+          url: getScenePatch(jobId, i) || url || '',
           label: `Scene ${i + 1}`,
         })).filter(c => c.url.startsWith('http'));
         setSceneClips(clips);
@@ -523,7 +550,11 @@ export function ProjectDetail() {
         }
       }
 
-      setSceneClips(clips);
+      // Apply any module-level patches before setting state
+      const patchedClips = clips.map(c => ({
+        ...c, url: getScenePatch(jobId, c.index) || c.url
+      }));
+      setSceneClips(patchedClips);
     } catch (e) {
       console.warn('loadSceneClips failed:', e);
     }
@@ -613,19 +644,13 @@ export function ProjectDetail() {
         ? `${res.data.scene_url}?v=${ts}`
         : null;
       if (newSceneUrl) {
-        // Update state immediately for display
+        const jobId = lastJobIdRef.current;
+        // Write to module-level Map — survives component unmount, navigation, React re-renders
+        if (jobId) setScenePatch(jobId, sceneIndex, newSceneUrl);
+        // Update React state for immediate display
         setSceneClips(prev => prev.map(c =>
           c.index === sceneIndex ? { ...c, url: newSceneUrl } : c
         ));
-        // Persist to sessionStorage so browser refresh and re-navigation restore it
-        try {
-          const jobId = lastJobIdRef.current;
-          if (jobId) {
-            const cached = JSON.parse(sessionStorage.getItem(`sf_scene_urls:${jobId}`) || '[]');
-            cached[sceneIndex] = res.data.scene_url; // store base URL without ?v=ts
-            sessionStorage.setItem(`sf_scene_urls:${jobId}`, JSON.stringify(cached));
-          }
-        } catch {}
       }
 
       // Post a system comment — fire-and-forget, never blocks or shows errors
