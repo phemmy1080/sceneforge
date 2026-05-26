@@ -355,6 +355,10 @@ export function ProjectDetail() {
   const [sceneClips, setSceneClips] = useState<SceneClip[]>([]);
   // Ref stores patched scene URLs that survive any setSceneClips reset
   const patchedClipUrls = React.useRef<Record<number, string>>({});
+  // Always use this to get a clip URL — ref patches take priority over state
+  function getClipUrl(index: number): string {
+    return patchedClipUrls.current[index] || sceneClips.find(c => c.index === index)?.url || '';
+  }
   const [activeScene, setActiveScene] = useState<number | null>(null);
   const [sceneCommentText, setSceneCommentText] = useState("");
   const [rerenderingScene, setRerenderingScene] = useState<number | null>(null);
@@ -609,13 +613,11 @@ export function ProjectDetail() {
         ? `${res.data.scene_url}?v=${ts}`
         : null;
       if (newSceneUrl) {
-        // Write to ref first — survives any future setSceneClips reset
+        // Write ONLY to ref — getClipUrl() reads ref first so display updates immediately.
+        // Never call setSceneClips here — avoids any risk of stale state or reset.
         patchedClipUrls.current[sceneIndex] = newSceneUrl;
-        setSceneClips(prev => prev.map(c =>
-          c.index === sceneIndex
-            ? { ...c, url: newSceneUrl, version: ts }
-            : c
-        ));
+        // Force a re-render so getClipUrl() is re-evaluated in the JSX
+        setSceneClips(prev => [...prev]);
       }
 
       // Post a system comment — fire-and-forget, never blocks or shows errors
@@ -1367,7 +1369,7 @@ ${emailBody}`)}
               const hasUpdate  = sceneCmts.some(c => c.is_scene_update);
               const isActive = activeScene === clip.index;
               return (
-                <div key={clip.url}
+                <div key={clip.index}
                   onClick={() => setActiveScene(isActive ? null : clip.index)}
                   className={`relative rounded-xl overflow-hidden cursor-pointer border transition-all ${
                     isActive
@@ -1375,8 +1377,8 @@ ${emailBody}`)}
                       : "border-white/[0.08] hover:border-white/[0.2]"
                   }`}>
                   <video
-                    key={clip.url}
-                    src={clip.url}
+                    key={getClipUrl(clip.index)}
+                    src={getClipUrl(clip.index)}
                     className={`w-full bg-black object-cover ${(() => {
                       const p = (project.platform || '').toLowerCase();
                       return p.includes('tiktok') || p.includes('shorts') || p.includes('reels') || p.includes('snapchat') || p.includes('pinterest')
@@ -1480,11 +1482,12 @@ ${emailBody}`)}
                   const aspectClass = isPortrait ? 'aspect-[9/16]' : isSquare ? 'aspect-square' : 'aspect-video';
                   // Find clip by index (not array position — index may not equal position after filtering)
                   const activeClip = sceneClips.find(c => c.index === activeScene);
-                  if (!activeClip?.url) return null;
+                  const activeUrl = activeScene !== null ? getClipUrl(activeScene) : '';
+                  if (!activeUrl) return null;
                   return (
                     <video
-                      key={activeClip.url}
-                      src={activeClip.url}
+                      key={activeUrl}
+                      src={activeUrl}
                       controls
                       className={`w-full rounded-xl bg-black mb-4 ${aspectClass}`}
                       style={{ maxHeight: isPortrait ? 420 : 280, objectFit: 'contain' }}
