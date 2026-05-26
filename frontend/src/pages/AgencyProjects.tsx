@@ -496,7 +496,7 @@ export function ProjectDetail() {
         const pad = String(i).padStart(2, '0');
         const key = `scene_${pad}.mp4`;
         if (r2[key]) {
-          clips.push({ index: i - 1, url: r2[key] + cacheBust, label: `Scene ${i}` });
+          clips.push({ index: i - 1, url: r2[key], label: `Scene ${i}` });
           i++;
         } else { break; }
       }
@@ -505,7 +505,7 @@ export function ProjectDetail() {
       if (clips.length === 0) {
         i = 1;
         while (r2[`scene_${i}.mp4`]) {
-          clips.push({ index: i - 1, url: r2[`scene_${i}.mp4`] + cacheBust, label: `Scene ${i}` });
+          clips.push({ index: i - 1, url: r2[`scene_${i}.mp4`], label: `Scene ${i}` });
           i++;
         }
       }
