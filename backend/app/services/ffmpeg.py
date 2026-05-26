@@ -196,6 +196,7 @@ async def render_scene(
     platform: str | None = None,
     motion: str = "auto",   # "auto" | "kenburns_in" | "kenburns_out" | "pan_left" | "pan_right" | "none"
     scene_index: int = 0,
+    is_custom_image: bool = False,  # True = letterbox (preserve proportions), False = scale-fill+crop
 ) -> str:
     w, h   = _dims(platform)
     duration = max(float(scene.duration or 10), 3.0)
@@ -204,8 +205,16 @@ async def render_scene(
     if motion == "auto":
         motion = _MOTION_CYCLE[scene_index % len(_MOTION_CYCLE)]
 
-    # Build video filter chain
-    if motion != "none":
+    # Custom uploaded images: letterbox (scale-to-fit + black padding) to preserve proportions
+    # Stock footage/AI images: scale-to-fill + crop for a cinematic look
+    if is_custom_image and is_image:
+        # Scale to fit within frame, pad with black to exact dimensions
+        letterbox_vf = (
+            f"scale=w={w}:h={h}:force_original_aspect_ratio=decrease,"
+            f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:black,setsar=1"
+        )
+        motion_vf = letterbox_vf
+    elif motion != "none":
         motion_vf = _motion_filter(motion, w, h, duration)
     else:
         motion_vf = f"scale=w={w}:h={h}:force_original_aspect_ratio=increase,crop={w}:{h},setsar=1"
@@ -554,6 +563,7 @@ async def render_full_pipeline(
         scene_out = str(Path(output_dir) / f"scene_{i+1:02d}.mp4")
         is_image = getattr(visual, "media_type", "video") == "image"
 
+        _is_custom = bool(getattr(scene, "custom_image_url", None))
         await render_scene(
             scene=scene,
             visual_path=visual.path,
@@ -564,6 +574,7 @@ async def render_full_pipeline(
             platform=platform,
             motion=motion,
             scene_index=i,
+            is_custom_image=_is_custom,
         )
         scene_outputs.append(scene_out)
 
