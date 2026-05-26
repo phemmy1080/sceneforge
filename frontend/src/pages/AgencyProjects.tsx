@@ -354,11 +354,8 @@ export function ProjectDetail() {
   const [busy, setBusy] = useState("");
   const [sceneClips, setSceneClips] = useState<SceneClip[]>([]);
   // Ref stores patched scene URLs that survive any setSceneClips reset
-  const patchedClipUrls = React.useRef<Record<number, string>>({});
-  // Always use this to get a clip URL — ref patches take priority over state
-  function getClipUrl(index: number): string {
-    return patchedClipUrls.current[index] || sceneClips.find(c => c.index === index)?.url || '';
-  }
+  // jobId used for sessionStorage persistence of patched scene URLs
+  const lastJobIdRef = React.useRef<string>('');
   const [activeScene, setActiveScene] = useState<number | null>(null);
   const [sceneCommentText, setSceneCommentText] = useState("");
   const [rerenderingScene, setRerenderingScene] = useState<number | null>(null);
@@ -418,7 +415,9 @@ export function ProjectDetail() {
       // Load scene clips from the latest render job
       const jobIds: string[] = projRes.data.project.render_job_ids || [];
       if (jobIds.length > 0) {
-        loadSceneClips(jobIds[jobIds.length - 1]);
+        const latestJobId = jobIds[jobIds.length - 1];
+        lastJobIdRef.current = latestJobId;
+        loadSceneClips(latestJobId);
       }
       // Restore pending edit badges from sessionStorage
       try {
@@ -441,30 +440,37 @@ export function ProjectDetail() {
 
   async function loadSceneClips(jobId: string, bustCache = false) {
     loadSceneCreator(jobId).catch(() => {});
-    const cacheBust = bustCache ? `?v=${Date.now()}` : '';
+    lastJobIdRef.current = jobId;
     if (!jobId) return;
+
+    // ── Instant seed from sessionStorage (survives refresh & navigation) ──
     try {
-      // ── Step 1: Try scenes endpoint first — has patched URLs from partial re-renders ──
+      const cached = JSON.parse(sessionStorage.getItem(`sf_scene_urls:${jobId}`) || 'null');
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        const clips: SceneClip[] = cached.map((url: string, i: number) => ({
+          index: i, url: url || '', label: `Scene ${i + 1}`,
+        })).filter((c: SceneClip) => c.url.startsWith('http'));
+        if (clips.length > 0) setSceneClips(clips);
+      }
+    } catch {}
+
+    try {
+      // ── Step 1: Redis scene_urls — always has latest patched URLs ──
       let patchedUrls: string[] = [];
       try {
         const scenesRes = await api.get(`/api/render/scenes/${jobId}`);
         patchedUrls = scenesRes.data.scene_urls || [];
       } catch { /* 404 = no scenes saved yet, fall through to status */ }
 
-      // If we have patched URLs, build clips directly from them
       if (patchedUrls.length > 0) {
+        // Save to sessionStorage so browser refresh restores patched URLs
+        try { sessionStorage.setItem(`sf_scene_urls:${jobId}`, JSON.stringify(patchedUrls)); } catch {}
         const clips: SceneClip[] = patchedUrls.map((url, i) => ({
           index: i,
-          url: (url || '') + cacheBust,
+          url: url || '',
           label: `Scene ${i + 1}`,
-        })).filter(c => c.url.startsWith('http'));  // keep index integrity by mapping first
-        // Merge any in-memory patches from re-renders (ref survives loadSceneClips resets)
-        const merged = clips.map(c =>
-          patchedClipUrls.current[c.index]
-            ? { ...c, url: patchedClipUrls.current[c.index] }
-            : c
-        );
-        setSceneClips(merged);
+        })).filter(c => c.url.startsWith('http'));
+        setSceneClips(clips);
         return;
       }
 
@@ -517,13 +523,7 @@ export function ProjectDetail() {
         }
       }
 
-      // Merge any in-memory patches from re-renders
-      const merged = clips.map(c =>
-        patchedClipUrls.current[c.index]
-          ? { ...c, url: patchedClipUrls.current[c.index] }
-          : c
-      );
-      setSceneClips(merged);
+      setSceneClips(clips);
     } catch (e) {
       console.warn('loadSceneClips failed:', e);
     }
@@ -613,11 +613,19 @@ export function ProjectDetail() {
         ? `${res.data.scene_url}?v=${ts}`
         : null;
       if (newSceneUrl) {
-        // Write ONLY to ref — getClipUrl() reads ref first so display updates immediately.
-        // Never call setSceneClips here — avoids any risk of stale state or reset.
-        patchedClipUrls.current[sceneIndex] = newSceneUrl;
-        // Force a re-render so getClipUrl() is re-evaluated in the JSX
-        setSceneClips(prev => [...prev]);
+        // Update state immediately for display
+        setSceneClips(prev => prev.map(c =>
+          c.index === sceneIndex ? { ...c, url: newSceneUrl } : c
+        ));
+        // Persist to sessionStorage so browser refresh and re-navigation restore it
+        try {
+          const jobId = lastJobIdRef.current;
+          if (jobId) {
+            const cached = JSON.parse(sessionStorage.getItem(`sf_scene_urls:${jobId}`) || '[]');
+            cached[sceneIndex] = res.data.scene_url; // store base URL without ?v=ts
+            sessionStorage.setItem(`sf_scene_urls:${jobId}`, JSON.stringify(cached));
+          }
+        } catch {}
       }
 
       // Post a system comment — fire-and-forget, never blocks or shows errors
@@ -1377,8 +1385,8 @@ ${emailBody}`)}
                       : "border-white/[0.08] hover:border-white/[0.2]"
                   }`}>
                   <video
-                    key={getClipUrl(clip.index)}
-                    src={getClipUrl(clip.index)}
+                    key={clip.url}
+                    src={clip.url}
                     className={`w-full bg-black object-cover ${(() => {
                       const p = (project.platform || '').toLowerCase();
                       return p.includes('tiktok') || p.includes('shorts') || p.includes('reels') || p.includes('snapchat') || p.includes('pinterest')
@@ -1482,12 +1490,11 @@ ${emailBody}`)}
                   const aspectClass = isPortrait ? 'aspect-[9/16]' : isSquare ? 'aspect-square' : 'aspect-video';
                   // Find clip by index (not array position — index may not equal position after filtering)
                   const activeClip = sceneClips.find(c => c.index === activeScene);
-                  const activeUrl = activeScene !== null ? getClipUrl(activeScene) : '';
-                  if (!activeUrl) return null;
+                  if (!activeClip?.url) return null;
                   return (
                     <video
-                      key={activeUrl}
-                      src={activeUrl}
+                      key={activeClip.url}
+                      src={activeClip.url}
                       controls
                       className={`w-full rounded-xl bg-black mb-4 ${aspectClass}`}
                       style={{ maxHeight: isPortrait ? 420 : 280, objectFit: 'contain' }}
