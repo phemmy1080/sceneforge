@@ -754,26 +754,36 @@ async def get_dashboard(redis: aioredis.Redis, ws_id: str, user_id: str = "") ->
                 })
 
     # Count scenes marked as updated (is_scene_update=True, not yet resolved)
-    # These need owner/admin review
+    # Use the LATEST unresolved update per scene index — re-renders of the same
+    # scene should count as 1 updated scene, not N comments.
     scenes_updated: list[dict] = []
     for proj in projects:
         comments_raw = await redis.lrange(_comments_key(proj["id"]), 0, -1)
-        update_comments = []
+        # Build a dict: scene_index → latest unresolved is_scene_update comment
+        latest_by_scene: dict = {}
         for r in comments_raw:
             c = json.loads(r)
             if c.get("is_scene_update") and not c.get("resolved", False):
-                update_comments.append({
-                    "scene_index": c["scene_index"],
+                idx = c.get("scene_index")
+                # Keep the latest (highest created_at) for each scene index
+                existing = latest_by_scene.get(idx)
+                if not existing or c.get("created_at", "") >= existing.get("created_at", ""):
+                    latest_by_scene[idx] = c
+        if latest_by_scene:
+            unique_scenes = [
+                {
+                    "scene_index": idx,
                     "text":        c.get("text", ""),
                     "author":      c.get("author_name", "Editor"),
-                })
-        if update_comments:
+                }
+                for idx, c in sorted(latest_by_scene.items(), key=lambda x: (x[0] is None, x[0]))
+            ]
             scenes_updated.append({
                 "project_id":    proj["id"],
                 "project_title": proj.get("title", "Untitled"),
                 "client_name":   proj.get("client_name", ""),
-                "count":         len(update_comments),
-                "scenes":        update_comments,
+                "count":         len(unique_scenes),
+                "scenes":        unique_scenes,
             })
 
     return {
