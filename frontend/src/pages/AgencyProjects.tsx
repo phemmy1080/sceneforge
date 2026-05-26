@@ -353,6 +353,8 @@ export function ProjectDetail() {
   const [statusOpen, setStatusOpen] = useState(false);
   const [busy, setBusy] = useState("");
   const [sceneClips, setSceneClips] = useState<SceneClip[]>([]);
+  // Ref stores patched scene URLs that survive any setSceneClips reset
+  const patchedClipUrls = React.useRef<Record<number, string>>({});
   const [activeScene, setActiveScene] = useState<number | null>(null);
   const [sceneCommentText, setSceneCommentText] = useState("");
   const [rerenderingScene, setRerenderingScene] = useState<number | null>(null);
@@ -452,7 +454,13 @@ export function ProjectDetail() {
           url: (url || '') + cacheBust,
           label: `Scene ${i + 1}`,
         })).filter(c => c.url.startsWith('http'));  // keep index integrity by mapping first
-        setSceneClips(clips);
+        // Merge any in-memory patches from re-renders (ref survives loadSceneClips resets)
+        const merged = clips.map(c =>
+          patchedClipUrls.current[c.index]
+            ? { ...c, url: patchedClipUrls.current[c.index] }
+            : c
+        );
+        setSceneClips(merged);
         return;
       }
 
@@ -505,7 +513,13 @@ export function ProjectDetail() {
         }
       }
 
-      setSceneClips(clips);
+      // Merge any in-memory patches from re-renders
+      const merged = clips.map(c =>
+        patchedClipUrls.current[c.index]
+          ? { ...c, url: patchedClipUrls.current[c.index] }
+          : c
+      );
+      setSceneClips(merged);
     } catch (e) {
       console.warn('loadSceneClips failed:', e);
     }
@@ -575,13 +589,8 @@ export function ProjectDetail() {
       return;
     }
 
-    // Before re-rendering, persist current store scenes to Redis so the
-    // partial re-render endpoint has the latest data for all scenes
-    if (storeScenes?.length) {
-      try {
-        await api.put(`/api/render/scenes/${lastJobId}`, { scenes: storeScenes });
-      } catch { /* non-fatal */ }
-    }
+    // Note: SceneEditor already flushes scenes to Redis on "Save & return"
+    // No need to flush again here — avoids race conditions with the rerender endpoint
 
     setRerenderingScene(sceneIndex);
     try {
@@ -600,6 +609,8 @@ export function ProjectDetail() {
         ? `${res.data.scene_url}?v=${ts}`
         : null;
       if (newSceneUrl) {
+        // Write to ref first — survives any future setSceneClips reset
+        patchedClipUrls.current[sceneIndex] = newSceneUrl;
         setSceneClips(prev => prev.map(c =>
           c.index === sceneIndex
             ? { ...c, url: newSceneUrl, version: ts }
