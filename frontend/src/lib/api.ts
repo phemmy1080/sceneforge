@@ -253,8 +253,11 @@ export const getTokenBalance = async (): Promise<TokenBalance> => {
 
 // ─── Generate ─────────────────────────────────────────────────────────────────
 
-export const generateIdeas = async (req: GenerateIdeasRequest): Promise<IdeaItem[]> => {
-  const { data } = await api.post('/api/generate/ideas', req)
+export const generateIdeas = async (req: GenerateIdeasRequest, agencyProjectId?: string): Promise<IdeaItem[]> => {
+  const { data } = await api.post('/api/generate/ideas', {
+    ...req,
+    ...(agencyProjectId ? { agency_project_id: agencyProjectId } : {}),
+  })
   return data.ideas
 }
 
@@ -263,8 +266,17 @@ export const generateScript = async (req: GenerateScriptRequest): Promise<{ scri
   return data
 }
 
-export const generateScenes = async (script: string, platform: string): Promise<{ scenes: Scene[]; total_duration: number }> => {
-  const { data } = await api.post('/api/generate/scenes', { script, platform })
+export const generateScriptForAgency = async (req: GenerateScriptRequest, agencyProjectId: string): Promise<{ script: string; word_count: number; estimated_duration_seconds: number }> => {
+  const { data } = await api.post('/api/generate/script', { ...req, agency_project_id: agencyProjectId })
+  return data
+}
+
+export const generateScenes = async (script: string, platform: string, agencyProjectId?: string): Promise<{ scenes: Scene[]; total_duration: number }> => {
+  const { data } = await api.post('/api/generate/scenes', {
+    script,
+    platform,
+    ...(agencyProjectId ? { agency_project_id: agencyProjectId } : {}),
+  })
   return data
 }
 
