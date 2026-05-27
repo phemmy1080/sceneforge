@@ -69,16 +69,6 @@ const AVATAR_COLORS = [
   "from-blue-400 to-cyan-500",
 ];
 
-function timeAgo(iso: string) {
-  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
-
-
 // Priority config
 const PRIORITY: Record<string, { label: string; dot: string; border: string; text: string; bg: string }> = {
   urgent: { label: "Urgent",  dot: "🔴", border: "border-red-500/30",    text: "text-red-400",    bg: "bg-red-400/[0.06]" },
