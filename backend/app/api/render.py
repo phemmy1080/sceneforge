@@ -377,6 +377,22 @@ async def rerender_scene(
             await redis.set(f"job:{job_id}:scene_urls", json.dumps(updated_urls), ex=86400 * 7)
             await redis.set(f"job:{job_id}:scenes",     json.dumps(updated_scenes), ex=86400 * 7)
 
+            # Write the patched video URL back into the job progress key
+            # so the review endpoint always serves the latest full video
+            try:
+                raw_progress = await redis.get(f"job:{job_id}:progress")
+                if raw_progress:
+                    import json as _jp
+                    progress = _jp.loads(raw_progress)
+                    progress["video_url"] = video_url
+                    # Also update r2_urls so all lookup paths find it
+                    if "r2_urls" not in progress:
+                        progress["r2_urls"] = {}
+                    progress["r2_urls"]["final_video_patched.mp4"] = video_url
+                    await redis.set(f"job:{job_id}:progress", _jp.dumps(progress), ex=3600 * 24 * 7)
+            except Exception as _e:
+                logger.warning("Failed to update progress with patched url: %s", _e)
+
             logger.info("Partial re-render complete — job=%s scene=%d url=%s", job_id, scene_index, video_url)
             return {
                 "video_url":  video_url,
