@@ -465,7 +465,7 @@ async def send_invite(
     """Invite a new team member to the workspace."""
     subject = "You have been invited to join " + workspace_name + " on SceneForge"
     role_cap = role.capitalize()
-    article = 'an' if role_cap.lower() in ('admin', 'editor', 'owner') else 'a'
+    article = 'an' if role_cap.lower() in ('admin', 'editor') else 'a'
     body = (
         '<div style="text-align:center;margin-bottom:28px">'
         '<div style="font-size:48px;margin-bottom:12px">\U0001f44b</div>'
@@ -607,3 +607,34 @@ async def send_member_unsuspended(
         "Log in here: " + dashboard_url + "\n\n\u2014 SceneForge"
     )
     await _send(to_email, subject, html, text)
+
+async def send_low_balance_alert(
+    to_email: str,
+    owner_name: str,
+    workspace_name: str,
+    balance: int,
+    threshold: int,
+) -> None:
+    """Notify workspace owner when token pool drops below the threshold."""
+    if not to_email:
+        return
+    subject = f"⚠️ Low token balance — {workspace_name}"
+    html = f"""
+    <div style="font-family:sans-serif;max-width:540px;margin:0 auto;padding:32px 24px;background:#0F172A;color:#E2E8F0;border-radius:12px;">
+      <h2 style="color:#F59E0B;font-size:20px;margin:0 0 12px;">Token balance running low</h2>
+      <p style="color:#94A3B8;font-size:15px;line-height:1.6;margin:0 0 20px;">
+        Hi {owner_name},<br><br>
+        Your agency workspace <strong style="color:#fff;">{workspace_name}</strong> has
+        <strong style="color:#F59E0B;">{balance:,} tokens</strong> remaining —
+        below the {threshold:,} token alert threshold.
+      </p>
+      <p style="color:#94A3B8;font-size:14px;line-height:1.6;">
+        Top up your token pool to keep your team's renders running without interruption.
+      </p>
+      <a href="https://scenraforge.com" style="display:inline-block;margin-top:20px;padding:12px 28px;background:#F59E0B;color:#0F172A;font-weight:700;border-radius:8px;text-decoration:none;font-size:14px;">
+        Top up tokens →
+      </a>
+      <p style="margin-top:28px;color:#475569;font-size:12px;">SceneForge · You are receiving this because you own workspace {workspace_name}</p>
+    </div>
+    """
+    await _send(to_email, subject, html)
