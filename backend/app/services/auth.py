@@ -192,6 +192,23 @@ async def get_user_out_with_workspace(redis: aioredis.Redis, user_id: str,
         if ws_id:
             role_raw = await redis.get(f"workspace:member:{ws_id}:{user_id}")
             role = (role_raw if isinstance(role_raw, str) else role_raw.decode()) if role_raw else None
+
+            # If member key is also missing, check the members set and repair
+            if not role:
+                in_set = await redis.sismember(f"workspace:members:{ws_id}", user_id)
+                if in_set:
+                    # They're in the set — check if they're the owner
+                    ws_raw2 = await redis.get(f"workspace:{ws_id}")
+                    if ws_raw2:
+                        import json as _j2
+                        ws_data2 = _j2.loads(ws_raw2 if isinstance(ws_raw2, str) else ws_raw2.decode())
+                        role = "owner" if ws_data2.get("owner_id") == user_id else "editor"
+                    else:
+                        role = "editor"
+                    # Repair the missing member key
+                    await redis.set(f"workspace:member:{ws_id}:{user_id}", role)
+                    logger.info("Repaired workspace:member key for user %s -> role %s", user_id, role)
+
             user_out.workspace_id   = ws_id
             user_out.workspace_role = role
             suspended_raw = await redis.get(f"workspace:suspended:{ws_id}:{user_id}")
