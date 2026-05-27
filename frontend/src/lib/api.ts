@@ -185,6 +185,7 @@ export interface TokenBalance {
   videos_created: number
   can_render: boolean
   cost_per_video: number
+  tokens_per_scene?: number
   is_agency?: boolean
   ws_id?: string
 }
