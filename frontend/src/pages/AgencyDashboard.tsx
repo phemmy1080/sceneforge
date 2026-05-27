@@ -78,6 +78,8 @@ export default function AgencyDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [usageLog, setUsageLog] = useState<UsageEntry[]>([]);
   const [usageOpen, setUsageOpen] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [polling, setPolling] = useState(false);
   const [loading, setLoading] = useState(!!(currentUser?.workspace_suspended));
   const [error, setError] = useState("");
   // Derive immediately from cached user — no API round-trip needed
@@ -99,6 +101,31 @@ export default function AgencyDashboard() {
     if (currentUser?.workspace_suspended) { setSuspendedBlocked(true); setLoading(false); }
   }, [currentUser?.workspace_suspended]);
 
+  // 30-second polling — keeps dashboard data fresh without a page refresh
+  useEffect(() => {
+    if (currentUser?.workspace_suspended) return;
+    const interval = setInterval(() => {
+      silentRefresh();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [currentUser?.workspace_suspended]);
+
+  // Silent background refresh — used by the 30s polling interval
+  async function silentRefresh() {
+    if (polling) return; // skip if already refreshing
+    try {
+      setPolling(true);
+      const [dashRes, usageRes] = await Promise.all([
+        api.get("/api/agency/workspace/dashboard"),
+        api.get("/api/agency/workspace/token-usage", { silent: true } as any).catch(() => ({ data: { usage: [] } })),
+      ]);
+      setData(dashRes.data);
+      setUsageLog(usageRes.data.usage || []);
+      setLastUpdated(new Date());
+    } catch { /* non-fatal — keep showing stale data */ }
+    finally { setPolling(false); }
+  }
+
   async function load() {
     try {
       setLoading(true);
@@ -110,6 +137,7 @@ export default function AgencyDashboard() {
       setWorkspace(wsRes.data.workspace);
       setData(dashRes.data);
       setUsageLog(usageRes.data.usage || []);
+      setLastUpdated(new Date());
       setError("");
     } catch (e: any) {
       const detail = e.response?.data?.detail || "";
@@ -171,6 +199,16 @@ export default function AgencyDashboard() {
       </div>
 
       {/* Stats */}
+      {/* Last updated indicator */}
+      {lastUpdated && (
+        <div className="flex items-center justify-end gap-2 mb-2">
+          {polling && <div className="w-1.5 h-1.5 rounded-full bg-teal-400/60 animate-pulse" />}
+          <span className="text-[11px] text-white/20">
+            Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          </span>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           {
