@@ -65,66 +65,80 @@ export default function ClientReview({ token }: { token: string }) {
       setData(res.data);
       setComments(res.data.comments || []);
 
-      // Backend now returns video_url directly — no separate job status call needed
-      const directUrl = res.data.project?.video_url || '';
-      if (directUrl) {
-        setVideoUrl(directUrl);
-      } else {
-        // Fallback: try job status API for older projects
-        const jobIds: string[] = res.data.project.render_job_ids || [];
-        for (let i = jobIds.length - 1; i >= 0; i--) {
-          try {
-            let jobRes;
-            try { jobRes = await axios.get(`${BASE}/api/render/status/${jobIds[i]}`); }
-            catch (e: any) { if (e?.response?.status === 404) continue; throw e; }
-            const d = jobRes.data;
-            const url = d.result?.video_url
+      // Load full video URL — prefer final_video_patched.mp4 if scenes were re-rendered
+      const jobIds0: string[] = res.data.project.render_job_ids || [];
+      const lastJob = jobIds0[jobIds0.length - 1];
+
+      // Check if a patched full video exists (created by partial re-render endpoint)
+      let resolvedUrl = '';
+      if (lastJob) {
+        try {
+          const statusRes = await axios.get(`${BASE}/api/render/status/${lastJob}`);
+          const d = statusRes.data;
+          // Patched video takes priority — it was rebuilt after a scene re-render
+          resolvedUrl = d.result?.r2_urls?.['final_video_patched.mp4']
+                     || d.result?.video_url
                      || d.result?.r2_urls?.['final_video_music.mp4']
                      || d.result?.r2_urls?.['final_video.mp4']
                      || '';
-            if (url) { setVideoUrl(url); break; }
-          } catch {}
-        }
+        } catch {}
       }
+      // Fall back to URL returned directly by the review endpoint
+      if (!resolvedUrl) resolvedUrl = res.data.project?.video_url || '';
+      if (resolvedUrl) setVideoUrl(resolvedUrl);
 
       if (res.data.review.status !== "pending") {
         setDecided(true);
         setDecision(res.data.review.status as any);
       }
 
-      // Load individual scene clips
+      // Load individual scene clips — always prefer patched URLs from Redis
       const jobIds: string[] = res.data.project.render_job_ids || [];
       if (jobIds.length > 0) {
+        const lastJobId = jobIds[jobIds.length - 1];
         try {
-          const jobRes = await axios.get(`${BASE}/api/render/status/${jobIds[jobIds.length - 1]}`);
-          const jobData = jobRes.data;
-          const r2 = jobData.result?.r2_urls || {};
-          const workerBase = (jobData.result?.video_url || '').replace(/\/renders\/.*$/, '');
-          const clips: SceneClip[] = [];
-          // Primary: R2 scene_01.mp4 keys
-          let i = 1;
-          while (i <= 50) {
-            const pad = String(i).padStart(2, '0');
-            const key = `scene_${pad}.mp4`;
-            if (r2[key]) { clips.push({ index: i - 1, url: r2[key] }); i++; }
-            else { break; }
-          }
-          // Fallback A: unpadded keys
-          if (clips.length === 0) {
-            i = 1;
-            while (r2[`scene_${i}.mp4`]) {
-              clips.push({ index: i - 1, url: r2[`scene_${i}.mp4`] }); i++;
+          // ── Step 1: GET /api/render/scenes has patched URLs after partial re-renders ──
+          let patchedUrls: string[] = [];
+          try {
+            const scenesRes = await axios.get(`${BASE}/api/render/scenes/${lastJobId}`);
+            patchedUrls = scenesRes.data.scene_urls || [];
+          } catch { /* 404 = no scene_urls yet, fall through */ }
+
+          if (patchedUrls.length > 0) {
+            // Use patched URLs — these reflect any scene re-renders done by editors
+            const clips: SceneClip[] = patchedUrls
+              .map((url: string, i: number) => ({ index: i, url: url || '' }))
+              .filter((c: SceneClip) => c.url.startsWith('http'));
+            setSceneClips(clips);
+          } else {
+            // ── Step 2: Fall back to original render status r2_urls ──
+            const jobRes = await axios.get(`${BASE}/api/render/status/${lastJobId}`);
+            const jobData = jobRes.data;
+            const r2 = jobData.result?.r2_urls || {};
+            const workerBase = (jobData.result?.video_url || '').replace(/\/renders\/.*$/, '');
+            const clips: SceneClip[] = [];
+            let i = 1;
+            while (i <= 50) {
+              const pad = String(i).padStart(2, '0');
+              const key = `scene_${pad}.mp4`;
+              if (r2[key]) { clips.push({ index: i - 1, url: r2[key] }); i++; }
+              else { break; }
             }
-          }
-          // Fallback B: worker base URL
-          if (clips.length === 0 && workerBase) {
-            const count = jobData.result?.scene_count || 0;
-            for (let j = 1; j <= count; j++) {
-              const pad = String(j).padStart(2, '0');
-              clips.push({ index: j - 1, url: `${workerBase}/renders/${jobIds[jobIds.length-1]}/scene_${pad}.mp4` });
+            if (clips.length === 0) {
+              i = 1;
+              while (r2[`scene_${i}.mp4`]) {
+                clips.push({ index: i - 1, url: r2[`scene_${i}.mp4`] }); i++;
+              }
             }
+            if (clips.length === 0 && workerBase) {
+              const count = jobData.result?.scene_count || 0;
+              for (let j = 1; j <= count; j++) {
+                const pad = String(j).padStart(2, '0');
+                clips.push({ index: j - 1, url: `${workerBase}/renders/${lastJobId}/scene_${pad}.mp4` });
+              }
+            }
+            setSceneClips(clips);
           }
-          setSceneClips(clips);
         } catch {}
       }
     } catch (e: any) {
@@ -228,7 +242,7 @@ export default function ClientReview({ token }: { token: string }) {
       {/* Header */}
       <div className="border-b border-white/5 px-5 py-4 flex items-center justify-between max-w-3xl mx-auto">
         <div>
-          <div className="text-xs text-zinc-500 font-mono mb-0.5">sceneraforge.com</div>
+          <div className="text-xs text-zinc-500 font-mono mb-0.5">scenraforge.com</div>
           <div className="text-sm font-semibold">{project.title}</div>
           <div className="text-xs text-zinc-500">{project.client_name} · {project.platform}</div>
         </div>
@@ -241,8 +255,16 @@ export default function ClientReview({ token }: { token: string }) {
 
         {/* ── Full video ── */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-          {videoUrl ? (
-            <video src={videoUrl} controls className="w-full aspect-video bg-black" />
+          {videoUrl ? (() => {
+            const plat = (project?.platform || '').toLowerCase();
+            const isPortrait = plat.includes('tiktok') || plat.includes('shorts') ||
+              plat.includes('reels') || plat.includes('snapchat') || plat.includes('pinterest');
+            const isSquare = plat.includes('linkedin');
+            const aspectClass = isPortrait ? 'aspect-[9/16]' : isSquare ? 'aspect-square' : 'aspect-video';
+            return <video src={videoUrl} controls
+              className={`w-full ${aspectClass} bg-black`}
+              style={{ maxHeight: isPortrait ? 500 : undefined, objectFit: 'contain' }} />;
+          })() : (
           ) : (
             <div className="aspect-video bg-zinc-950 flex flex-col items-center justify-center gap-3">
               <div className="w-14 h-14 rounded-full bg-zinc-800 flex items-center justify-center">
@@ -311,14 +333,23 @@ export default function ClientReview({ token }: { token: string }) {
                     className="ml-auto text-xs text-zinc-600 hover:text-zinc-400 transition">Deselect</button>
                 </div>
 
-                {/* Full scene player */}
-                <video
-                  key={sceneClips[activeScene]?.url}
-                  src={sceneClips[activeScene]?.url}
-                  controls
-                  className="w-full rounded-xl bg-black"
-                  style={{ maxHeight: 260 }}
-                />
+                {/* Full scene player — find by index not array position */}
+                {(() => {
+                  const platform = (project?.platform || '').toLowerCase();
+                  const isPortrait = platform.includes('tiktok') || platform.includes('shorts') ||
+                    platform.includes('reels') || platform.includes('snapchat') || platform.includes('pinterest');
+                  const activeClip = sceneClips.find(c => c.index === activeScene);
+                  if (!activeClip?.url) return null;
+                  return (
+                    <video
+                      key={activeClip.url}
+                      src={activeClip.url}
+                      controls
+                      className="w-full rounded-xl bg-black"
+                      style={{ maxHeight: isPortrait ? 400 : 260, objectFit: 'contain' }}
+                    />
+                  );
+                })()}
 
                 {/* Existing notes on this scene */}
                 {comments.filter(c => c.scene_index === activeScene).length > 0 && (
@@ -445,7 +476,7 @@ export default function ClientReview({ token }: { token: string }) {
         </div>
 
         <p className="text-center text-zinc-600 text-xs">
-          Powered by SceneForge · sceneraforge.com
+          Powered by SceneForge · scenraforge.com
         </p>
       </div>
     </div>
