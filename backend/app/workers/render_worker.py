@@ -62,13 +62,70 @@ async def render_video(ctx, job_id: str, payload: dict):
             pct = 5 + int((done / total) * 35)
             await _set_progress(redis, job_id, f"Voice {done}/{total}...", pct)
 
-        if req.uploaded_voice_path:
+        # Check if any scene has a custom voice clip
+        has_per_scene_voice = any(
+            getattr(s, "custom_voice_url", None) for s in req.scenes
+        )
+
+        if req.uploaded_voice_path and not has_per_scene_voice:
+            # Legacy: single uploaded voiceover for the whole video
             await _set_progress(redis, job_id, "Splitting uploaded voice...", 8)
             audio_files = await split_audio_by_scenes(
                 audio_path=req.uploaded_voice_path,
                 scenes=req.scenes,
                 output_dir=str(output_dir),
             )
+        elif has_per_scene_voice:
+            # Per-scene custom voice clips — download each and use directly
+            # Scenes without a custom clip get synthesised via TTS
+            await _set_progress(redis, job_id, "Preparing voice clips...", 8)
+            import httpx as _httpx
+            audio_files = []
+            scenes_needing_tts = []
+            tts_indices = []
+
+            for i, scene in enumerate(req.scenes):
+                voice_url = getattr(scene, "custom_voice_url", None)
+                if voice_url:
+                    # Download the processed voice clip
+                    clip_path = str(output_dir / f"scene_{i+1:02d}_custom_voice.mp3")
+                    try:
+                        async with _httpx.AsyncClient(timeout=30) as client:
+                            resp = await client.get(voice_url, follow_redirects=True)
+                            resp.raise_for_status()
+                        with open(clip_path, "wb") as fh:
+                            fh.write(resp.content)
+                        # Use custom_voice_duration to update scene duration
+                        custom_dur = getattr(scene, "custom_voice_duration", None)
+                        if custom_dur and custom_dur > 0:
+                            # Adjust scene duration to match voice clip (ceil to int, min 1)
+                            import math
+                            scene.__dict__["duration"] = max(1, math.ceil(custom_dur))
+                        audio_files.append(clip_path)
+                        logger.info("Custom voice ✓ scene %s → %.1fs", i+1, custom_dur or 0)
+                    except Exception as e:
+                        logger.warning("Custom voice download failed scene %s: %s — falling back to TTS", i+1, e)
+                        audio_files.append(None)
+                        scenes_needing_tts.append((i, scene))
+                        tts_indices.append(i)
+                else:
+                    audio_files.append(None)
+                    scenes_needing_tts.append((i, scene))
+                    tts_indices.append(i)
+
+            # Synthesise TTS for scenes without custom voice
+            if scenes_needing_tts:
+                tts_scenes = [s for _, s in scenes_needing_tts]
+                tts_paths = await synthesize_all_scenes(
+                    scenes=tts_scenes,
+                    voice_name=req.voice_name,
+                    output_dir=str(output_dir),
+                    speed=req.voice_speed,
+                    stability=req.voice_stability if hasattr(req, "voice_stability") else "medium",
+                    on_progress=voice_progress,
+                )
+                for idx, (i, _) in enumerate(scenes_needing_tts):
+                    audio_files[i] = tts_paths[idx]
         else:
             audio_files = await synthesize_all_scenes(
                 scenes=req.scenes,
