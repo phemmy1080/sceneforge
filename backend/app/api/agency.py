@@ -64,6 +64,17 @@ async def _require_workspace(user_id: str, redis) -> dict:
 async def _require_role(ws_id: str, user_id: str, redis,
                          allowed: tuple = ("owner", "admin", "editor")):
     role = await svc.get_member_role(redis, ws_id, user_id)
+    # Fallback: if no member key exists, check if user is the workspace owner directly
+    # This handles legacy workspaces created before member keys were consistently written
+    if not role:
+        ws_raw = await redis.get(f"workspace:{ws_id}")
+        if ws_raw:
+            import json as _j
+            ws_data = _j.loads(ws_raw)
+            if ws_data.get("owner_id") == user_id:
+                role = "owner"
+                # Repair the missing member key for future calls
+                await redis.set(f"workspace:member:{ws_id}:{user_id}", "owner")
     if role not in allowed:
         raise HTTPException(403, "Insufficient permissions")
     # Block suspended members from all mutating actions
@@ -309,7 +320,12 @@ async def get_token_usage(
     """Return the last 50 token deduction events for the workspace."""
     user = await _get_user(authorization, redis)
     ws   = await _require_workspace(user.id, redis)
-    await _require_role(ws["id"], user.id, redis, ("owner", "admin"))
+    # Check role — also allow workspace owner directly (handles legacy workspaces
+    # where the member key may not have been written for the original owner)
+    role = await svc.get_member_role(redis, ws["id"], user.id)
+    is_owner = ws.get("owner_id") == user.id
+    if role not in ("owner", "admin") and not is_owner:
+        raise HTTPException(403, "Insufficient permissions")
     usage = await svc.get_token_usage_log(redis, ws["id"], limit=50)
     return {"usage": usage, "pool_tokens": await svc.get_pool_balance(redis, ws["id"])}
 
