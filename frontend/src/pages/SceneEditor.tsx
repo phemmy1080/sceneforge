@@ -145,7 +145,19 @@ export default function SceneEditor() {
         duration: Math.max(1, Math.ceil(result.duration)),
       } as any)
     } catch (e: any) {
-      const msg = e?.response?.data?.detail || 'Voice processing failed'
+      const raw = e?.response?.data?.detail || e?.message || ''
+      let msg = 'Voice processing failed — please try again'
+      if (!raw || raw.toLowerCase().includes('network')) {
+        msg = 'Could not reach the server. Check your connection and try again.'
+      } else if (raw.toLowerCase().includes('too large') || e?.response?.status === 413) {
+        msg = 'File too large — maximum 50 MB.'
+      } else if (raw.toLowerCase().includes('invalid file') || e?.response?.status === 400) {
+        msg = 'Invalid file type. Please upload an audio file (MP3, WAV, WebM, M4A).'
+      } else if (raw.toLowerCase().includes('processing failed')) {
+        msg = 'Audio processing failed. Try a different file format or re-record.'
+      } else if (raw) {
+        msg = raw
+      }
       setVoiceError(err => ({ ...err, [sceneIdx]: msg }))
     } finally {
       setVoiceUploading(u => ({ ...u, [sceneIdx]: false }))
