@@ -1008,7 +1008,7 @@ export function ProjectDetail() {
       </div>
 
       {/* Review link card */}
-      {reviewUrl && !reviewDismissed && (() => {
+      {reviewUrl && !reviewDismissed && isAdmin && (() => {
         const clientName = project.client_name || "there";
         const projectTitle = project.title || "your video";
         const platform = project.platform ? ` on ${project.platform}` : "";
