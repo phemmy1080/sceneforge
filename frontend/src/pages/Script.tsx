@@ -5,6 +5,7 @@ import { Button, Card, Badge, LoadingState, PageHeader, ProgressBar } from '../c
 
 export default function Script() {
   const config = useStore((s) => s.config)
+  const agencyProjectId = useStore((s: any) => s.agencyProjectId)
   const selectedIdea = useStore((s) => s.selectedIdea)
   const script = useStore((s) => s.script)
   const wordCount = useStore((s) => s.wordCount)
