@@ -259,6 +259,20 @@ async def list_members(
     return {"members": members, "pending_invites": pending}
 
 
+
+@router.patch("/workspace/branding")
+async def update_workspace_branding(
+    data: dict,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    """Update workspace branding: logo_url, brand_color, cover_url, name."""
+    user = await _get_user(authorization, redis)
+    ws   = await _require_workspace(user.id, redis)
+    await _require_role(ws["id"], user.id, redis, ("owner", "admin"))
+    updated = await svc.update_workspace_branding(redis, ws["id"], user.id, data)
+    return {"workspace": updated}
+
 @router.post("/workspace/invite")
 async def invite_member(
     req: InviteMemberRequest,
