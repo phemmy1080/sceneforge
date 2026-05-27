@@ -103,6 +103,50 @@ async def _check_tokens(authorization: Optional[str]) -> None:
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
+async def _resolve_brand_kit(redis, authorization: Optional[str], agency_project_id: str) -> dict:
+    """
+    Given an agency project ID, look up its brand kit and return the relevant
+    fields for AI generation. Returns empty dict if anything fails (non-fatal).
+    """
+    if not agency_project_id:
+        return {}
+    try:
+        import json as _json
+        # Resolve user from token
+        token = (authorization or "").removeprefix("Bearer ").strip()
+        if not token:
+            return {}
+        user_id = auth_service.verify_token(token)
+        if not user_id:
+            return {}
+
+        # Load the agency project
+        proj_raw = await redis.get(f"agency:project:{agency_project_id}")
+        if not proj_raw:
+            return {}
+        project = _json.loads(proj_raw)
+
+        kit_id = project.get("brand_kit_id", "")
+        if not kit_id:
+            return {}
+
+        # Load the brand kit
+        kit_raw = await redis.get(f"agency:brandkit:{kit_id}")
+        if not kit_raw:
+            return {}
+        kit = _json.loads(kit_raw)
+
+        return {
+            "brand_client_name": kit.get("client_name", ""),
+            "brand_ai_tone":     kit.get("ai_tone", ""),
+            "brand_voice_notes": kit.get("brand_voice_notes", ""),
+            "brand_default_cta": kit.get("default_cta", ""),
+        }
+    except Exception as e:
+        logger.warning("Brand kit resolution failed (non-fatal): %s", e)
+        return {}
+
+
 @router.post("/ideas", response_model=GenerateIdeasResponse)
 @limiter.limit("10/minute")
 async def generate_ideas(
@@ -114,6 +158,13 @@ async def generate_ideas(
     await _check_tokens(authorization)
     try:
         plan  = await _get_user_plan(redis, authorization)
+        # Inject brand kit fields if this is an agency project
+        agency_proj_id = getattr(req, "agency_project_id", "") or ""
+        if agency_proj_id:
+            kit_fields = await _resolve_brand_kit(redis, authorization, agency_proj_id)
+            for k, v in kit_fields.items():
+                if v and not getattr(req, k, ""):
+                    setattr(req, k, v)
         ideas = await ai.generate_ideas(req, plan=plan)
 
         # Track niche usage — fire and forget
@@ -148,7 +199,14 @@ async def generate_script(
     redis=Depends(get_redis),
 ):
     try:
-        plan   = await _get_user_plan(redis, authorization)
+        plan = await _get_user_plan(redis, authorization)
+        # Inject brand kit fields if this is an agency project
+        agency_proj_id = getattr(req, "agency_project_id", "") or ""
+        if agency_proj_id:
+            kit_fields = await _resolve_brand_kit(redis, authorization, agency_proj_id)
+            for k, v in kit_fields.items():
+                if v and not getattr(req, k, ""):
+                    setattr(req, k, v)
         script = await ai.generate_script(req, plan=plan)
         word_count = len(script.split())
         estimated_duration = int(word_count / 150 * 60)
@@ -173,6 +231,13 @@ async def stream_script(
     redis=Depends(get_redis),
 ):
     plan = await _get_user_plan(redis, authorization)
+    # Inject brand kit fields if this is an agency project
+    agency_proj_id = getattr(req, "agency_project_id", "") or ""
+    if agency_proj_id:
+        kit_fields = await _resolve_brand_kit(redis, authorization, agency_proj_id)
+        for k, v in kit_fields.items():
+            if v and not getattr(req, k, ""):
+                setattr(req, k, v)
     logger.info("Streaming script via %s for plan=%s",
                 ai.get_provider_info(plan)["provider"], plan)
 
@@ -201,7 +266,14 @@ async def generate_scenes(
     redis=Depends(get_redis),
 ):
     try:
-        plan    = await _get_user_plan(redis, authorization)
+        plan = await _get_user_plan(redis, authorization)
+        # Inject brand kit fields if this is an agency project
+        agency_proj_id = getattr(req, "agency_project_id", "") or ""
+        if agency_proj_id:
+            kit_fields = await _resolve_brand_kit(redis, authorization, agency_proj_id)
+            for k, v in kit_fields.items():
+                if v and not getattr(req, k, ""):
+                    setattr(req, k, v)
         scenes  = await ai.generate_scenes(req, plan=plan)
 
         # Enforce scene limit — truncate to max for free users
