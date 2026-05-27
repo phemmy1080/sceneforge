@@ -869,6 +869,37 @@ async def revoke_invite(
 
 # ── Client review links ───────────────────────────────────────────────────────
 
+
+@router.get("/projects/{proj_id}/review-link")
+async def get_current_review_link(
+    proj_id: str,
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    """Return the current active review link for a project, if one exists."""
+    user = await _get_user(authorization, redis)
+    ws   = await _require_workspace(user.id, redis)
+    project = await svc.get_project(redis, proj_id)
+    if not project or project["ws_id"] != ws["id"]:
+        raise HTTPException(404, "Project not found")
+
+    token = project.get("latest_review_token", "")
+    if not token:
+        return {"review_url": None, "status": None, "token": None}
+
+    review = await svc.get_review_link(redis, token)
+    if not review:
+        # Token expired or not found
+        return {"review_url": None, "status": "expired", "token": None}
+
+    review_url = f"https://scenraforge.com/review/{token}"
+    return {
+        "review_url": review_url,
+        "status":     review.get("status", "pending"),
+        "token":      token,
+        "expires_at": review.get("expires_at"),
+    }
+
 @router.post("/projects/{proj_id}/review-link")
 async def create_review_link(
     proj_id: str,
