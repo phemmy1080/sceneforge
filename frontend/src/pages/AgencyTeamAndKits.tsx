@@ -15,6 +15,7 @@ interface BrandKit {
   subtitle_style: string; ai_tone: string; default_cta: string;
   font: string; brand_voice_notes: string;
   intro_url: string; outro_url: string; watermark_position: string;
+  watermark_opacity: number; watermark_scale: number;
 }
 interface Workspace { id: string; name: string; owner_id: string; seat_limit: number; }
 
@@ -587,6 +588,8 @@ function BrandKitForm({ kit, onSaved, onCancel }: { kit: BrandKit | null; onSave
     intro_url:          (kit as any)?.intro_url           || "",
     outro_url:          (kit as any)?.outro_url           || "",
     watermark_position: (kit as any)?.watermark_position  || "",
+    watermark_opacity:  Number((kit as any)?.watermark_opacity  ?? 0.25),
+    watermark_scale:    Number((kit as any)?.watermark_scale    ?? 0.12),
   });
   const [saving, setSaving]       = useState(false);
   const [uploading, setUploading]             = useState(false);
@@ -805,6 +808,29 @@ function BrandKitForm({ kit, onSaved, onCancel }: { kit: BrandKit | null; onSave
             </select>
             <p className={HINT}>Overlays the client logo on every video frame. Requires a logo to be set on the Identity tab.</p>
           </div>
+
+          {form.watermark_position && (<>
+            <div>
+              <label className={LBL}>Watermark opacity — {Math.round((form.watermark_opacity ?? 0.25) * 100)}%</label>
+              <input
+                type="range" min="5" max="80" step="5"
+                value={Math.round((form.watermark_opacity ?? 0.25) * 100)}
+                onChange={e => setForm(f => ({ ...f, watermark_opacity: Number(e.target.value) / 100 }))}
+                className="w-full mt-1"
+              />
+              <p className={HINT}>How visible the watermark is. 25% is subtle, 50% is clearly visible.</p>
+            </div>
+            <div>
+              <label className={LBL}>Watermark size — {Math.round((form.watermark_scale ?? 0.12) * 100)}% of frame width</label>
+              <input
+                type="range" min="5" max="30" step="1"
+                value={Math.round((form.watermark_scale ?? 0.12) * 100)}
+                onChange={e => setForm(f => ({ ...f, watermark_scale: Number(e.target.value) / 100 }))}
+                className="w-full mt-1"
+              />
+              <p className={HINT}>12% is a small corner logo. 20–25% is prominent.</p>
+            </div>
+          </>)}
         </>)}
 
         {error && <p className="text-rose-400 text-xs font-medium">{error}</p>}
