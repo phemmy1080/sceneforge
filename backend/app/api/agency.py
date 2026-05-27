@@ -40,8 +40,29 @@ async def _get_user(authorization: Optional[str], redis):
 async def _require_workspace(user_id: str, redis) -> dict:
     ws = await svc.get_user_workspace(redis, user_id)
     if not ws:
-        # Auto-create workspace if user has agency plan but no workspace yet
-        # (handles users who upgraded before auto-create was deployed)
+        # Fallback 1: scan for workspaces where this user is a member
+        # (handles editors/admins whose workspace:user: key was not written correctly)
+        try:
+            import json as _json
+            # Scan workspace:member:*:{user_id} keys to find their workspace
+            pattern = f"workspace:member:*:{user_id}"
+            member_keys = []
+            async for key in redis.scan_iter(pattern, count=100):
+                member_keys.append(key)
+            for mk in member_keys:
+                parts = mk.split(":") if isinstance(mk, str) else mk.decode().split(":")
+                if len(parts) >= 4:
+                    ws_id = parts[2]
+                    ws = await svc.get_workspace(redis, ws_id)
+                    if ws:
+                        # Repair the missing workspace:user: key
+                        await redis.set(f"workspace:user:{user_id}", ws_id)
+                        logger.info("Repaired missing workspace:user key for %s -> %s", user_id, ws_id)
+                        return ws
+        except Exception as e:
+            logger.warning("Workspace member scan failed: %s", e)
+
+        # Fallback 2: auto-create for agency plan owners
         try:
             import json as _json
             raw_user = await redis.get(f"user:{user_id}")
