@@ -115,8 +115,12 @@ export default function AgencyDashboard() {
       const detail = e.response?.data?.detail || "";
       if (e.response?.status === 403 && detail.toLowerCase().includes("suspended")) {
         setSuspendedBlocked(true);
-      } else if (e.response?.status === 403) {
+      } else if (e.response?.status === 403 && detail.toLowerCase().includes("upgrade")) {
+        // Only show SetupWorkspace if they truly have no workspace
         setError("no_workspace");
+      } else if (e.response?.status === 403) {
+        // Editor or other role — show a clear message instead of setup screen
+        setError("You don't have permission to view this dashboard. Contact your workspace owner.");
       } else {
         setError(detail || "Failed to load");
       }
