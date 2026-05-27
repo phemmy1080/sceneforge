@@ -675,7 +675,9 @@ async def submit_review_decision(redis: aioredis.Redis, token: str,
 async def add_comment(redis: aioredis.Redis, proj_id: str, author_id: str,
                       author_name: str, scene_index: Optional[int],
                       text: str, is_client: bool = False,
-                      is_scene_update: bool = False) -> dict:
+                      is_scene_update: bool = False,
+                      priority: str = "medium",
+                      deadline: Optional[str] = None) -> dict:
     comment = {
         "id":           str(uuid.uuid4()),
         "proj_id":      proj_id,
@@ -687,6 +689,8 @@ async def add_comment(redis: aioredis.Redis, proj_id: str, author_id: str,
         "is_scene_update":  is_scene_update,
         "resolved":     False,
         "created_at":   _now(),
+        "priority":     priority,    # "urgent" | "medium" | "low"
+        "deadline":     deadline,    # ISO datetime string or None
     }
     await redis.lpush(_comments_key(proj_id), json.dumps(comment))
     await redis.ltrim(_comments_key(proj_id), 0, 499)
@@ -799,24 +803,34 @@ async def get_dashboard(redis: aioredis.Redis, ws_id: str, user_id: str = "") ->
     active       = [p for p in projects if p["status"] not in ("exported",)]
     pending_appr = [p for p in projects if p["status"] == "client_review"]
 
-    # Scenes needing adjustment: projects where an unresolved scene comment exists
-    # for the projects assigned to this user
+    # ── My Tasks: unresolved scene comments on projects assigned to this user ──
     scenes_needing_review: list[dict] = []
+    my_tasks: list[dict] = []
     if user_id:
         for proj in projects:
-            # Only look at projects the editor is assigned to
             if user_id not in proj.get("assigned_to", []):
                 continue
-            # Only if project has been reviewed (has comments)
             comments_raw = await redis.lrange(_comments_key(proj["id"]), 0, -1)
             scene_comments = []
             for r in comments_raw:
                 c = json.loads(r)
                 if c.get("scene_index") is not None and not c.get("resolved", False):
-                    scene_comments.append({
+                    sc = {
                         "scene_index": c["scene_index"],
-                        "text": c.get("text", ""),
-                        "author": c.get("author_name", "Reviewer"),
+                        "text":        c.get("text", ""),
+                        "author":      c.get("author_name", "Reviewer"),
+                        "priority":    c.get("priority", "medium"),
+                        "deadline":    c.get("deadline"),
+                        "created_at":  c.get("created_at", ""),
+                        "comment_id":  c.get("id", ""),
+                    }
+                    scene_comments.append(sc)
+                    my_tasks.append({
+                        **sc,
+                        "project_id":    proj["id"],
+                        "project_title": proj.get("title", "Untitled"),
+                        "client_name":   proj.get("client_name", ""),
+                        "proj_status":   proj.get("status", ""),
                     })
             if scene_comments:
                 scenes_needing_review.append({
@@ -826,6 +840,13 @@ async def get_dashboard(redis: aioredis.Redis, ws_id: str, user_id: str = "") ->
                     "comments":      scene_comments,
                     "count":         len(scene_comments),
                 })
+    # Sort my_tasks: urgent first, then by deadline, then by created_at
+    priority_order = {"urgent": 0, "medium": 1, "low": 2}
+    my_tasks.sort(key=lambda t: (
+        priority_order.get(t.get("priority", "medium"), 1),
+        t.get("deadline") or "9999",
+        t.get("created_at", ""),
+    ))
 
     # Count scenes marked as updated (is_scene_update=True, not yet resolved)
     # Use the LATEST unresolved update per scene index — re-renders of the same
@@ -849,15 +870,21 @@ async def get_dashboard(redis: aioredis.Redis, ws_id: str, user_id: str = "") ->
                     "scene_index": idx,
                     "text":        c.get("text", ""),
                     "author":      c.get("author_name", "Editor"),
+                    "author_id":   c.get("author_id", ""),
+                    "updated_at":  c.get("created_at", ""),
+                    "priority":    c.get("priority", "medium"),
                 }
                 for idx, c in sorted(latest_by_scene.items(), key=lambda x: (x[0] is None, x[0]))
             ]
+            # Most recent update across all scenes in this project
+            latest_ts = max((s["updated_at"] for s in unique_scenes), default="")
             scenes_updated.append({
                 "project_id":    proj["id"],
                 "project_title": proj.get("title", "Untitled"),
                 "client_name":   proj.get("client_name", ""),
                 "count":         len(unique_scenes),
                 "scenes":        unique_scenes,
+                "latest_update":  latest_ts,
             })
 
     return {
@@ -870,5 +897,6 @@ async def get_dashboard(redis: aioredis.Redis, ws_id: str, user_id: str = "") ->
         "members":               members,
         "scenes_needing_review": scenes_needing_review,
         "scenes_updated":        scenes_updated,
+        "my_tasks":               my_tasks,
     }
 # cache-bust-2026-05-25-0528
