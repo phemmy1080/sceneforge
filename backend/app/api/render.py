@@ -232,6 +232,7 @@ class RenderSceneRequest(BaseModel):
     scene: Optional[dict] = None          # updated scene fields
     visual_source: Optional[str] = None
     custom_image_url: Optional[str] = None
+    custom_voice_url: Optional[str] = None  # user-uploaded/recorded voice clip
     voice_name: Optional[str] = None
     voice_speed: Optional[float] = None
     subtitle_style: Optional[str] = None
@@ -295,13 +296,52 @@ async def rerender_scene(
             )
             is_img = visual_file.media_type == "image"
 
-            # ── Step 2: Synthesise voice ────────────────────────────────────
-            audio_path = await _synthesize_scene(
-                scene=scene,
-                voice_name=req.voice_name or "alloy",
-                output_dir=str(work_dir),
-                speed=req.voice_speed or 1.0,
+            # ── Step 2: Voice — use custom clip if available, else TTS ────────
+            # Priority: req.custom_voice_url > scene.custom_voice_url > TTS
+            _custom_voice = (
+                req.custom_voice_url
+                or getattr(scene, "custom_voice_url", None)
+                or (req.scene or {}).get("custom_voice_url")
             )
+            if _custom_voice:
+                # Download the processed voice clip
+                _voice_dl_path = str(work_dir / f"scene_{scene_index:02d}_custom.mp3")
+                try:
+                    import httpx as _hx
+                    async with _hx.AsyncClient(timeout=30) as _cl:
+                        _r = await _cl.get(_custom_voice, follow_redirects=True)
+                        _r.raise_for_status()
+                    with open(_voice_dl_path, "wb") as _f:
+                        _f.write(_r.content)
+                    audio_path = _voice_dl_path
+                    # Adjust scene duration to match voice clip
+                    _custom_dur = (
+                        getattr(scene, "custom_voice_duration", None)
+                        or (req.scene or {}).get("custom_voice_duration")
+                    )
+                    if _custom_dur and float(_custom_dur) > 0:
+                        import math as _math
+                        scene.__dict__["duration"] = max(1, _math.ceil(float(_custom_dur)))
+                    logging.getLogger(__name__).info(
+                        "Partial re-render using custom voice: %s", _custom_voice
+                    )
+                except Exception as _ve:
+                    logging.getLogger(__name__).warning(
+                        "Custom voice download failed, falling back to TTS: %s", _ve
+                    )
+                    audio_path = await _synthesize_scene(
+                        scene=scene,
+                        voice_name=req.voice_name or "Marcus",
+                        output_dir=str(work_dir),
+                        speed=req.voice_speed or 1.0,
+                    )
+            else:
+                audio_path = await _synthesize_scene(
+                    scene=scene,
+                    voice_name=req.voice_name or "Marcus",
+                    output_dir=str(work_dir),
+                    speed=req.voice_speed or 1.0,
+                )
 
             # ── Step 3: Render the single scene ────────────────────────────
             scene_out = str(work_dir / f"scene_{scene_index:02d}_new.mp4")
