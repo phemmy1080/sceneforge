@@ -485,6 +485,15 @@ export function ProjectDetail() {
       setComments(projRes.data.comments);
       // Keep agencyProjectId in sync — important for when editors navigate here
       useStore.getState().setAgencyProjectId(id || '');
+
+      // Auto-restore the current review link so owner always sees the latest link
+      // without having to regenerate after editor fixes scenes
+      try {
+        const rlRes = await api.get(`/api/agency/projects/${id}/review-link`);
+        if (rlRes.data?.review_url && rlRes.data?.status !== 'expired') {
+          setReviewUrl(rlRes.data.review_url);
+        }
+      } catch { /* non-fatal */ }
       // Only editors/admins can be assigned — not clients
       const eligible = (membersRes.data.members || []).filter(
         (m: Member) => m.role === 'editor' || m.role === 'admin' || m.role === 'owner'
