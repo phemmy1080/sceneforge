@@ -85,17 +85,47 @@ async def _require_workspace(user_id: str, redis) -> dict:
 async def _require_role(ws_id: str, user_id: str, redis,
                          allowed: tuple = ("owner", "admin", "editor")):
     role = await svc.get_member_role(redis, ws_id, user_id)
-    # Fallback: if no member key exists, check if user is the workspace owner directly
-    # This handles legacy workspaces created before member keys were consistently written
+
     if not role:
+        import json as _j
+        # Fallback A: check if user is the workspace owner via workspace record
         ws_raw = await redis.get(f"workspace:{ws_id}")
         if ws_raw:
-            import json as _j
             ws_data = _j.loads(ws_raw)
             if ws_data.get("owner_id") == user_id:
                 role = "owner"
-                # Repair the missing member key for future calls
                 await redis.set(f"workspace:member:{ws_id}:{user_id}", "owner")
+                logger.info("Repaired missing member key (owner) for %s in ws %s", user_id, ws_id)
+
+    if not role:
+        # Fallback B: scan invite records to find what role this user was invited as
+        # Handles editors/admins whose workspace:member: key was never written on invite accept
+        try:
+            import json as _j
+            async for key in redis.scan_iter(f"workspace:invite:*", count=200):
+                raw = await redis.get(key)
+                if not raw:
+                    continue
+                inv = _j.loads(raw) if isinstance(raw, str) else _j.loads(raw.decode())
+                if inv.get("ws_id") == ws_id and inv.get("accepted_by") == user_id:
+                    role = inv.get("role", "editor")
+                    await redis.set(f"workspace:member:{ws_id}:{user_id}", role)
+                    logger.info("Repaired missing member key (invite) for %s in ws %s role=%s", user_id, ws_id, role)
+                    break
+        except Exception as _e:
+            logger.warning("Member key repair scan failed: %s", _e)
+
+    if not role:
+        # Fallback C: check members set — if user is in the members set, default to editor
+        try:
+            in_set = await redis.sismember(f"workspace:members:{ws_id}", user_id)
+            if in_set:
+                role = "editor"
+                await redis.set(f"workspace:member:{ws_id}:{user_id}", "editor")
+                logger.info("Repaired missing member key (members set) for %s in ws %s", user_id, ws_id)
+        except Exception:
+            pass
+
     if role not in allowed:
         raise HTTPException(403, "Insufficient permissions")
     # Block suspended members from all mutating actions
