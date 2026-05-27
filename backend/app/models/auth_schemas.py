@@ -50,3 +50,6 @@ class TokenBalanceResponse(BaseModel):
     can_render: bool
     cost_per_video: int = 100      # minimum cost per video (base)
     tokens_per_scene: int = 12     # marginal cost per scene
+    renders_today: int = 0         # renders used today
+    daily_limit: int = -1          # max renders per day (-1 = unlimited)
+    renders_remaining: int = -1    # renders left today (-1 = unlimited)
