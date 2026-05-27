@@ -184,6 +184,8 @@ class AddCommentRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=2000)
     scene_index: Optional[int] = None
     is_scene_update: bool = False
+    priority: str = "medium"   # "urgent" | "medium" | "low"
+    deadline: Optional[str] = None  # ISO datetime string
 
 class ReviewDecisionRequest(BaseModel):
     decision: str   # "approved" | "changes_requested"
@@ -771,7 +773,10 @@ async def add_comment(
     role = await svc.get_member_role(redis, ws["id"], user.id)
     comment = await svc.add_comment(
         redis, proj_id, user.id, user.full_name,
-        req.scene_index, req.text, is_client=(role == "client"), is_scene_update=req.is_scene_update
+        req.scene_index, req.text, is_client=(role == "client"),
+        is_scene_update=req.is_scene_update,
+        priority=req.priority,
+        deadline=req.deadline,
     )
     await svc._log_activity(redis, ws["id"], user.id, "comment_added", {
         "proj_id": proj_id, "scene": req.scene_index
