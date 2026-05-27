@@ -947,10 +947,13 @@ async def get_review_public(token: str, redis=Depends(get_redis)):
                 import json as _jj
                 job_data = _jj.loads(raw_job)
                 if job_data.get("status") == "complete":
+                    r2 = job_data.get("r2_urls", {})
                     video_url = (
+                        # Patched video takes priority — rebuilt after a scene re-render
+                        r2.get("final_video_patched.mp4") or
                         job_data.get("video_url") or
-                        job_data.get("r2_urls", {}).get("final_video_music.mp4") or
-                        job_data.get("r2_urls", {}).get("final_video.mp4") or ""
+                        r2.get("final_video_music.mp4") or
+                        r2.get("final_video.mp4") or ""
                     )
                     if video_url:
                         break
