@@ -372,6 +372,9 @@ export function ProjectDetail() {
   const [statusOpen, setStatusOpen] = useState(false);
   const [busy, setBusy] = useState("");
   const [sceneClips, setSceneClips] = useState<SceneClip[]>([]);
+  // Ref always holds latest sceneClips so polling callback avoids stale closure
+  const sceneClipsRef = React.useRef<SceneClip[]>([]);
+  React.useEffect(() => { sceneClipsRef.current = sceneClips; }, [sceneClips]);
   // Ref stores patched scene URLs that survive any setSceneClips reset
   // jobId used for sessionStorage persistence of patched scene URLs
   const lastJobIdRef = React.useRef<string>('');
@@ -414,6 +417,63 @@ export function ProjectDetail() {
         .catch(() => {});
     }
   }, [id]);
+
+  // ── Poll for scene updates from other users (editor re-renders) ─────────────
+  // Runs every 15s while the project detail is open.
+  // Compares Redis scene_urls against current sceneClips — updates only on change.
+  useEffect(() => {
+    if (!id || isSuspended) return;
+
+    const pollInterval = setInterval(async () => {
+      const jobId = lastJobIdRef.current;
+      if (!jobId) return;
+      try {
+        const res = await api.get(`/api/render/scenes/${jobId}`);
+        const freshUrls: string[] = res.data.scene_urls || [];
+        if (freshUrls.length === 0) return;
+
+        // Compare against what we're currently showing
+        // Use module-level patches as the current source of truth
+        let hasChange = false;
+        freshUrls.forEach((url, i) => {
+          if (!url) return;
+          // Get what we're currently displaying for this index
+          const currentClip = sceneClipsRef.current.find((c: SceneClip) => c.index === i);
+          const currentBase = (currentClip?.url || '').split('?')[0];
+          const freshBase   = url.split('?')[0];
+          // New URL = a patch happened that we haven't seen yet
+          if (freshBase && freshBase !== currentBase) {
+            hasChange = true;
+            // Write to module-level Map so getClipUrl picks it up
+            _scenePatches.set(getPatchKey(jobId, i), url);
+            // Update sessionStorage
+            try {
+              const stored = JSON.parse(sessionStorage.getItem(`sf_scene_urls:${jobId}`) || '[]');
+              stored[i] = url;
+              sessionStorage.setItem(`sf_scene_urls:${jobId}`, JSON.stringify(stored));
+            } catch {}
+          }
+        });
+
+        if (hasChange) {
+          // Rebuild clips from fresh URLs, applying module-level patches
+          const clips: SceneClip[] = freshUrls.map((url, i) => ({
+            index: i,
+            url: _scenePatches.get(getPatchKey(jobId, i)) || url || '',
+            label: `Scene ${i + 1}`,
+          })).filter(c => c.url.startsWith('http'));
+          setSceneClips(clips);
+          // Also refresh comments so is_scene_update badges appear
+          api.get(`/api/agency/projects/${id}`)
+            .then(r => setComments(r.data.comments || []))
+            .catch(() => {});
+        }
+      } catch { /* non-fatal — poll silently */ }
+    }, 15000); // every 15 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [id, isSuspended]);
+
 
   async function load() {
     try {
