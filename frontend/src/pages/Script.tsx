@@ -69,7 +69,7 @@ export default function Script() {
     const finalScript = streamedText
     setScenesLoading(true)
     try {
-      const result = await generateScenes(finalScript, config.platform)
+      const result = await generateScenes(finalScript, config.platform,agencyProjectId || undefined)
       setScenes(result.scenes)
       markStepComplete('script')
       setStep('scenes')
