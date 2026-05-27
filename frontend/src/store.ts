@@ -69,6 +69,8 @@ interface AppState {
   estimatedDuration: number
   scenes: Scene[]
   activeSceneIndex: number
+  sceneHistory: Scene[][]   // undo stack — array of past scenes arrays
+  sceneHistoryIndex: number // pointer into the stack
   voiceConfig: VoiceConfig
   uploadedVoicePath: string | null
   jobId: string | null
@@ -103,6 +105,10 @@ interface AppState {
   moveScene: (from: number, to: number) => void
   deleteScene: (index: number) => void
   addScene: () => void
+  duplicateScene: (index: number) => void
+  undoScenes: () => void
+  redoScenes: () => void
+  pushSceneHistory: (scenes: Scene[]) => void
   setActiveSceneIndex: (i: number) => void
   setVoiceConfig: (cfg: Partial<VoiceConfig>) => void
   setUploadedVoicePath: (path: string | null) => void
@@ -130,6 +136,7 @@ const DEFAULT_VOICE: VoiceConfig = {
 const CLEAR_WORKFLOW = {
   ideas: [] as IdeaItem[], selectedIdea: null, script: '', wordCount: 0,
   estimatedDuration: 0, scenes: [] as Scene[], activeSceneIndex: 0,
+        sceneHistory: [], sceneHistoryIndex: -1,
   jobId: null, videoUrl: null, renderProgress: 0, renderStage: '',
   renderStatus: 'idle' as const, uploadedVoicePath: null,
   voiceConfig: DEFAULT_VOICE,
@@ -341,7 +348,8 @@ export const useStore = create<AppState>()(
         },
 
         setScenes: (scenes) => {
-          set({ scenes, activeSceneIndex: 0 })
+          // Don't push history for setScenes — it's called on load, not user edits
+          set({ scenes, activeSceneIndex: 0, sceneHistory: [scenes], sceneHistoryIndex: 0 })
           const { activeProjectId } = get()
           if (activeProjectId) {
             debounce(`scenes-${activeProjectId}`, () => {
@@ -354,11 +362,34 @@ export const useStore = create<AppState>()(
           }
         },
 
+
+        pushSceneHistory: (scenes) => set((s) => {
+          // Truncate any redo states above current pointer
+          const base = s.sceneHistory.slice(0, s.sceneHistoryIndex + 1)
+          const next = [...base, scenes].slice(-30) // keep max 30
+          return { sceneHistory: next, sceneHistoryIndex: next.length - 1 }
+        }),
+
+        undoScenes: () => set((s) => {
+          const idx = s.sceneHistoryIndex - 1
+          if (idx < 0) return s
+          return { scenes: s.sceneHistory[idx], sceneHistoryIndex: idx }
+        }),
+
+        redoScenes: () => set((s) => {
+          const idx = s.sceneHistoryIndex + 1
+          if (idx >= s.sceneHistory.length) return s
+          return { scenes: s.sceneHistory[idx], sceneHistoryIndex: idx }
+        }),
+
         updateScene: (index, patch) => {
           set((s) => {
             const scenes = [...s.scenes]
             scenes[index] = { ...scenes[index], ...patch }
-            return { scenes }
+            // Push current scenes to history before applying
+            const base = s.sceneHistory.slice(0, s.sceneHistoryIndex + 1)
+            const history = [...base, s.scenes].slice(-30)
+            return { scenes, sceneHistory: history, sceneHistoryIndex: history.length - 1 }
           })
           const { activeProjectId, scenes } = get()
           if (activeProjectId) {
@@ -373,13 +404,17 @@ export const useStore = create<AppState>()(
           const scenes = [...s.scenes]
           const [item] = scenes.splice(from, 1)
           scenes.splice(to, 0, item)
-          return { scenes, activeSceneIndex: to }
+          const base = s.sceneHistory.slice(0, s.sceneHistoryIndex + 1)
+          const history = [...base, s.scenes].slice(-30)
+          return { scenes, activeSceneIndex: to, sceneHistory: history, sceneHistoryIndex: history.length - 1 }
         }),
 
         deleteScene: (index) => set((s) => {
           if (s.scenes.length <= 1) return s
           const scenes = s.scenes.filter((_, i) => i !== index)
-          return { scenes, activeSceneIndex: Math.min(s.activeSceneIndex, scenes.length - 1) }
+          const base = s.sceneHistory.slice(0, s.sceneHistoryIndex + 1)
+          const history = [...base, s.scenes].slice(-30)
+          return { scenes, activeSceneIndex: Math.min(s.activeSceneIndex, scenes.length - 1), sceneHistory: history, sceneHistoryIndex: history.length - 1 }
         }),
 
         addScene: () => set((s) => {
@@ -388,7 +423,19 @@ export const useStore = create<AppState>()(
             visual: 'Describe what appears on screen.', duration: 5,
             type: 'main', visual_keyword: s.config.niche || 'business',
           }
-          return { scenes: [...s.scenes, newScene], activeSceneIndex: s.scenes.length }
+          const base = s.sceneHistory.slice(0, s.sceneHistoryIndex + 1)
+          const history = [...base, s.scenes].slice(-30)
+          return { scenes: [...s.scenes, newScene], activeSceneIndex: s.scenes.length, sceneHistory: history, sceneHistoryIndex: history.length - 1 }
+        }),
+
+        duplicateScene: (index) => set((s) => {
+          const original = s.scenes[index]
+          const dupe = { ...original, id: Date.now() }
+          const scenes = [...s.scenes]
+          scenes.splice(index + 1, 0, dupe)
+          const base = s.sceneHistory.slice(0, s.sceneHistoryIndex + 1)
+          const history = [...base, s.scenes].slice(-30)
+          return { scenes, activeSceneIndex: index + 1, sceneHistory: history, sceneHistoryIndex: history.length - 1 }
         }),
 
         setActiveSceneIndex: (i) => set({ activeSceneIndex: i }),
