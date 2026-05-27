@@ -95,7 +95,10 @@ export default function VoiceVisuals() {
   const estimatedCost = tokenBalance
     ? Math.max(tokenBalance.cost_per_video ?? 100, scenes.length * (tokenBalance.tokens_per_scene ?? 12))
     : 100;
-  const canRender = !tokenBalance || tokenBalance.tokens_remaining >= estimatedCost
+  const dailyExhausted = tokenBalance?.daily_limit !== undefined
+    && tokenBalance.daily_limit !== -1
+    && (tokenBalance.renders_remaining ?? 1) === 0
+  const canRender = !tokenBalance || (tokenBalance.tokens_remaining >= estimatedCost && !dailyExhausted)
 
   return (
     <div>
@@ -329,6 +332,23 @@ export default function VoiceVisuals() {
                   </div>
                 )}
                 <span className="text-[10.5px] text-white/20">Re-renders are free · Cost varies by scene count</span>
+                {/* Daily render limit for free users */}
+                {tokenBalance.daily_limit !== undefined && tokenBalance.daily_limit !== -1 && (
+                  <div className={`flex items-center justify-between text-[11.5px] mt-1 px-3 py-2 rounded-lg border ${
+                    (tokenBalance.renders_remaining ?? 0) === 0
+                      ? "bg-red-400/[0.08] border-red-400/20 text-red-400"
+                      : (tokenBalance.renders_remaining ?? 0) <= 1
+                        ? "bg-amber-400/[0.08] border-amber-400/20 text-amber-300"
+                        : "bg-white/[0.03] border-white/[0.06] text-white/40"
+                  }`}>
+                    <span>Renders today</span>
+                    <span className="font-semibold">
+                      {(tokenBalance.renders_remaining ?? 0) === 0
+                        ? "None left — resets midnight UTC"
+                        : `${tokenBalance.renders_remaining} of ${tokenBalance.daily_limit} remaining`}
+                    </span>
+                  </div>
+                )}
               </div>
             );
           })()}
