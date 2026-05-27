@@ -67,12 +67,15 @@ async def create_workspace(redis: aioredis.Redis, owner_id: str, name: str,
                            initial_tokens: int = 50_000) -> dict:
     ws_id = str(uuid.uuid4())
     ws = {
-        "id":         ws_id,
-        "name":       name,
-        "owner_id":   owner_id,
-        "plan":       "agency",
-        "seat_limit": 5,
-        "created_at": _now(),
+        "id":           ws_id,
+        "name":         name,
+        "owner_id":     owner_id,
+        "plan":         "agency",
+        "seat_limit":   5,
+        "created_at":   _now(),
+        "logo_url":     "",
+        "brand_color":  "#F59E0B",
+        "cover_url":    "",
     }
     pipe = redis.pipeline()
     pipe.set(_ws_key(ws_id), json.dumps(ws))
@@ -309,6 +312,20 @@ async def transfer_projects(redis: aioredis.Redis, ws_id: str,
     return count
 
 
+
+async def update_workspace_branding(redis: aioredis.Redis, ws_id: str, user_id: str, data: dict) -> dict:
+    """Update workspace branding fields (logo, brand_color, cover_url, name)."""
+    ws = await get_workspace(redis, ws_id)
+    if not ws:
+        raise ValueError("Workspace not found")
+    allowed = {"name", "logo_url", "brand_color", "cover_url"}
+    for k, v in data.items():
+        if k in allowed:
+            ws[k] = v
+    await redis.set(_ws_key(ws_id), json.dumps(ws))
+    await _log_activity(redis, ws_id, user_id, "workspace_branding_updated", {"fields": list(data.keys())})
+    return ws
+
 async def rename_workspace(redis: aioredis.Redis, ws_id: str,
                             owner_id: str, new_name: str) -> dict:
     """Update workspace display name."""
@@ -497,6 +514,7 @@ async def create_project(redis: aioredis.Redis, ws_id: str, creator_id: str,
         "assigned_to":  data.get("assigned_to", [creator_id]),
         "render_job_ids": [],
         "notes":        data.get("notes", ""),
+        "deadline":     data.get("deadline", ""),   # ISO datetime or ""
         "created_by":   creator_id,
         "created_at":   _now(),
         "updated_at":   _now(),
@@ -550,7 +568,7 @@ async def update_project(redis: aioredis.Redis, proj_id: str, data: dict) -> dic
     project = await get_project(redis, proj_id)
     if not project:
         raise ValueError("Project not found")
-    allowed = {"title","client_name","brand_kit_id","platform","notes","assigned_to","render_job_ids"}
+    allowed = {"title","client_name","brand_kit_id","platform","notes","assigned_to","render_job_ids","deadline"}
     for k, v in data.items():
         if k in allowed:
             project[k] = v
@@ -887,16 +905,117 @@ async def get_dashboard(redis: aioredis.Redis, ws_id: str, user_id: str = "") ->
                 "latest_update":  latest_ts,
             })
 
+    # ── Editor metrics ────────────────────────────────────────────────────────
+    import datetime as _dt_d
+    _today_str = _dt_d.date.today().isoformat()
+    editor_metrics: dict = {}
+    if user_id:
+        assigned_projs = [p for p in projects if user_id in p.get("assigned_to", [])]
+        pending_reviews = [p for p in assigned_projs if p["status"] in ("in_review", "client_review")]
+        completed_today = [
+            p for p in assigned_projs
+            if p["status"] == "exported" and p.get("updated_at", "")[:10] == _today_str
+        ]
+        overdue_tasks = [
+            t for t in my_tasks
+            if t.get("deadline") and t["deadline"] < _dt_d.datetime.now(_dt_d.timezone.utc).isoformat()
+        ]
+        editor_metrics = {
+            "assigned_projects": len(assigned_projs),
+            "pending_reviews":   len(pending_reviews),
+            "overdue_tasks":     len(overdue_tasks),
+            "completed_today":   len(completed_today),
+        }
+
+    # ── Scene counters per project ─────────────────────────────────────────────
+    # Attach flagged/total scene counts to each project in recent_projects
+    enriched_projects = []
+    for proj in projects[:10]:
+        comments_raw = await redis.lrange(_comments_key(proj["id"]), 0, -1)
+        flagged = sum(1 for r in comments_raw
+                      if not json.loads(r).get("resolved", False)
+                      and json.loads(r).get("scene_index") is not None)
+        approved = sum(1 for r in comments_raw
+                       if json.loads(r).get("resolved", False)
+                       and json.loads(r).get("scene_index") is not None)
+        # total scenes from last render job
+        total_scenes = 0
+        job_ids = proj.get("render_job_ids", [])
+        if job_ids:
+            scenes_raw = await redis.get(f"job:{job_ids[-1]}:scene_urls")
+            if scenes_raw:
+                try:
+                    total_scenes = len(json.loads(scenes_raw))
+                except Exception:
+                    pass
+        enriched = dict(proj)
+        enriched["scene_counts"] = {
+            "total":    total_scenes,
+            "flagged":  flagged,
+            "approved": approved,
+        }
+        # Project health warnings
+        health: list[str] = []
+        if flagged > 0:
+            health.append(f"{flagged} flagged scene{'s' if flagged != 1 else ''}")
+        # Pending approval >48h
+        if proj["status"] == "client_review":
+            updated = proj.get("updated_at", "")
+            if updated:
+                try:
+                    updated_dt = _dt_d.datetime.fromisoformat(updated)
+                    age_h = (_dt_d.datetime.now(_dt_d.timezone.utc) - updated_dt).total_seconds() / 3600
+                    if age_h > 48:
+                        health.append("Pending approval >48h")
+                except Exception:
+                    pass
+        # Missing brand assets
+        bk_id = proj.get("brand_kit_id", "")
+        if bk_id:
+            bk_raw = await redis.get(f"agency:brandkit:{bk_id}")
+            if bk_raw:
+                bk = json.loads(bk_raw)
+                if not bk.get("logo_url"):
+                    health.append("Brand kit missing logo")
+        # Overdue project deadline
+        deadline = proj.get("deadline", "")
+        if deadline and deadline < _dt_d.datetime.now(_dt_d.timezone.utc).isoformat():
+            health.append("Project overdue")
+        enriched["health"] = health
+        enriched_projects.append(enriched)
+
+    # ── Recently updated scenes — flat chronological feed ─────────────────────
+    recent_scene_updates: list[dict] = []
+    for proj in projects[:8]:
+        job_ids = proj.get("render_job_ids", [])
+        if not job_ids:
+            continue
+        comments_raw = await redis.lrange(_comments_key(proj["id"]), 0, -1)
+        for r in comments_raw:
+            c = json.loads(r)
+            if c.get("is_scene_update") and not c.get("resolved", False):
+                recent_scene_updates.append({
+                    "project_id":    proj["id"],
+                    "project_title": proj.get("title", "Untitled"),
+                    "scene_index":   c.get("scene_index"),
+                    "text":          c.get("text", "Scene updated"),
+                    "author":        c.get("author_name", "Editor"),
+                    "updated_at":    c.get("created_at", ""),
+                })
+    recent_scene_updates.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
+
     return {
         "active_projects":       len(active),
         "pending_approvals":     len(pending_appr),
         "team_members":          len(members),
         "pool_tokens":           pool,
-        "recent_projects":       projects[:5],
+        "recent_projects":       enriched_projects,
         "recent_activity":       activity[:10],
         "members":               members,
         "scenes_needing_review": scenes_needing_review,
         "scenes_updated":        scenes_updated,
-        "my_tasks":               my_tasks,
+        "my_tasks":              my_tasks,
+        "editor_metrics":        editor_metrics,
+        "recent_scene_updates":  recent_scene_updates[:20],
     }
 # cache-bust-2026-05-25-0528
