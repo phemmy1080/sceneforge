@@ -105,7 +105,7 @@ export default function AgencyDashboard() {
       const [wsRes, dashRes, usageRes] = await Promise.all([
         api.get("/api/agency/workspace"),
         api.get("/api/agency/workspace/dashboard"),
-        api.get("/api/agency/workspace/token-usage").catch(() => ({ data: { usage: [] } })),
+        api.get("/api/agency/workspace/token-usage", { silent: true } as any).catch(() => ({ data: { usage: [] } })),
       ]);
       setWorkspace(wsRes.data.workspace);
       setData(dashRes.data);
