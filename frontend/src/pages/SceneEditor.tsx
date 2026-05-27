@@ -30,12 +30,19 @@ export default function SceneEditor() {
   const moveScene = useStore((s) => s.moveScene)
   const deleteScene = useStore((s) => s.deleteScene)
   const addScene = useStore((s) => s.addScene)
+  const duplicateScene = useStore((s: any) => s.duplicateScene)
+  const undoScenes = useStore((s: any) => s.undoScenes)
+  const redoScenes = useStore((s: any) => s.redoScenes)
+  const sceneHistoryIndex = useStore((s: any) => s.sceneHistoryIndex)
+  const sceneHistory = useStore((s: any) => s.sceneHistory)
   const { canAddScene, scenesRemaining, maxScenes, isFree } = usePlanLimits()
   const setStep = useStore((s) => s.setStep)
   const markStepComplete = useStore((s) => s.markStepComplete)
 
   const [visualResults, setVisualResults] = useState<VisualResult[]>([])
   const [visualLoading, setVisualLoading] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [previewing, setPreviewing] = useState(false)
 
   // Review notes from agency project comments
   const [reviewNotes, setReviewNotes] = useState<ReviewNote[]>([])
@@ -69,6 +76,52 @@ export default function SceneEditor() {
       .catch(() => {})
       .finally(() => setNotesLoading(false))
   }, [agencyProjectId])
+
+  // Keyboard shortcuts: Ctrl/Cmd+Z = undo, Ctrl/Cmd+Shift+Z = redo
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const ctrl = e.ctrlKey || e.metaKey
+      if (!ctrl) return
+      // Don't fire inside text inputs / textareas
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undoScenes() }
+      if ((e.key === 'z' && e.shiftKey) || e.key === 'y') { e.preventDefault(); redoScenes() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [undoScenes, redoScenes])
+
+  // Preview a single scene using the partial re-render endpoint
+  async function previewScene() {
+    if (!activeScene || !agencyProjectId) return
+    setPreviewing(true)
+    setPreviewUrl(null)
+    try {
+      const projRes = await api.get(`/api/agency/projects/${agencyProjectId}`)
+      const jobIds: string[] = projRes.data.project?.render_job_ids || []
+      if (jobIds.length === 0) {
+        alert('No previous render found. Complete a full render first before previewing individual scenes.')
+        return
+      }
+      const lastJobId = jobIds[jobIds.length - 1]
+      // Flush current scenes to Redis first
+      await api.put(`/api/render/scenes/${lastJobId}`, { scenes: useStore.getState().scenes })
+      // Trigger partial re-render for just this scene
+      const res = await api.post(`/api/render/scenes/${lastJobId}/${activeSceneIndex}`, {
+        scene: activeScene,
+        visual_source: 'pexels_video',
+        subtitle_style: 'viral',
+        platform: useStore.getState().config?.platform || 'TikTok',
+        motion: 'auto',
+      })
+      setPreviewUrl(res.data.scene_url || res.data.video_url || null)
+    } catch (e: any) {
+      alert(e.response?.data?.detail || 'Preview failed. Try again.')
+    } finally {
+      setPreviewing(false)
+    }
+  }
 
   // Upload custom image for a scene
   async function uploadCustomImage(sceneIndex: number, file: File) {
@@ -160,6 +213,21 @@ export default function SceneEditor() {
           <Badge color="teal">{totalDuration}s total</Badge>
         </div>
         <div className="flex gap-2">
+          {/* Undo / Redo */}
+          <div className="flex items-center gap-1 mr-1">
+            <button
+              onClick={undoScenes}
+              disabled={sceneHistoryIndex <= 0}
+              title="Undo (Ctrl+Z)"
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-white/40 hover:text-white hover:bg-white/[0.07] transition disabled:opacity-25 text-sm"
+            >↩</button>
+            <button
+              onClick={redoScenes}
+              disabled={sceneHistoryIndex >= (sceneHistory?.length ?? 0) - 1}
+              title="Redo (Ctrl+Shift+Z)"
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-white/40 hover:text-white hover:bg-white/[0.07] transition disabled:opacity-25 text-sm"
+            >↪</button>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {isFree && maxScenes !== -1 && (
               <span style={{
@@ -254,6 +322,11 @@ export default function SceneEditor() {
                     title="Move down"
                   >↓</button>
                   <button
+                    onClick={(e) => { e.stopPropagation(); duplicateScene(i) }}
+                    className="w-5 h-5 bg-[#22222F] rounded text-white/40 hover:text-teal-400 text-[10px] flex items-center justify-center"
+                    title="Duplicate"
+                  >⧉</button>
+                  <button
                     onClick={(e) => { e.stopPropagation(); deleteScene(i) }}
                     className="w-5 h-5 bg-[#22222F] rounded text-red-400/60 hover:text-red-400 text-[10px] flex items-center justify-center"
                     title="Delete"
@@ -271,8 +344,45 @@ export default function SceneEditor() {
               <h3 className="font-display font-bold text-[15px] text-white">
                 Scene {activeSceneIndex + 1}
               </h3>
-              <Badge color={TYPE_COLORS[activeScene.type]}>{activeScene.type}</Badge>
+              <div className="flex items-center gap-2">
+                {agencyProjectId && (
+                  <button
+                    onClick={previewScene}
+                    disabled={previewing}
+                    title="Preview this scene — renders a quick clip without saving"
+                    className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-violet-400/15 border border-violet-400/25 text-violet-300 hover:bg-violet-400/20 transition disabled:opacity-50 flex items-center gap-1"
+                  >
+                    {previewing
+                      ? <><div className="w-2.5 h-2.5 border border-violet-400/50 border-t-transparent rounded-full animate-spin" />Previewing…</>
+                      : <>▶ Preview scene</>}
+                  </button>
+                )}
+                <Badge color={TYPE_COLORS[activeScene.type]}>{activeScene.type}</Badge>
+              </div>
             </div>
+
+            {/* Preview result */}
+            {previewUrl && (
+              <div className="mb-4 bg-violet-400/[0.06] border border-violet-400/20 rounded-xl overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-violet-400/10">
+                  <span className="text-xs font-bold text-violet-300">▶ Scene preview</span>
+                  <button onClick={() => setPreviewUrl(null)} className="text-white/25 hover:text-white/60 transition text-sm">×</button>
+                </div>
+                <div className="p-3">
+                  <video
+                    key={previewUrl}
+                    src={previewUrl}
+                    controls
+                    autoPlay
+                    className="w-full rounded-lg bg-black"
+                    style={{ maxHeight: 200, objectFit: 'contain' }}
+                  />
+                  <p className="text-[10px] text-white/25 mt-2 text-center">
+                    Preview only — click Save &amp; return to project to keep changes
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Voiceover */}
             <div className="mb-4">
