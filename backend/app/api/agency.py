@@ -300,6 +300,19 @@ async def remove_member(
 
 # ── Token pool ────────────────────────────────────────────────────────────────
 
+
+@router.get("/workspace/token-usage")
+async def get_token_usage(
+    authorization: Optional[str] = Header(None),
+    redis=Depends(get_redis),
+):
+    """Return the last 50 token deduction events for the workspace."""
+    user = await _get_user(authorization, redis)
+    ws   = await _require_workspace(user.id, redis)
+    await _require_role(ws["id"], user.id, redis, ("owner", "admin"))
+    usage = await svc.get_token_usage_log(redis, ws["id"], limit=50)
+    return {"usage": usage, "pool_tokens": await svc.get_pool_balance(redis, ws["id"])}
+
 @router.get("/workspace/tokens")
 async def get_pool_balance(
     authorization: Optional[str] = Header(None),
