@@ -78,3 +78,21 @@ def check_upload_footage(plan: str) -> bool:
 
 def get_resolution(plan: str) -> str:
     return get_limits(plan)["max_resolution"]
+
+def resolution_to_dims(resolution: str):
+    """Convert resolution string to (max_width, max_height) cap.
+    Returns None for 1080p (no cap needed — all platforms are <= 1920x1080).
+    """
+    mapping = {
+        "720p":  (1280, 720),
+        "480p":  (854,  480),
+    }
+    return mapping.get(resolution)
+
+
+def check_daily_limit(plan: str, used_today: int) -> tuple:
+    """Returns (allowed, max_daily). max_daily=-1 means unlimited."""
+    max_daily = get_limits(plan)["max_renders_per_day"]
+    if max_daily == -1:
+        return True, -1
+    return used_today < max_daily, max_daily
