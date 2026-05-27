@@ -214,17 +214,14 @@ export default function ClientReview({ token }: { token: string }) {
   const { project, review } = data;
 
   // ── Decided state ──────────────────────────────────────────────────────────
-  if (decided) return (
+  // Approved — show confirmation only, nothing more to do
+  if (decided && decision === "approved") return (
     <div className="min-h-screen bg-[#07070e] flex items-center justify-center px-4">
       <div className="text-center space-y-4 max-w-sm">
-        <div className="text-6xl">{decision === "approved" ? "✅" : "📝"}</div>
-        <h1 className="text-white text-xl font-bold">
-          {decision === "approved" ? "Video approved!" : "Changes requested"}
-        </h1>
+        <div className="text-6xl">&#x2705;</div>
+        <h1 className="text-white text-xl font-bold">Video approved!</h1>
         <p className="text-zinc-400 text-sm">
-          {decision === "approved"
-            ? "The agency has been notified and will export your video shortly."
-            : "The agency has been notified and will make the revisions."}
+          The agency has been notified and will export your video shortly.
         </p>
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-left">
           <div className="text-xs text-zinc-500 mb-1">Project</div>
@@ -234,6 +231,7 @@ export default function ClientReview({ token }: { token: string }) {
       </div>
     </div>
   );
+  // Changes requested -- fall through to full review UI with a notice banner
 
   // ── Main review UI ─────────────────────────────────────────────────────────
   return (
@@ -253,7 +251,22 @@ export default function ClientReview({ token }: { token: string }) {
 
       <div className="max-w-3xl mx-auto px-5 py-6 space-y-6">
 
-        {/* ── Full video ── */}
+        {/* Changes requested notice */}
+        {decided && decision === "changes_requested" && (
+          <div className="bg-amber-400/10 border border-amber-400/25 rounded-2xl px-5 py-4 flex items-start gap-3">
+            <div className="text-xl flex-shrink-0">&#x1F4DD;</div>
+            <div>
+              <div className="text-sm font-bold text-amber-300">Your change request has been received</div>
+              <p className="text-xs text-white/50 mt-1 leading-relaxed">
+                The agency is working on your requested revisions.
+                You can still watch the current version below.
+                You will receive a new review link once the changes are ready.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Full video */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
           {(() => {
             const plat = (project?.platform || '').toLowerCase();
@@ -406,8 +419,8 @@ export default function ClientReview({ token }: { token: string }) {
           />
         </div>
 
-        {/* Approval section */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-4">
+        {/* Approval section -- hidden once client has already submitted a decision */}
+        {!decided && <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-4">
           <div className="font-semibold text-sm">Your decision</div>
           <textarea
             rows={3}
@@ -432,7 +445,7 @@ export default function ClientReview({ token }: { token: string }) {
               ✎ Request changes
             </button>
           </div>
-        </div>
+        </div>}
 
         {/* Comments */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
