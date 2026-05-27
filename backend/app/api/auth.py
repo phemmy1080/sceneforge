@@ -143,12 +143,31 @@ async def get_tokens(
         pass  # fall through to personal balance
 
     bal = await auth_service.get_token_balance(redis, user_id)
+
+    # Daily render usage for free plan users
+    import datetime as _dt
+    from app.services.plans import get_limits as _get_limits
+    import json as _j2
+    _raw_user2 = await redis.get(f"user:{user_id}")
+    _plan2 = "free"
+    if _raw_user2:
+        _plan2 = _j2.loads(_raw_user2).get("plan", "free")
+    _limits2 = _get_limits(_plan2)
+    _daily_max = _limits2["max_renders_per_day"]
+    _today2 = _dt.date.today().isoformat()
+    _daily_raw = await redis.get(f"renders:daily:{user_id}:{_today2}")
+    _used_today = int(_daily_raw) if _daily_raw else 0
+    _remaining = (-1 if _daily_max == -1 else max(0, _daily_max - _used_today))
+
     return TokenBalanceResponse(
         tokens_remaining=bal["tokens_remaining"],
         tokens_total=bal["tokens_total"],
         videos_created=bal["videos_created"],
         can_render=bal["tokens_remaining"] >= 100,
         is_agency=False,
+        renders_today=_used_today,
+        daily_limit=_daily_max,
+        renders_remaining=_remaining,
     )
 
 
