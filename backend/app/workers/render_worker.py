@@ -201,16 +201,24 @@ async def render_video(ctx, job_id: str, payload: dict):
                 # 3. Overlay logo watermark
                 logo_url   = brand_kit.get("logo_url", "").strip()
                 wm_pos     = brand_kit.get("watermark_position", "").strip()
+                wm_opacity = float(brand_kit.get("watermark_opacity", 0.25) or 0.25)
+                wm_scale   = float(brand_kit.get("watermark_scale",   0.12) or 0.12)
                 if logo_url and wm_pos and current_final and os.path.exists(current_final):
                     wm_out = str(Path(out_dir) / "final_with_watermark.mp4")
                     current_final = await overlay_logo_watermark(
                         current_final, logo_url, wm_pos, wm_out,
-                        opacity=0.25, scale=0.12
+                        opacity=wm_opacity, scale=wm_scale,
                     )
+
+                # Track what was applied for logging + error surfacing
+                applied = {
+                    "intro":     bool(intro_url),
+                    "outro":     bool(outro_url),
+                    "watermark": bool(logo_url and wm_pos),
+                }
 
                 # Update result with brand-kitted final path
                 if current_final != (result.get("final_path") or result.get("output_path", "")):
-                    # Rename to the expected final filename
                     final_name = str(Path(out_dir) / "final_video.mp4")
                     if current_final != final_name:
                         import shutil
@@ -218,9 +226,25 @@ async def render_video(ctx, job_id: str, payload: dict):
                         current_final = final_name
                     result["final_path"] = current_final
                     logger.info("Brand kit applied — intro=%s outro=%s watermark=%s",
-                                bool(intro_url), bool(outro_url), bool(wm_pos))
+                                applied["intro"], applied["outro"], applied["watermark"])
+
+                # Store brand kit application status on the job so UI can surface issues
+                await redis.set(
+                    f"job:{job_id}:brand_kit_applied",
+                    json.dumps(applied),
+                    ex=86400 * 7,
+                )
         except Exception as e:
             logger.warning("Brand kit application failed (non-fatal): %s", e)
+            # Store failure so UI can warn the owner
+            try:
+                await redis.set(
+                    f"job:{job_id}:brand_kit_error",
+                    str(e),
+                    ex=86400 * 7,
+                )
+            except Exception:
+                pass
 
         # ── Stage 4: CapCut draft ─────────────────────────────────────────────
         await _set_progress(redis, job_id, "Generating CapCut package...", 88)
