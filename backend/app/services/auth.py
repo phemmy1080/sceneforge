@@ -170,8 +170,26 @@ async def get_user_out_with_workspace(redis: aioredis.Redis, user_id: str,
     user_out = _user_out(data)
     try:
         ws_id_raw = await redis.get(f"workspace:user:{user_id}")
+        ws_id = None
+
         if ws_id_raw:
             ws_id = ws_id_raw if isinstance(ws_id_raw, str) else ws_id_raw.decode()
+        else:
+            # Fallback: scan workspace:member:*:{user_id} to find their workspace
+            # This repairs editors/admins whose workspace:user: key was never written
+            import re as _re
+            async for key in redis.scan_iter(f"workspace:member:*:{user_id}", count=100):
+                key_str = key if isinstance(key, str) else key.decode()
+                parts = key_str.split(":")
+                # key format: workspace:member:{ws_id}:{user_id}
+                if len(parts) == 4:
+                    ws_id = parts[2]
+                    # Repair the missing key so next login works without the scan
+                    await redis.set(f"workspace:user:{user_id}", ws_id)
+                    logger.info("Repaired workspace:user key for user %s -> ws %s", user_id, ws_id)
+                    break
+
+        if ws_id:
             role_raw = await redis.get(f"workspace:member:{ws_id}:{user_id}")
             role = (role_raw if isinstance(role_raw, str) else role_raw.decode()) if role_raw else None
             user_out.workspace_id   = ws_id
