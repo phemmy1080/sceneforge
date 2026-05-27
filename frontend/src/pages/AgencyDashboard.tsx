@@ -7,6 +7,17 @@ import { SuspendedScreen } from './AgencyProjects';
 interface Project {
   id: string; title: string; client_name: string;
   platform: string; status: string; updated_at: string;
+  deadline?: string;
+  scene_counts?: { total: number; flagged: number; approved: number };
+  health?: string[];
+}
+interface Workspace {
+  id: string; name: string; owner_id: string; plan: string;
+  logo_url?: string; brand_color?: string; cover_url?: string;
+}
+interface EditorMetrics {
+  assigned_projects: number; pending_reviews: number;
+  overdue_tasks: number; completed_today: number;
 }
 interface Member {
   user_id: string; name: string; email: string; role: string; initials: string;
@@ -40,6 +51,11 @@ interface DashboardData {
   scenes_needing_review?: SceneReview[];
   scenes_updated?: SceneReview[];
   my_tasks?: MyTask[];
+  editor_metrics?: EditorMetrics;
+  recent_scene_updates?: {
+    project_id: string; project_title: string; scene_index: number;
+    text: string; author: string; updated_at: string;
+  }[];
 }
 
 const STATUS: Record<string, { label: string; color: string; dot: string }> = {
@@ -113,6 +129,9 @@ export default function AgencyDashboard() {
   const [usageOpen, setUsageOpen] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [polling, setPolling] = useState(false);
+  const [brandingOpen, setBrandingOpen] = useState(false);
+  const [brandForm, setBrandForm] = useState({ logo_url: "", brand_color: "#F59E0B", cover_url: "", name: "" });
+  const [brandSaving, setBrandSaving] = useState(false);
   const [loading, setLoading] = useState(!!(currentUser?.workspace_suspended));
   const [error, setError] = useState("");
   // Derive immediately from cached user — no API round-trip needed
@@ -144,6 +163,17 @@ export default function AgencyDashboard() {
   }, [currentUser?.workspace_suspended]);
 
   // Silent background refresh — used by the 30s polling interval
+
+  async function saveBranding() {
+    setBrandSaving(true);
+    try {
+      const res = await api.patch("/api/agency/workspace/branding", brandForm);
+      setWorkspace(res.data.workspace);
+      setBrandingOpen(false);
+    } catch { /* non-fatal */ }
+    finally { setBrandSaving(false); }
+  }
+
   async function silentRefresh() {
     if (polling) return; // skip if already refreshing
     try {
@@ -168,6 +198,8 @@ export default function AgencyDashboard() {
         api.get("/api/agency/workspace/token-usage", { silent: true } as any).catch(() => ({ data: { usage: [] } })),
       ]);
       setWorkspace(wsRes.data.workspace);
+      const ws = wsRes.data.workspace;
+      setBrandForm({ logo_url: ws.logo_url || "", brand_color: ws.brand_color || "#F59E0B", cover_url: ws.cover_url || "", name: ws.name || "" });
       setData(dashRes.data);
       setUsageLog(usageRes.data.usage || []);
       setLastUpdated(new Date());
@@ -232,6 +264,78 @@ export default function AgencyDashboard() {
       </div>
 
       {/* Stats */}
+      {/* ── Workspace branding header ── */}
+      <div className="rounded-2xl overflow-hidden border border-white/[0.08] mb-1" style={{
+        background: workspace?.brand_color ? `${workspace.brand_color}18` : "rgba(255,255,255,0.02)",
+        borderColor: workspace?.brand_color ? `${workspace.brand_color}30` : undefined,
+      }}>
+        {/* Cover banner */}
+        {workspace?.cover_url && (
+          <div className="h-16 w-full bg-cover bg-center" style={{ backgroundImage: `url(${workspace.cover_url})`, opacity: 0.6 }} />
+        )}
+        <div className="flex items-center justify-between px-5 py-4">
+          <div className="flex items-center gap-3">
+            {workspace?.logo_url ? (
+              <img src={workspace.logo_url} alt="logo" className="w-10 h-10 rounded-xl object-contain bg-white/10 p-1" />
+            ) : (
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold text-white"
+                style={{ background: workspace?.brand_color || "#F59E0B" }}>
+                {(workspace?.name || "W").slice(0, 1).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <div className="text-sm font-bold text-white">{workspace?.name || "Your Workspace"}</div>
+              <div className="text-[11px] text-white/35">Agency workspace</div>
+            </div>
+          </div>
+          {isAdminOrOwner && (
+            <button onClick={() => setBrandingOpen(o => !o)}
+              className="text-[11px] text-white/40 hover:text-white border border-white/[0.1] px-3 py-1.5 rounded-lg transition">
+              {brandingOpen ? "Done" : "Edit branding"}
+            </button>
+          )}
+        </div>
+
+        {/* Branding edit form */}
+        {brandingOpen && (
+          <div className="px-5 pb-4 border-t border-white/[0.06] pt-4 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="text-[11px] text-white/40 mb-1">Workspace name</div>
+                <input value={brandForm.name} onChange={e => setBrandForm(f => ({...f, name: e.target.value}))}
+                  className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2 text-white text-xs outline-none focus:border-white/20" />
+              </div>
+              <div>
+                <div className="text-[11px] text-white/40 mb-1">Brand colour</div>
+                <div className="flex items-center gap-2">
+                  <input type="color" value={brandForm.brand_color}
+                    onChange={e => setBrandForm(f => ({...f, brand_color: e.target.value}))}
+                    className="w-8 h-8 rounded-lg border border-white/[0.1] cursor-pointer bg-transparent" />
+                  <input value={brandForm.brand_color} onChange={e => setBrandForm(f => ({...f, brand_color: e.target.value}))}
+                    className="flex-1 bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2 text-white text-xs outline-none focus:border-white/20 font-mono" />
+                </div>
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] text-white/40 mb-1">Logo URL</div>
+              <input placeholder="https://…/logo.png" value={brandForm.logo_url}
+                onChange={e => setBrandForm(f => ({...f, logo_url: e.target.value}))}
+                className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2 text-white text-xs outline-none focus:border-white/20 font-mono" />
+            </div>
+            <div>
+              <div className="text-[11px] text-white/40 mb-1">Cover banner URL</div>
+              <input placeholder="https://…/banner.jpg" value={brandForm.cover_url}
+                onChange={e => setBrandForm(f => ({...f, cover_url: e.target.value}))}
+                className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-3 py-2 text-white text-xs outline-none focus:border-white/20 font-mono" />
+            </div>
+            <button onClick={saveBranding} disabled={brandSaving}
+              className="bg-amber-400 hover:bg-amber-300 text-black font-bold px-5 py-2 rounded-xl text-xs transition disabled:opacity-50">
+              {brandSaving ? "Saving…" : "Save branding"}
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Last updated indicator */}
       {lastUpdated && (
         <div className="flex items-center justify-end gap-2 mb-2">
@@ -243,23 +347,21 @@ export default function AgencyDashboard() {
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
-          {
-            label: isAdminOrOwner ? "Active projects" : "Assigned to me",
-            value: isAdminOrOwner
-              ? data.active_projects
-              : data.recent_projects.filter((p: any) => p.assigned_to?.includes(currentUser?.id)).length,
-            color: "text-white", bg: "from-white/[0.06]", icon: "📁"
-          },
-          { label: "Pending approvals", value: data.pending_approvals,           color: "text-amber-400",   bg: "from-amber-400/[0.08]", icon: "⏳" },
-          { label: "Team members",      value: data.team_members,                color: "text-teal-400",    bg: "from-teal-400/[0.08]",  icon: "👥" },
-          { label: "Shared tokens",     value: data.pool_tokens.toLocaleString(), color: "text-violet-300", bg: "from-violet-400/[0.08]",icon: "🪙" },
-        ].map(s => (
-          <div key={s.label}
-            className={`bg-gradient-to-br ${s.bg} to-transparent border border-white/[0.08] rounded-2xl p-4 hover:border-white/[0.14] transition-colors`}>
+        {(isAdminOrOwner ? [
+          { label: "Active projects",   value: data.active_projects,              color: "text-amber-300",  icon: "📁" },
+          { label: "Pending approvals", value: data.pending_approvals,            color: "text-violet-300", icon: "⏳" },
+          { label: "Team members",      value: data.team_members,                 color: "text-teal-300",   icon: "👥" },
+          { label: "Shared tokens",     value: data.pool_tokens.toLocaleString(), color: "text-violet-300", icon: "🪙" },
+        ] : [
+          { label: "Assigned projects", value: data.editor_metrics?.assigned_projects ?? 0, color: "text-amber-300",  icon: "📁" },
+          { label: "Pending reviews",   value: data.editor_metrics?.pending_reviews   ?? 0, color: "text-violet-300", icon: "⏳" },
+          { label: "Overdue tasks",     value: data.editor_metrics?.overdue_tasks     ?? 0, color: data.editor_metrics?.overdue_tasks ? "text-red-400" : "text-white/50", icon: "🔴" },
+          { label: "Completed today",   value: data.editor_metrics?.completed_today   ?? 0, color: "text-teal-300",   icon: "✅" },
+        ]).map((s: any) => (
+          <div key={s.label} className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-4">
             <div className="text-2xl mb-2">{s.icon}</div>
-            <div className={`text-2xl font-extrabold tracking-tight ${s.color}`}>{s.value}</div>
-            <div className="text-[11px] text-white/35 mt-1 font-medium">{s.label}</div>
+            <div className={`text-2xl font-extrabold ${s.color}`}>{s.value}</div>
+            <div className="text-[11px] text-white/35 mt-1">{s.label}</div>
           </div>
         ))}
       </div>
@@ -362,6 +464,37 @@ export default function AgencyDashboard() {
           <div>
             <div className="text-sm font-bold text-white">All caught up!</div>
             <div className="text-xs text-white/30 mt-0.5">No tasks assigned to you right now.</div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Recently updated scenes ── */}
+      {(data.recent_scene_updates?.length ?? 0) > 0 && (
+        <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl overflow-hidden mb-2">
+          <div className="px-5 py-3 border-b border-white/[0.06]">
+            <div className="text-sm font-bold text-white">Recently updated scenes</div>
+          </div>
+          <div className="divide-y divide-white/[0.04] max-h-56 overflow-y-auto">
+            {data.recent_scene_updates!.slice(0, 8).map((upd, i) => (
+              <div key={i} className="flex items-center gap-3 px-5 py-2.5 hover:bg-white/[0.02] transition cursor-pointer"
+                onClick={() => { useStore.getState().setAgencyProjectId(upd.project_id); useStore.getState().setStep('agency-detail' as any) }}>
+                <div className="w-6 h-6 rounded-lg bg-teal-400/15 border border-teal-400/20 flex items-center justify-center text-[10px] font-bold text-teal-300 flex-shrink-0">
+                  {(upd.scene_index ?? 0) + 1}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold text-white/70 truncate">
+                    {upd.project_title} — Scene {(upd.scene_index ?? 0) + 1}
+                  </div>
+                  <div className="text-[11px] text-white/35 truncate">{upd.text}</div>
+                </div>
+                <div className="flex-shrink-0 flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-full bg-violet-400/20 flex items-center justify-center text-[8px] font-bold text-violet-300">
+                    {initials(upd.author)}
+                  </div>
+                  <span className="text-[10px] text-white/25">{timeAgo(upd.updated_at)}</span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
