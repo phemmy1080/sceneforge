@@ -622,32 +622,77 @@ async def download_clip(url: str, dest: str) -> bool:
         return False
 
 
+async def _probe_video(path: str) -> dict:
+    """Return dict with width, height, codec for a video file using ffprobe."""
+    import asyncio as _asyncio, json as _json
+    try:
+        proc = await _asyncio.create_subprocess_exec(
+            "ffprobe", "-v", "quiet", "-print_format", "json",
+            "-show_streams", path,
+            stdout=_asyncio.subprocess.PIPE, stderr=_asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        data = _json.loads(stdout)
+        for s in data.get("streams", []):
+            if s.get("codec_type") == "video":
+                return {"width": s.get("width", 0), "height": s.get("height", 0), "codec": s.get("codec_name", "")}
+    except Exception:
+        pass
+    return {"width": 0, "height": 0, "codec": ""}
+
+
+async def _normalise_clip_to_match(clip_path: str, ref_path: str, output_path: str) -> str:
+    """Normalise clip to match ref video dimensions and codec. Returns output_path or clip_path on fail."""
+    ref_info  = await _probe_video(ref_path)
+    clip_info = await _probe_video(clip_path)
+    w, h = ref_info["width"], ref_info["height"]
+    if w == 0 or h == 0:
+        return clip_path   # can't probe ref — skip normalisation
+    try:
+        await run_ffmpeg([
+            "ffmpeg", "-y", "-i", clip_path,
+            "-vf", f"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:black",
+            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+            "-c:a", "aac", "-ar", "44100", "-ac", "2",
+            "-movflags", "+faststart",
+            output_path,
+        ])
+        logger.info("Clip normalised %dx%d → %dx%d", clip_info["width"], clip_info["height"], w, h)
+        return output_path
+    except Exception as e:
+        logger.warning("Clip normalisation failed: %s", e)
+        return clip_path
+
+
 async def prepend_intro(main_video: str, intro_url: str, output_path: str) -> str:
     """Prepend brand intro clip to main video. Returns output_path on success, main_video on fail."""
     intro_path = output_path.replace(".mp4", "_intro_src.mp4")
     if not await download_clip(intro_url, intro_path):
+        logger.warning("Intro clip download failed — skipping intro: %s", intro_url)
         return main_video
     concat_list = output_path.replace(".mp4", "_intro_list.txt")
+    intro_norm  = output_path.replace(".mp4", "_intro_norm.mp4")
     try:
-        # Normalise intro to match main video specs
-        intro_norm = output_path.replace(".mp4", "_intro_norm.mp4")
-        await normalize_scene(intro_path, intro_norm, platform=platform)
+        # Normalise intro to match main video dimensions
+        normed = await _normalise_clip_to_match(intro_path, main_video, intro_norm)
         with open(concat_list, "w") as f:
-            f.write(f"file '{os.path.abspath(intro_norm)}'\n")
+            f.write(f"file '{os.path.abspath(normed)}'\n")
             f.write(f"file '{os.path.abspath(main_video)}'\n")
         await run_ffmpeg([
             "ffmpeg", "-y",
             "-f", "concat", "-safe", "0", "-i", concat_list,
-            "-c", "copy", "-movflags", "+faststart",
+            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+            "-c:a", "aac", "-ar", "44100", "-ac", "2",
+            "-movflags", "+faststart",
             output_path,
         ])
         logger.info("Brand intro prepended → %s", Path(output_path).name)
         return output_path
     except Exception as e:
-        logger.warning("Intro prepend failed (non-fatal): %s", e)
+        logger.warning("Intro prepend failed: %s", e)
         return main_video
     finally:
-        for p in [intro_path, concat_list, output_path.replace(".mp4","_intro_norm.mp4")]:
+        for p in [intro_path, concat_list, intro_norm]:
             try: Path(p).unlink(missing_ok=True)
             except: pass
 
@@ -656,27 +701,31 @@ async def append_outro(main_video: str, outro_url: str, output_path: str) -> str
     """Append brand outro clip to main video. Returns output_path on success, main_video on fail."""
     outro_path = output_path.replace(".mp4", "_outro_src.mp4")
     if not await download_clip(outro_url, outro_path):
+        logger.warning("Outro clip download failed — skipping outro: %s", outro_url)
         return main_video
     concat_list = output_path.replace(".mp4", "_outro_list.txt")
+    outro_norm  = output_path.replace(".mp4", "_outro_norm.mp4")
     try:
-        outro_norm = output_path.replace(".mp4", "_outro_norm.mp4")
-        await normalize_scene(outro_path, outro_norm, platform=platform)
+        # Normalise outro to match main video dimensions
+        normed = await _normalise_clip_to_match(outro_path, main_video, outro_norm)
         with open(concat_list, "w") as f:
             f.write(f"file '{os.path.abspath(main_video)}'\n")
-            f.write(f"file '{os.path.abspath(outro_norm)}'\n")
+            f.write(f"file '{os.path.abspath(normed)}'\n")
         await run_ffmpeg([
             "ffmpeg", "-y",
             "-f", "concat", "-safe", "0", "-i", concat_list,
-            "-c", "copy", "-movflags", "+faststart",
+            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+            "-c:a", "aac", "-ar", "44100", "-ac", "2",
+            "-movflags", "+faststart",
             output_path,
         ])
         logger.info("Brand outro appended → %s", Path(output_path).name)
         return output_path
     except Exception as e:
-        logger.warning("Outro append failed (non-fatal): %s", e)
+        logger.warning("Outro append failed: %s", e)
         return main_video
     finally:
-        for p in [outro_path, concat_list, output_path.replace(".mp4","_outro_norm.mp4")]:
+        for p in [outro_path, concat_list, outro_norm]:
             try: Path(p).unlink(missing_ok=True)
             except: pass
 
