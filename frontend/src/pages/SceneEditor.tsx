@@ -113,7 +113,7 @@ export default function SceneEditor() {
         <h3 className="text-white font-bold text-base text-center mb-1">Delete Scene {confirmDeleteIndex + 1}?</h3>
         <p className="text-white/40 text-sm text-center mb-6 leading-relaxed">
           This scene will be permanently removed from your video.<br/>
-          <span className="text-white/25 text-xs">You can undo this with Ctrl+Z.</span>
+          <span className="text-white/25 text-xs">You cannot undo this.</span>
         </p>
         <div className="flex gap-3">
           <button
@@ -224,6 +224,8 @@ export default function SceneEditor() {
         subtitle_style: 'viral',
         platform: useStore.getState().config?.platform || 'TikTok',
         motion: 'auto',
+        // Pass custom voice so partial re-render uses it instead of TTS
+        custom_voice_url: (activeScene as any).custom_voice_url || null,
       })
       setPreviewUrl(res.data.scene_url || res.data.video_url || null)
     } catch (e: any) {
