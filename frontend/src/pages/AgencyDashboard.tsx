@@ -21,6 +21,12 @@ interface SceneReview {
   scenes?: { scene_index: number; text: string; author: string }[];
 }
 
+interface MyTask {
+  comment_id: string; scene_index: number; text: string; author: string;
+  priority: string; deadline?: string; created_at: string;
+  project_id: string; project_title: string; client_name: string; proj_status: string;
+}
+
 interface UsageEntry {
   user_id: string; job_id: string; tokens_used: number; scene_count: number;
   project_id: string; project_title: string; ts: string;
@@ -33,6 +39,7 @@ interface DashboardData {
   recent_projects: Project[]; recent_activity: ActivityEvent[]; members: Member[];
   scenes_needing_review?: SceneReview[];
   scenes_updated?: SceneReview[];
+  my_tasks?: MyTask[];
 }
 
 const STATUS: Record<string, { label: string; color: string; dot: string }> = {
@@ -69,6 +76,42 @@ function timeAgo(iso: string) {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
+}
+
+
+// Priority config
+const PRIORITY: Record<string, { label: string; dot: string; border: string; text: string; bg: string }> = {
+  urgent: { label: "Urgent",  dot: "🔴", border: "border-red-500/30",    text: "text-red-400",    bg: "bg-red-400/[0.06]" },
+  medium: { label: "Medium",  dot: "🟡", border: "border-amber-400/30",  text: "text-amber-300",  bg: "bg-amber-400/[0.06]" },
+  low:    { label: "Low",     dot: "🟢", border: "border-emerald-400/30",text: "text-emerald-300",bg: "bg-emerald-400/[0.06]" },
+};
+
+function deadlineLabel(deadline?: string): { label: string; urgent: boolean } | null {
+  if (!deadline) return null;
+  const diff = new Date(deadline).getTime() - Date.now();
+  const hours = diff / 3600000;
+  if (diff < 0)         return { label: "Overdue",       urgent: true };
+  if (hours < 2)        return { label: `Due in ${Math.round(hours * 60)}m`, urgent: true };
+  if (hours < 24)       return { label: `Due in ${Math.round(hours)}h`,      urgent: true };
+  const days = Math.floor(hours / 24);
+  if (days === 0)       return { label: "Due today",      urgent: true };
+  if (days === 1)       return { label: "Due tomorrow",   urgent: false };
+  return { label: `Due in ${days}d`, urgent: false };
+}
+
+function timeAgo(ts: string): string {
+  if (!ts) return "";
+  const diff = Date.now() - new Date(ts).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1)  return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+function initials(name: string): string {
+  return name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
 }
 
 export default function AgencyDashboard() {
@@ -267,40 +310,128 @@ export default function AgencyDashboard() {
         </div>
       )}
 
+      {/* ── My Tasks — visible to editors with assigned work ── */}
+      {!isAdminOrOwner && (data.my_tasks?.length ?? 0) > 0 && (
+        <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl overflow-hidden mb-2">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+            <div>
+              <div className="text-sm font-bold text-white">My Tasks</div>
+              <div className="text-xs text-white/30 mt-0.5">{data.my_tasks!.length} task{data.my_tasks!.length !== 1 ? "s" : ""} need your attention</div>
+            </div>
+            <div className="flex items-center gap-2 text-[11px]">
+              {["urgent","medium","low"].map(p => {
+                const count = data.my_tasks!.filter(t => (t.priority || "medium") === p).length;
+                if (!count) return null;
+                const pri = PRIORITY[p];
+                return <span key={p} className={`flex items-center gap-1 ${pri.text}`}>{pri.dot} {count}</span>;
+              })}
+            </div>
+          </div>
+          <div className="divide-y divide-white/[0.05]">
+            {data.my_tasks!.map((task, i) => {
+              const pri = PRIORITY[task.priority || "medium"];
+              const dl = deadlineLabel(task.deadline);
+              const ago = timeAgo(task.created_at);
+              return (
+                <div key={i} className={`flex items-start gap-3 px-5 py-3.5 ${pri.bg} hover:bg-white/[0.03] transition`}>
+                  <span className="text-sm flex-shrink-0 mt-0.5" title={pri.label}>{pri.dot}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                      <span className="text-xs font-bold text-white">{task.project_title}</span>
+                      {task.client_name && <span className="text-[11px] text-white/30">· {task.client_name}</span>}
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${pri.border} ${pri.text}`}>
+                        Scene {task.scene_index + 1}
+                      </span>
+                      {dl && (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${dl.urgent ? "bg-red-400/15 text-red-400 border border-red-400/30" : "bg-white/[0.06] text-white/40 border border-white/[0.08]"}`}>
+                          {dl.label}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-white/50 line-clamp-2">{task.text}</p>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="text-[10px] text-white/25">From {task.author} · {ago}</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { useStore.getState().setAgencyProjectId(task.project_id); useStore.getState().setStep('agency-detail' as any) }}
+                    className="flex-shrink-0 text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-amber-400/15 border border-amber-400/25 text-amber-300 hover:bg-amber-400/20 transition mt-0.5"
+                  >
+                    Fix →
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          {/* Empty state */}
+        </div>
+      )}
+      {!isAdminOrOwner && (data.my_tasks?.length ?? 0) === 0 && data !== null && (
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl px-5 py-6 mb-2 flex items-center gap-3">
+          <div className="text-2xl">✅</div>
+          <div>
+            <div className="text-sm font-bold text-white">All caught up!</div>
+            <div className="text-xs text-white/30 mt-0.5">No tasks assigned to you right now.</div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
         {/* ── Scenes updated by editors — awaiting owner/admin review ── */}
       {isAdminOrOwner && (data.scenes_updated?.length ?? 0) > 0 && (
-        <div className="bg-green-400/[0.05] border border-green-400/20 rounded-2xl p-4 mb-2">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-6 h-6 rounded-full bg-green-400/15 flex items-center justify-center text-sm">↻</div>
-            <div className="text-sm font-bold text-green-300">
-              {data.scenes_updated!.reduce((t, p) => t + p.count, 0)} updated scene{data.scenes_updated!.reduce((t, p) => t + p.count, 0) !== 1 ? 's' : ''} awaiting your review
+        <div className="bg-green-400/[0.05] border border-green-400/20 rounded-2xl overflow-hidden mb-2">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-green-400/10">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-green-400/15 flex items-center justify-center text-xs font-bold text-green-300">
+                {data.scenes_updated!.reduce((t, p) => t + p.count, 0)}
+              </div>
+              <span className="text-sm font-bold text-green-300">Scenes awaiting your review</span>
             </div>
           </div>
-          <div className="space-y-2">
-            {data.scenes_updated!.map(proj => (
-              <div key={proj.project_id} className="bg-white/[0.04] border border-white/[0.07] rounded-xl p-3">
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <div>
-                    <span className="text-xs font-semibold text-white">{proj.project_title}</span>
-                    {proj.client_name && <span className="text-xs text-white/35 ml-1.5">· {proj.client_name}</span>}
-                  </div>
-                  <span className="text-[11px] bg-green-400/15 text-green-300 border border-green-400/20 px-2 py-0.5 rounded-full font-medium flex-shrink-0">
-                    {proj.count} scene{proj.count !== 1 ? 's' : ''} updated
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  {proj.scenes?.slice(0, 3).map((s: any, i: number) => (
-                    <div key={i} className="flex items-start gap-1.5 text-[11px] text-white/45">
-                      <span className="text-green-400/60 flex-shrink-0">Scene {s.scene_index + 1}:</span>
-                      <span className="line-clamp-1">{s.text}</span>
+          {/* Scene rows */}
+          <div className="divide-y divide-white/[0.05]">
+            {data.scenes_updated!.flatMap(proj =>
+              (proj.scenes ?? []).slice(0, 4).map((s: any, i: number) => {
+                const pri = PRIORITY[s.priority || "medium"];
+                const member = data.members?.find((m: any) => m.user_id === s.author_id);
+                const ago = timeAgo(s.updated_at || "");
+                return (
+                  <div key={`${proj.project_id}-${i}`} className={`flex items-start gap-3 px-4 py-3 ${pri.bg} hover:bg-white/[0.03] transition`}>
+                    {/* Priority dot */}
+                    <span className="text-sm flex-shrink-0 mt-0.5" title={pri.label}>{pri.dot}</span>
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                        <span className="text-xs font-bold text-white">{proj.project_title}</span>
+                        {proj.client_name && <span className="text-[11px] text-white/30">· {proj.client_name}</span>}
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${pri.border} ${pri.text}`}>
+                          Scene {s.scene_index + 1}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-white/50 line-clamp-1">{s.text || "Scene updated"}</p>
                     </div>
-                  ))}
-                  {(proj.scenes?.length ?? 0) > 3 && <div className="text-[11px] text-white/30">+{proj.scenes!.length - 3} more</div>}
-                </div>
-              </div>
-            ))}
+                    {/* Meta + actions */}
+                    <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                      <div className="flex items-center gap-1.5">
+                        {/* Editor avatar */}
+                        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-[9px] font-bold text-white" title={s.author}>
+                          {initials(s.author || "?")}
+                        </div>
+                        {ago && <span className="text-[10px] text-white/25">{ago}</span>}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => { useStore.getState().setAgencyProjectId(proj.project_id); useStore.getState().setStep('agency-detail' as any) }}
+                          className="text-[10px] font-semibold px-2 py-0.5 rounded bg-white/[0.08] border border-white/[0.10] text-white/60 hover:text-white hover:bg-white/[0.12] transition"
+                        >Fix →</button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       )}
@@ -438,18 +569,38 @@ export default function AgencyDashboard() {
             <div className="overflow-y-auto max-h-52">
               {data.recent_activity.length === 0 ? (
                 <div className="py-8 text-center text-white/20 text-xs">No activity yet</div>
-              ) : data.recent_activity.map(ev => (
-                <div key={ev.id} className="flex items-start gap-2.5 px-4 py-2.5 border-b border-white/[0.04] last:border-0">
-                  <div className="w-1.5 h-1.5 rounded-full bg-amber-400/50 mt-1.5 flex-shrink-0" />
-                  <div className="min-w-0">
-                    <div className="text-[11.5px] text-white/55 leading-snug">
-                      {ACTION_LABEL[ev.action] || ev.action}
-                      {ev.detail?.title && <span className="text-white/30"> — {ev.detail.title}</span>}
+              ) : data.recent_activity.map((ev, i) => {
+                const member = data.members?.find((m: any) => m.user_id === ev.detail?.user_id || m.user_id === ev.id);
+                const memberName = member?.name || ev.detail?.email || "Team member";
+                const ini = initials(memberName);
+                const actionIcons: Record<string,string> = {
+                  comment_added: "💬", project_created: "✨", member_joined: "👋",
+                  project_status_changed: "🔄", review_link_created: "🔗",
+                  render_complete: "🎬", client_approved: "✅", client_changes_requested: "📝",
+                  scene_rerendered: "↻", brand_kit_created: "🎨", workspace_created: "🏢",
+                };
+                const icon = actionIcons[ev.action] || "•";
+                return (
+                  <div key={ev.id || i} className="flex items-start gap-3 px-4 py-3 border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition">
+                    {/* Member avatar */}
+                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500/60 to-indigo-600/60 flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0 mt-0.5">
+                      {ini}
                     </div>
-                    <div className="text-[10px] text-white/20 mt-0.5">{timeAgo(ev.ts)}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[11.5px] text-white/60 leading-snug">
+                        <span className="mr-1">{icon}</span>
+                        <span className="font-semibold text-white/80">{memberName}</span>
+                        {" "}{(ACTION_LABEL[ev.action] || ev.action).toLowerCase()}
+                        {ev.detail?.title && <span className="text-white/30"> — {ev.detail.title}</span>}
+                        {ev.detail?.scene !== undefined && ev.detail?.scene !== null && (
+                          <span className="text-white/30"> · Scene {Number(ev.detail.scene) + 1}</span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-white/20 mt-0.5">{timeAgo(ev.ts)}</div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
