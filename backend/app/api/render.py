@@ -4,7 +4,7 @@ import logging
 from typing import Optional
 from pydantic import BaseModel
 
-from fastapi import APIRouter, HTTPException, Header, Request
+from fastapi import APIRouter, HTTPException, Header, Request, UploadFile, File, Form
 
 from app.config import get_settings
 from app.models.schemas import RenderRequest, RenderJobResponse, JobStatusResponse
@@ -429,7 +429,6 @@ async def process_voice_upload(
     - Loudness normalisation (-14 LUFS)
     - Fade in/out (50ms / 80ms)
     """
-    from fastapi import UploadFile, File, Form
     from app.services.voice_processing import process_and_upload
 
     redis = await _get_redis()
