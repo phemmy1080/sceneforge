@@ -330,12 +330,76 @@ async def get_pool_balance(redis: aioredis.Redis, ws_id: str) -> int:
     return int(val) if val else 0
 
 
-async def deduct_pool_tokens(redis: aioredis.Redis, ws_id: str, amount: int) -> int:
+async def deduct_pool_tokens(
+    redis: aioredis.Redis,
+    ws_id: str,
+    amount: int,
+    user_id: str = "",
+    job_id: str = "",
+    scene_count: int = 0,
+    project_id: str = "",
+    project_title: str = "",
+) -> int:
     balance = await get_pool_balance(redis, ws_id)
     if balance < amount:
         raise ValueError("Insufficient workspace tokens")
     new_balance = await redis.decrby(_pool_key(ws_id), amount)
-    return int(new_balance)
+    new_bal = int(new_balance)
+
+    # Log deduction for workspace usage tracking
+    try:
+        log_entry = json.dumps({
+            "user_id":       user_id,
+            "job_id":        job_id,
+            "tokens_used":   amount,
+            "scene_count":   scene_count,
+            "project_id":    project_id,
+            "project_title": project_title,
+            "balance_after": new_bal,
+            "ts":            datetime.now(timezone.utc).isoformat(),
+            "type":          "agency",
+        })
+        await redis.lpush(f"token_log:ws:{ws_id}", log_entry)
+        await redis.ltrim(f"token_log:ws:{ws_id}", 0, 499)  # keep last 500
+
+        # Low-balance alert — fire when pool drops below 500 tokens
+        LOW_BALANCE_THRESHOLD = 500
+        if new_bal < LOW_BALANCE_THRESHOLD and balance >= LOW_BALANCE_THRESHOLD:
+            # Only fire when crossing the threshold, not on every deduction below it
+            try:
+                ws_raw = await redis.get(f"workspace:{ws_id}")
+                if ws_raw:
+                    ws = json.loads(ws_raw)
+                    owner_id = ws.get("owner_id", "")
+                    owner_raw = await redis.get(f"user:{owner_id}")
+                    if owner_raw:
+                        owner = json.loads(owner_raw)
+                        from app.services.email import send_low_balance_alert
+                        asyncio.create_task(send_low_balance_alert(
+                            to_email=owner.get("email", ""),
+                            owner_name=owner.get("full_name", "there"),
+                            workspace_name=ws.get("name", "your workspace"),
+                            balance=new_bal,
+                            threshold=LOW_BALANCE_THRESHOLD,
+                        ))
+            except Exception as _e:
+                logger.warning("Low balance alert failed: %s", _e)
+    except Exception as _e:
+        logger.warning("Token log failed (non-fatal): %s", _e)
+
+    return new_bal
+
+
+async def get_token_usage_log(redis: aioredis.Redis, ws_id: str, limit: int = 50) -> list[dict]:
+    """Return the last N token deduction events for a workspace."""
+    raw_entries = await redis.lrange(f"token_log:ws:{ws_id}", 0, limit - 1)
+    entries = []
+    for r in raw_entries:
+        try:
+            entries.append(json.loads(r))
+        except Exception:
+            pass
+    return entries
 
 
 async def add_pool_tokens(redis: aioredis.Redis, ws_id: str, amount: int) -> int:
