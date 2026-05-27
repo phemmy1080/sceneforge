@@ -1591,6 +1591,32 @@ ${emailBody}`)}
                   </div>
                 </div>
 
+                {/* Brand kit status banner */}
+                {(project as any).brand_kit_error && (
+                  <div className="bg-red-400/[0.08] border border-red-400/20 rounded-xl px-4 py-3 flex items-start gap-3 mb-3">
+                    <span className="flex-shrink-0">⚠️</span>
+                    <div>
+                      <div className="text-xs font-bold text-red-300">Brand kit could not be fully applied</div>
+                      <p className="text-[11px] text-white/40 mt-0.5 leading-relaxed">
+                        The intro, outro, or watermark failed during rendering. Check that your brand kit URLs are accessible and the video format is compatible.
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {(project as any).brand_kit_applied && !(project as any).brand_kit_error && (
+                  <div className="bg-teal-400/[0.06] border border-teal-400/15 rounded-xl px-4 py-2.5 flex items-center gap-2 mb-3">
+                    <span className="text-xs text-teal-300">✓</span>
+                    <span className="text-[11px] text-teal-300/70">
+                      Brand kit applied —{" "}
+                      {[
+                        (project as any).brand_kit_applied.intro     && "intro",
+                        (project as any).brand_kit_applied.outro     && "outro",
+                        (project as any).brand_kit_applied.watermark && "watermark",
+                      ].filter(Boolean).join(", ") || "none"}
+                    </span>
+                  </div>
+                )}
+
                 {/* Full video player — aspect ratio from platform */}
                 {(() => {
                   const platform = (project.platform || '').toLowerCase();
