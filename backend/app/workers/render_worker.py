@@ -115,6 +115,28 @@ async def render_video(ctx, job_id: str, payload: dict):
         async def ffmpeg_progress(stage: str, pct: int):
             await _set_progress(redis, job_id, stage, pct)
 
+        # Resolve user plan for resolution gating
+        _render_user_plan = "free"
+        if user_id:
+            _raw_render_user = await redis.get(f"user:{user_id}")
+            if _raw_render_user:
+                _render_user_plan = json.loads(_raw_render_user).get("plan", "free")
+            # Agency workspace members get workspace plan
+            try:
+                from app.services.agency_service import get_workspace_id_for_user as _gwid
+                _ws_id_r = await _gwid(redis, user_id)
+                if _ws_id_r:
+                    _ws_raw_r = await redis.get(f"workspace:{_ws_id_r}")
+                    if _ws_raw_r:
+                        _ws_plan_r = json.loads(_ws_raw_r).get("plan", _render_user_plan)
+                        _RANK = {"free": 0, "starter": 1, "pro": 2, "studio": 3, "agency": 4}
+                        if _RANK.get(_ws_plan_r, 0) > _RANK.get(_render_user_plan, 0):
+                            _render_user_plan = _ws_plan_r
+            except Exception:
+                pass
+        from app.services.plans import get_resolution as _get_resolution
+        _max_resolution = _get_resolution(_render_user_plan)
+
         result = await render_full_pipeline(
             scenes=req.scenes,
             audio_files=audio_files,
@@ -124,6 +146,7 @@ async def render_video(ctx, job_id: str, payload: dict):
             music_path=req.music if req.music != "none" else None,
             on_progress=ffmpeg_progress,
             platform=req.platform,
+            max_resolution=_max_resolution,
         )
         _render_seconds = __import__('time').time() - _render_start
 
