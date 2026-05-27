@@ -92,7 +92,10 @@ export default function VoiceVisuals() {
   // Resolve the Edge TTS voice ID from the stored voice name
   const selectedVoiceId = getVoiceByName(voiceConfig.voice_name)?.id ?? 'en-US-GuyNeural'
   const speedValue      = parseFloat(voiceConfig.voice_speed.toString())
-  const canRender       = !tokenBalance || tokenBalance.tokens_remaining >= (tokenBalance.cost_per_video ?? 100)
+  const estimatedCost = tokenBalance
+    ? Math.max(tokenBalance.cost_per_video ?? 100, scenes.length * (tokenBalance.tokens_per_scene ?? 12))
+    : 100;
+  const canRender = !tokenBalance || tokenBalance.tokens_remaining >= estimatedCost
 
   return (
     <div>
@@ -300,15 +303,35 @@ export default function VoiceVisuals() {
               }}
             />
           </div>
-          <div className="flex justify-between">
-            <span className="text-[11.5px] text-white/35">
-              Cost: <span className="text-white/55 font-medium">{tokenBalance.cost_per_video} tokens</span>
-              {' '}per new video · Re-renders are free
-            </span>
-            {!canRender && (
-              <span className="text-[11.5px] text-red-400 font-semibold">Insufficient tokens</span>
-            )}
-          </div>
+          {/* Scene-accurate cost estimate */}
+          {(() => {
+            const perScene   = tokenBalance.tokens_per_scene ?? 12;
+            const base       = tokenBalance.cost_per_video ?? 100;
+            const estimated  = Math.max(base, scenes.length * perScene);
+            const remaining  = tokenBalance.tokens_remaining;
+            const lowBalance = remaining < estimated * 2 && remaining >= estimated;
+            const noBalance  = remaining < estimated;
+            return (
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-[11.5px] text-white/35">
+                    Estimated cost:{'  '}
+                    <span className="text-white/60 font-semibold">{estimated} tokens</span>
+                    <span className="text-white/25"> ({scenes.length} scenes × {perScene})</span>
+                  </span>
+                  {noBalance && (
+                    <span className="text-[11.5px] text-red-400 font-semibold">Insufficient tokens</span>
+                  )}
+                </div>
+                {lowBalance && (
+                  <div className="text-[11px] text-amber-300 bg-amber-400/[0.08] border border-amber-400/20 rounded-lg px-3 py-2">
+                    ⚠ Low balance — you have {remaining} tokens, about {Math.floor(remaining / estimated)} render{Math.floor(remaining / estimated) !== 1 ? 's' : ''} remaining.
+                  </div>
+                )}
+                <span className="text-[10.5px] text-white/20">Re-renders are free · Cost varies by scene count</span>
+              </div>
+            );
+          })()}
         </div>
       )}
 
