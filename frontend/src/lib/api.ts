@@ -124,6 +124,8 @@ export interface Scene {
   visual_keyword: string
   emotion?: string
   b_roll_note?: string
+  custom_voice_url?: string
+  custom_voice_duration?: number
 }
 
 export interface GenerateIdeasRequest {
@@ -354,6 +356,24 @@ export interface VisualResult {
   width: number
   height: number
   provider: 'pexels' | 'dalle'
+}
+
+
+export async function uploadVoiceClip(
+  file: File | Blob,
+  sceneId: number,
+  onProgress?: (pct: number) => void,
+): Promise<{ voice_url: string; duration: number; steps: string[] }> {
+  const form = new FormData()
+  form.append('file', file, file instanceof File ? file.name : `scene_${sceneId}_voice.webm`)
+  form.append('scene_id', String(sceneId))
+  const res = await api.post('/api/render/voice/process-upload', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: (e: any) => {
+      if (onProgress && e.total) onProgress(Math.round((e.loaded / e.total) * 100))
+    },
+  })
+  return res.data
 }
 
 export const searchVisuals = async (
