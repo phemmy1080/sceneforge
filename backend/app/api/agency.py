@@ -1040,6 +1040,16 @@ async def get_review_public(token: str, redis=Depends(get_redis)):
                         r2.get("final_video_music.mp4") or
                         r2.get("final_video.mp4") or ""
                     )
+                    # Brand kit application status
+                    try:
+                        bk_applied_raw = await redis.get(f"job:{job_ids[-1]}:brand_kit_applied")
+                        bk_error_raw   = await redis.get(f"job:{job_ids[-1]}:brand_kit_error")
+                        if bk_applied_raw:
+                            project["brand_kit_applied"] = json.loads(bk_applied_raw)
+                        if bk_error_raw:
+                            project["brand_kit_error"] = bk_error_raw if isinstance(bk_error_raw, str) else bk_error_raw.decode()
+                    except Exception:
+                        pass
                     if video_url:
                         break
         except Exception:
