@@ -48,4 +48,5 @@ class TokenBalanceResponse(BaseModel):
     tokens_total: int
     videos_created: int
     can_render: bool
-    cost_per_video: int = 100      # tokens deducted per new video
+    cost_per_video: int = 100      # minimum cost per video (base)
+    tokens_per_scene: int = 12     # marginal cost per scene
