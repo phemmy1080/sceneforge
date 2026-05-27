@@ -255,26 +255,33 @@ export default function ClientReview({ token }: { token: string }) {
 
         {/* ── Full video ── */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-          {videoUrl ? (() => {
+          {(() => {
             const plat = (project?.platform || '').toLowerCase();
             const isPortrait = plat.includes('tiktok') || plat.includes('shorts') ||
               plat.includes('reels') || plat.includes('snapchat') || plat.includes('pinterest');
             const isSquare = plat.includes('linkedin');
             const aspectClass = isPortrait ? 'aspect-[9/16]' : isSquare ? 'aspect-square' : 'aspect-video';
-            return <video src={videoUrl} controls
-              className={`w-full ${aspectClass} bg-black`}
-              style={{ maxHeight: isPortrait ? 500 : undefined, objectFit: 'contain' }} />;
-          })() : (
-          ) : (
-            <div className="aspect-video bg-zinc-950 flex flex-col items-center justify-center gap-3">
-              <div className="w-14 h-14 rounded-full bg-zinc-800 flex items-center justify-center">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="white" opacity="0.4"><path d="M6 4l12 6-12 6V4z"/></svg>
+            if (videoUrl) {
+              return (
+                <video
+                  src={videoUrl}
+                  controls
+                  className={`w-full ${aspectClass} bg-black`}
+                  style={{ maxHeight: isPortrait ? 500 : undefined, objectFit: 'contain' }}
+                />
+              );
+            }
+            return (
+              <div className="aspect-video bg-zinc-950 flex flex-col items-center justify-center gap-3">
+                <div className="w-14 h-14 rounded-full bg-zinc-800 flex items-center justify-center">
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="white" opacity="0.4"><path d="M6 4l12 6-12 6V4z"/></svg>
+                </div>
+                <div className="text-zinc-500 text-sm">
+                  {project.render_job_ids.length === 0 ? "Video is being prepared — check back soon" : "Loading video…"}
+                </div>
               </div>
-              <div className="text-zinc-500 text-sm">
-                {project.render_job_ids.length === 0 ? "Video is being prepared — check back soon" : "Loading video…"}
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* ── Scene-by-scene review ── */}
