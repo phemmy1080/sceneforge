@@ -369,6 +369,7 @@ export function ProjectDetail() {
   const [copied, setCopied] = useState(false);
   const [copiedMsg, setCopiedMsg] = useState(false);
   const [shareTab, setShareTab] = useState<"whatsapp"|"email"|"copy">("whatsapp");
+  const [reviewDismissed, setReviewDismissed] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [busy, setBusy] = useState("");
   const [sceneClips, setSceneClips] = useState<SceneClip[]>([]);
@@ -494,6 +495,7 @@ export function ProjectDetail() {
         const rlRes = await api.get(`/api/agency/projects/${id}/review-link`);
         if (rlRes.data?.review_url && rlRes.data?.status !== 'expired') {
           setReviewUrl(rlRes.data.review_url);
+          setReviewDismissed(false);
         }
       } catch { /* non-fatal */ }
       // Only editors/admins can be assigned — not clients
@@ -660,6 +662,7 @@ export function ProjectDetail() {
     try {
       const res = await api.post(`/api/agency/projects/${id}/review-link`);
       setReviewUrl(res.data.review_url);
+      setReviewDismissed(false);
       setProject(p => p ? { ...p, status: "client_review" } : p);
     } finally { setBusy(""); }
   }
@@ -1005,7 +1008,7 @@ export function ProjectDetail() {
       </div>
 
       {/* Review link card */}
-      {reviewUrl && (() => {
+      {reviewUrl && !reviewDismissed && (() => {
         const clientName = project.client_name || "there";
         const projectTitle = project.title || "your video";
         const platform = project.platform ? ` on ${project.platform}` : "";
@@ -1057,15 +1060,17 @@ Best regards`;
         async function copyMessage(text: string) {
           await navigator.clipboard.writeText(text);
           setCopiedMsg(true);
-          setTimeout(() => setCopiedMsg(false), 2500);
+          setTimeout(() => { setCopiedMsg(false); setReviewDismissed(true); }, 1200);
         }
 
         function openWhatsApp() {
           window.open(`https://wa.me/?text=${encodeURIComponent(whatsappMsg)}`, "_blank");
+          setTimeout(() => setReviewDismissed(true), 800);
         }
 
         function openEmail() {
           window.open(`mailto:?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`, "_blank");
+          setTimeout(() => setReviewDismissed(true), 800);
         }
 
         return (
@@ -1076,10 +1081,15 @@ Best regards`;
                 <div className="text-sm font-bold text-emerald-300">🔗 Client review link ready</div>
                 <div className="text-[11px] text-white/35 mt-0.5 font-mono truncate max-w-xs">{reviewUrl}</div>
               </div>
-              <button onClick={copy}
-                className="text-xs bg-emerald-400/15 border border-emerald-400/25 text-emerald-300 hover:bg-emerald-400/20 px-3.5 py-1.5 rounded-xl transition font-semibold flex-shrink-0 ml-3">
-                {copied ? "Copied ✓" : "Copy link"}
-              </button>
+              <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                <button onClick={() => { copy(); setTimeout(() => setReviewDismissed(true), 1200); }}
+                  className="text-xs bg-emerald-400/15 border border-emerald-400/25 text-emerald-300 hover:bg-emerald-400/20 px-3.5 py-1.5 rounded-xl transition font-semibold">
+                  {copied ? "Copied ✓" : "Copy link"}
+                </button>
+                <button onClick={() => setReviewDismissed(true)}
+                  className="text-white/25 hover:text-white/60 transition text-lg leading-none px-1"
+                  title="Dismiss">×</button>
+              </div>
             </div>
 
             {/* Share tabs */}
