@@ -553,9 +553,34 @@ async def render_full_pipeline(
     motion: str = "auto",
     transition: str = "fade",
     transition_duration: float = 0.4,
+    max_resolution: str | None = None,   # e.g. "720p" for free plan
 ) -> dict:
     # Resolve music track name → local file path
     resolved_music = await _resolve_music(music_path, output_dir)
+
+    # Apply plan resolution cap — downscale platform dims if needed
+    if max_resolution and max_resolution != "1080p":
+        from app.services.plans import resolution_to_dims as _res_to_dims
+        cap = _res_to_dims(max_resolution)
+        if cap and platform:
+            w, h = get_platform_dims(platform)
+            cap_w, cap_h = cap
+            # Scale down proportionally if either dimension exceeds cap
+            if w > cap_w or h > cap_h:
+                ratio = min(cap_w / w, cap_h / h)
+                w = int(w * ratio)
+                h = int(h * ratio)
+                # Make even numbers (required by H.264)
+                w = w - (w % 2)
+                h = h - (h % 2)
+                # Override platform dims for this render
+                _original_get_dims = get_platform_dims
+                _capped_dims = (w, h)
+                import functools
+                _orig_fn = get_platform_dims
+                def get_platform_dims(p):  # noqa: F811
+                    return _capped_dims
+                logger.info("Resolution capped to %dx%d for plan=%s", w, h, max_resolution)
 
     scene_outputs = []
 
