@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useStore } from '../store'
 import { useAuthStore } from '../authStore'
 import { usePlanLimits } from '../hooks/usePlanLimits'
-import { searchVisuals, type Scene, type VisualResult, api } from '../lib/api'
+import { searchVisuals, uploadVoiceClip, type Scene, type VisualResult, api } from '../lib/api'
 import { Button, Badge, PageHeader } from '../components/ui'
 
 const TYPE_COLORS = {
@@ -49,6 +49,18 @@ export default function SceneEditor() {
   const [reviewNotes, setReviewNotes] = useState<ReviewNote[]>([])
   const [notesLoading, setNotesLoading] = useState(false)
   const [showNotes, setShowNotes] = useState(true)
+
+  // Voice upload/record per scene
+  const [voiceUploading, setVoiceUploading] = useState<Record<number, boolean>>({})
+  const [voiceProcessing, setVoiceProcessing] = useState<Record<number, boolean>>({})
+  const [voiceError, setVoiceError] = useState<Record<number, string>>({})
+  const [voiceRecording, setVoiceRecording] = useState(false)
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
+  const [recordingChunks, setRecordingChunks] = useState<Blob[]>([])
+  const [recordingSeconds, setRecordingSeconds] = useState(0)
+  const recordingTimer = useRef<ReturnType<typeof setInterval> | null>(null)
+  const voiceFileInputRef = useRef<HTMLInputElement>(null)
+  const voiceUploadForScene = useRef<number | null>(null)
 
   // Custom image upload per scene
   const [uploading, setUploading] = useState<Record<number, boolean>>({})
@@ -101,7 +113,7 @@ export default function SceneEditor() {
         <h3 className="text-white font-bold text-base text-center mb-1">Delete Scene {confirmDeleteIndex + 1}?</h3>
         <p className="text-white/40 text-sm text-center mb-6 leading-relaxed">
           This scene will be permanently removed from your video.<br/>
-          <span className="text-white/25 text-xs">This action cannot be undo.</span>
+          <span className="text-white/25 text-xs">You can undo this with Ctrl+Z.</span>
         </p>
         <div className="flex gap-3">
           <button
@@ -120,6 +132,63 @@ export default function SceneEditor() {
       </div>
     </div>
   ) : null
+
+  async function processVoiceFile(sceneIdx: number, file: File | Blob) {
+    setVoiceError(e => ({ ...e, [sceneIdx]: '' }))
+    setVoiceUploading(u => ({ ...u, [sceneIdx]: true }))
+    setVoiceProcessing(p => ({ ...p, [sceneIdx]: true }))
+    try {
+      const result = await uploadVoiceClip(file, sceneIdx)
+      updateScene(sceneIdx, {
+        custom_voice_url: result.voice_url,
+        custom_voice_duration: result.duration,
+        duration: Math.max(1, Math.ceil(result.duration)),
+      } as any)
+    } catch (e: any) {
+      const msg = e?.response?.data?.detail || 'Voice processing failed'
+      setVoiceError(err => ({ ...err, [sceneIdx]: msg }))
+    } finally {
+      setVoiceUploading(u => ({ ...u, [sceneIdx]: false }))
+      setVoiceProcessing(p => ({ ...p, [sceneIdx]: false }))
+    }
+  }
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const chunks: Blob[] = []
+      const mr = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' })
+      mr.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
+      mr.onstop = () => {
+        stream.getTracks().forEach(t => t.stop())
+        setRecordingChunks(chunks)
+      }
+      mr.start(100)
+      setMediaRecorder(mr)
+      setVoiceRecording(true)
+      setRecordingSeconds(0)
+      setRecordingChunks([])
+      recordingTimer.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000)
+    } catch {
+      setVoiceError(e => ({ ...e, [activeSceneIndex]: 'Microphone access denied' }))
+    }
+  }
+
+  function stopRecordingAndProcess() {
+    if (mediaRecorder) mediaRecorder.stop()
+    if (recordingTimer.current) clearInterval(recordingTimer.current)
+    setVoiceRecording(false)
+  }
+
+  // When recording stops and chunks arrive, process them
+  useEffect(() => {
+    if (!voiceRecording && recordingChunks.length > 0) {
+      const blob = new Blob(recordingChunks, { type: 'audio/webm;codecs=opus' })
+      setRecordingChunks([])
+      processVoiceFile(activeSceneIndex, blob)
+    }
+  }, [voiceRecording, recordingChunks])
+
 
   // Preview a single scene using the partial re-render endpoint
   async function previewScene() {
@@ -644,6 +713,121 @@ export default function SceneEditor() {
                   e.target.value = ''
                 }}
               />
+            </div>
+
+            {/* ── Voice upload / record ── */}
+            <div className="mb-4 mt-4 border-t border-white/[0.06] pt-4">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-[12px] font-semibold text-white/60">
+                  Custom voice
+                  <span className="ml-2 text-[10px] text-white/25 font-normal">upload or record for this scene</span>
+                </label>
+                {(activeScene as any).custom_voice_url && (
+                  <button
+                    onClick={() => updateScene(activeSceneIndex, { custom_voice_url: null, custom_voice_duration: null } as any)}
+                    className="text-[10px] text-rose-400/60 hover:text-rose-400 transition">
+                    Remove
+                  </button>
+                )}
+              </div>
+
+              {/* Current voice clip player */}
+              {(activeScene as any).custom_voice_url && !voiceUploading[activeSceneIndex] && (
+                <div className="mb-3 bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2.5 flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-lg bg-teal-400/15 border border-teal-400/20 flex items-center justify-center flex-shrink-0">
+                    <svg width="10" height="12" viewBox="0 0 10 12" fill="none"><path d="M1 1l8 5-8 5V1z" fill="#2dd4bf"/></svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <audio src={(activeScene as any).custom_voice_url} controls
+                      className="w-full h-7" style={{ colorScheme: 'dark' }} />
+                  </div>
+                  <div className="flex-shrink-0 text-right">
+                    <div className="text-[10px] text-teal-300 font-semibold">Custom voice ✓</div>
+                    {(activeScene as any).custom_voice_duration && (
+                      <div className="text-[10px] text-white/30">{((activeScene as any).custom_voice_duration as number).toFixed(1)}s — duration updated</div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Processing steps badge */}
+              {voiceProcessing[activeSceneIndex] && (
+                <div className="mb-3 bg-teal-400/[0.06] border border-teal-400/15 rounded-xl px-3 py-2.5 space-y-1.5">
+                  <div className="flex items-center gap-2 text-[11px] text-teal-300">
+                    <div className="w-3 h-3 border border-teal-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                    Processing your voice clip…
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {["Trimming silence","Reducing noise","EQ balancing","Compression","Loudness norm","Fade in/out"].map(step => (
+                      <span key={step} className="text-[10px] bg-teal-400/10 text-teal-400/70 border border-teal-400/15 px-1.5 py-0.5 rounded-full">
+                        {step}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Error */}
+              {voiceError[activeSceneIndex] && (
+                <div className="mb-2 text-[11px] text-rose-400 bg-rose-400/[0.08] border border-rose-400/20 rounded-lg px-3 py-2">
+                  {voiceError[activeSceneIndex]}
+                </div>
+              )}
+
+              {/* Recording UI */}
+              {voiceRecording ? (
+                <div className="flex items-center gap-3 mb-2 bg-red-400/[0.08] border border-red-400/20 rounded-xl px-4 py-3">
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse flex-shrink-0" />
+                  <span className="text-[12px] text-red-300 font-semibold flex-1">
+                    Recording… {Math.floor(recordingSeconds / 60)}:{String(recordingSeconds % 60).padStart(2, '0')}
+                  </span>
+                  <button onClick={stopRecordingAndProcess}
+                    className="text-[11px] font-bold bg-red-500/20 border border-red-500/40 text-red-300 hover:bg-red-500/30 px-3 py-1.5 rounded-lg transition">
+                    Stop & process
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  {/* Upload button */}
+                  <button
+                    onClick={() => {
+                      voiceUploadForScene.current = activeSceneIndex
+                      voiceFileInputRef.current?.click()
+                    }}
+                    disabled={voiceUploading[activeSceneIndex] || voiceProcessing[activeSceneIndex]}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-dashed border-white/15 hover:border-white/30 rounded-lg text-[11.5px] text-white/40 hover:text-white/70 transition disabled:opacity-40">
+                    {voiceUploading[activeSceneIndex] ? (
+                      <><div className="w-3 h-3 border border-white/40 border-t-transparent rounded-full animate-spin" />Uploading…</>
+                    ) : (
+                      <><span>🎤</span> Upload voice clip</>
+                    )}
+                  </button>
+                  {/* Record button */}
+                  <button
+                    onClick={startRecording}
+                    disabled={voiceUploading[activeSceneIndex] || voiceProcessing[activeSceneIndex]}
+                    className="flex items-center gap-1.5 px-3 py-2.5 border border-dashed border-red-400/20 hover:border-red-400/40 rounded-lg text-[11.5px] text-red-400/50 hover:text-red-400 transition disabled:opacity-40">
+                    <div className="w-2 h-2 rounded-full bg-red-400/60" />
+                    Record
+                  </button>
+                </div>
+              )}
+
+              <input
+                ref={voiceFileInputRef}
+                type="file"
+                accept="audio/*,.webm,.ogg,.wav,.mp3,.mp4,.m4a,.aac"
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files?.[0]
+                  const si = voiceUploadForScene.current
+                  if (f && si !== null) processVoiceFile(si!, f)
+                  e.target.value = ''
+                }}
+              />
+              <p className="text-[10px] text-white/20 mt-1.5 leading-relaxed">
+                MP3, WAV, WebM, M4A — max 50 MB. Processing applies noise reduction, EQ, loudness normalisation and auto-adjusts scene duration.
+              </p>
             </div>
           </div>
         )}
