@@ -43,6 +43,7 @@ export default function SceneEditor() {
   const [visualLoading, setVisualLoading] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewing, setPreviewing] = useState(false)
+  const [confirmDeleteIndex, setConfirmDeleteIndex] = useState<number | null>(null)
 
   // Review notes from agency project comments
   const [reviewNotes, setReviewNotes] = useState<ReviewNote[]>([])
@@ -91,6 +92,34 @@ export default function SceneEditor() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [undoScenes, redoScenes])
+
+  // Delete confirmation modal rendered inline
+  const DeleteConfirmModal = confirmDeleteIndex !== null ? (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+      <div className="bg-[#16161F] border border-white/[0.10] rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+        <div className="text-2xl mb-3 text-center">🗑️</div>
+        <h3 className="text-white font-bold text-base text-center mb-1">Delete Scene {confirmDeleteIndex + 1}?</h3>
+        <p className="text-white/40 text-sm text-center mb-6 leading-relaxed">
+          This scene will be permanently removed from your video.<br/>
+          <span className="text-white/25 text-xs">You can undo this with Ctrl+Z.</span>
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setConfirmDeleteIndex(null)}
+            className="flex-1 h-9 rounded-xl border border-white/[0.10] text-white/60 hover:text-white hover:border-white/20 text-sm font-semibold transition"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => { deleteScene(confirmDeleteIndex); setConfirmDeleteIndex(null) }}
+            className="flex-1 h-9 rounded-xl bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30 hover:text-red-300 text-sm font-semibold transition"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null
 
   // Preview a single scene using the partial re-render endpoint
   async function previewScene() {
@@ -201,6 +230,7 @@ export default function SceneEditor() {
 
   return (
     <div>
+      {DeleteConfirmModal}
       <PageHeader
         title="Scene editor"
         subtitle="Edit each scene before rendering — your video storyboard"
@@ -214,19 +244,31 @@ export default function SceneEditor() {
         </div>
         <div className="flex gap-2">
           {/* Undo / Redo */}
-          <div className="flex items-center gap-1 mr-1">
+          <div className="flex items-center gap-1 mr-2">
             <button
               onClick={undoScenes}
               disabled={sceneHistoryIndex <= 0}
               title="Undo (Ctrl+Z)"
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-white/40 hover:text-white hover:bg-white/[0.07] transition disabled:opacity-25 text-sm"
-            >↩</button>
+              className="flex items-center gap-1 px-2 h-7 rounded-lg text-[11px] font-semibold border transition
+                disabled:opacity-30 disabled:cursor-not-allowed
+                border-white/[0.10] text-white/60 hover:text-white hover:bg-white/[0.07] hover:border-white/20
+                disabled:border-white/[0.06] disabled:text-white/25"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6C2 3.8 3.8 2 6 2c1.5 0 2.8.8 3.5 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M2 2v4h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Undo
+            </button>
             <button
               onClick={redoScenes}
               disabled={sceneHistoryIndex >= (sceneHistory?.length ?? 0) - 1}
               title="Redo (Ctrl+Shift+Z)"
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-white/40 hover:text-white hover:bg-white/[0.07] transition disabled:opacity-25 text-sm"
-            >↪</button>
+              className="flex items-center gap-1 px-2 h-7 rounded-lg text-[11px] font-semibold border transition
+                disabled:opacity-30 disabled:cursor-not-allowed
+                border-white/[0.10] text-white/60 hover:text-white hover:bg-white/[0.07] hover:border-white/20
+                disabled:border-white/[0.06] disabled:text-white/25"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M10 6C10 3.8 8.2 2 6 2c-1.5 0-2.8.8-3.5 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M10 2v4H6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Redo
+            </button>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {isFree && maxScenes !== -1 && (
@@ -327,9 +369,9 @@ export default function SceneEditor() {
                     title="Duplicate"
                   >⧉</button>
                   <button
-                    onClick={(e) => { e.stopPropagation(); deleteScene(i) }}
+                    onClick={(e) => { e.stopPropagation(); setConfirmDeleteIndex(i) }}
                     className="w-5 h-5 bg-[#22222F] rounded text-red-400/60 hover:text-red-400 text-[10px] flex items-center justify-center"
-                    title="Delete"
+                    title="Delete scene"
                   >×</button>
                 </div>
               </div>
