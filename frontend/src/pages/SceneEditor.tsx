@@ -101,7 +101,7 @@ export default function SceneEditor() {
         <h3 className="text-white font-bold text-base text-center mb-1">Delete Scene {confirmDeleteIndex + 1}?</h3>
         <p className="text-white/40 text-sm text-center mb-6 leading-relaxed">
           This scene will be permanently removed from your video.<br/>
-          <span className="text-white/25 text-xs">You can undo this with Ctrl+Z.</span>
+          <span className="text-white/25 text-xs">This action cannot be undo.</span>
         </p>
         <div className="flex gap-3">
           <button
