@@ -83,7 +83,15 @@ SECRET = (settings.anthropic_api_key or settings.groq_api_key or "dev-secret-key
 TOKEN_TTL_HOURS = 72
 
 TOKENS_ON_SIGNUP = 1000   # credits given to every new user
-TOKENS_PER_VIDEO = 100    # cost of each new video render
+TOKENS_PER_VIDEO = 100    # base cost — used as minimum and for estimates
+TOKENS_PER_SCENE = 12     # marginal cost per scene rendered
+
+
+def calculate_render_cost(scene_count: int) -> int:
+    """Return the token cost for a render with the given number of scenes."""
+    if scene_count <= 0:
+        return TOKENS_PER_VIDEO
+    return max(TOKENS_PER_VIDEO, scene_count * TOKENS_PER_SCENE)
 
 
 # ─── Password hashing ─────────────────────────────────────────────────────────
@@ -320,10 +328,17 @@ async def check_can_render(redis: aioredis.Redis, user_id: str, job_id: str) -> 
     }
 
 
-async def deduct_tokens(redis: aioredis.Redis, user_id: str, job_id: str) -> UserOut:
+async def deduct_tokens(
+    redis: aioredis.Redis,
+    user_id: str,
+    job_id: str,
+    scene_count: int = 0,
+    project_id: str = "",
+    project_title: str = "",
+) -> UserOut:
     """
-    Deduct TOKENS_PER_VIDEO from the user's balance and record the job_id
-    so the same job is never charged twice.
+    Deduct tokens from the user's balance.
+    Cost = max(TOKENS_PER_VIDEO, scene_count * TOKENS_PER_SCENE).
     Call this ONLY after the render completes successfully.
     """
     raw = await redis.get(_user_key(user_id))
@@ -331,18 +346,31 @@ async def deduct_tokens(redis: aioredis.Redis, user_id: str, job_id: str) -> Use
         raise ValueError("User not found")
 
     data = json.loads(raw)
+    cost = calculate_render_cost(scene_count)
 
     # Idempotency — never charge twice for the same job
     already_charged = await redis.sismember(_user_jobs_key(user_id), job_id)
     if not already_charged:
         current = data.get("tokens_remaining", TOKENS_ON_SIGNUP)
-        data["tokens_remaining"] = max(0, current - TOKENS_PER_VIDEO)
+        data["tokens_remaining"] = max(0, current - cost)
         data["videos_created"] = data.get("videos_created", 0) + 1
         await redis.set(_user_key(user_id), json.dumps(data))
-        # Note: total_scenes_generated is updated separately via update_scene_stats()
-        # Mark this job as charged — TTL 90 days
         await redis.sadd(_user_jobs_key(user_id), job_id)
         await redis.expire(_user_jobs_key(user_id), 60 * 60 * 24 * 90)
+        # Log deduction for usage tracking
+        import json as _j, datetime as _dt
+        log_entry = _j.dumps({
+            "user_id":       user_id,
+            "job_id":        job_id,
+            "tokens_used":   cost,
+            "scene_count":   scene_count,
+            "project_id":    project_id,
+            "project_title": project_title,
+            "ts":            _dt.datetime.utcnow().isoformat(),
+            "type":          "personal",
+        })
+        await redis.lpush(f"token_log:user:{user_id}", log_entry)
+        await redis.ltrim(f"token_log:user:{user_id}", 0, 199)  # keep last 200
 
     return _user_out(data)
 
