@@ -410,6 +410,85 @@ async def rerender_scene(
 
 
 
+@router.post("/voice/process-upload")
+async def process_voice_upload(
+    request: Request,
+    file: UploadFile = File(...),
+    scene_id: int = Form(default=0),
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Accept a voice upload or recording, run the full processing pipeline,
+    upload to R2, and return the processed URL + detected duration.
+
+    Processing steps applied automatically:
+    - Silence trimming
+    - Noise reduction (afftdn)
+    - EQ balancing (highpass + presence boost)
+    - Compression (acompressor)
+    - Loudness normalisation (-14 LUFS)
+    - Fade in/out (50ms / 80ms)
+    """
+    from fastapi import UploadFile, File, Form
+    from app.services.voice_processing import process_and_upload
+
+    redis = await _get_redis()
+    user_id = _extract_user_id(authorization)
+
+    # Validate file type
+    content_type = file.content_type or ""
+    allowed = {"audio/webm", "audio/ogg", "audio/wav", "audio/mpeg",
+               "audio/mp3", "audio/mp4", "audio/x-m4a", "audio/aac", "video/webm"}
+    if content_type not in allowed and not content_type.startswith("audio/"):
+        raise HTTPException(400, detail="Invalid file type. Must be an audio file.")
+
+    # Limit file size — 50MB
+    MAX_BYTES = 50 * 1024 * 1024
+    data = await file.read()
+    if len(data) > MAX_BYTES:
+        raise HTTPException(413, detail="File too large. Maximum 50MB.")
+
+    # Save to temp file
+    import tempfile as _tmp
+    suffix = Path(file.filename or "voice.webm").suffix or ".webm"
+    with _tmp.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(data)
+        tmp_path = tmp.name
+
+    work_dir = _tmp.mkdtemp(prefix="voice_proc_")
+
+    try:
+        result = await process_and_upload(
+            input_path=tmp_path,
+            scene_id=scene_id,
+            output_dir=work_dir,
+        )
+        if result["error"]:
+            raise HTTPException(422, detail=f"Processing failed: {result['error']}")
+
+        return {
+            "voice_url":  result["r2_url"],
+            "duration":   result["duration"],
+            "scene_id":   scene_id,
+            "processed":  True,
+            "steps": [
+                "silence_trimmed",
+                "noise_reduced",
+                "eq_balanced",
+                "compressed",
+                "loudness_normalised",
+                "fade_applied",
+            ],
+        }
+    finally:
+        try: Path(tmp_path).unlink(missing_ok=True)
+        except: pass
+        try:
+            import shutil as _sh
+            _sh.rmtree(work_dir, ignore_errors=True)
+        except: pass
+
+
 @router.get("/job-creator/{job_id}")
 async def get_job_creator(job_id: str):
     """Return the user_id of whoever submitted this render job."""
