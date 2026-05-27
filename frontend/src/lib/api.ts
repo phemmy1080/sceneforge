@@ -76,7 +76,9 @@ api.interceptors.response.use(
     const isExpiredJob = status === 404 && url.includes('/render/status/')
     // Suppress 403 on token-usage — editors don't have access and that's expected
     const isExpected403 = status === 403 && url.includes('/token-usage')
-    if (status !== 401 && !isSilent && !isExpiredJob && !isExpected403) {
+    // Suppress all errors on voice upload — SceneEditor handles them inline
+    const isVoiceUpload = url.includes('/voice/process-upload')
+    if (status !== 401 && !isSilent && !isExpiredJob && !isExpected403 && !isVoiceUpload) {
       document.dispatchEvent(new CustomEvent('api-error', {
         detail: { message: friendly, status, raw: error?.response?.data }
       }))
@@ -369,10 +371,11 @@ export async function uploadVoiceClip(
   form.append('scene_id', String(sceneId))
   const res = await api.post('/api/render/voice/process-upload', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    silent: true,
     onUploadProgress: (e: any) => {
       if (onProgress && e.total) onProgress(Math.round((e.loaded / e.total) * 100))
     },
-  })
+  } as any)
   return res.data
 }
 
