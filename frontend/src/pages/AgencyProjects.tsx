@@ -204,8 +204,6 @@ export function AgencyProjects() {
         ))}
       </div>
 
-      {loadingdiv>
-
       {loading ? (
         <div className="flex justify-center py-16">
           <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
