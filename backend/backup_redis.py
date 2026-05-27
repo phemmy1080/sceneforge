@@ -1,0 +1,130 @@
+"""
+backup_redis.py  —  Fast Redis backup using pipelining.
+
+Batches all TYPE checks and all GET/LRANGE/HGETALL calls into pipelines
+so the number of round-trips is O(keys/batch) not O(keys).
+
+Usage:
+  python backup_redis.py          # backup to R2
+  python backup_redis.py --local  # backup to /tmp only (for testing)
+"""
+from __future__ import annotations
+import os, asyncio, datetime, json, sys, logging
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
+log = logging.getLogger(__name__)
+
+BATCH = 500   # keys per pipeline batch — safe for all Redis providers
+
+
+async def dump_redis(r) -> dict:
+    """Dump all Redis keys to a plain dict using batched pipelines."""
+    all_keys = await r.keys("*")
+    total = len(all_keys)
+    log.info("Found %d keys to back up", total)
+    if total == 0:
+        return {}
+
+    data: dict = {}
+
+    # ── Phase 1: get type of every key in batches ──────────────────────────
+    types: list[str] = []
+    for i in range(0, total, BATCH):
+        batch = all_keys[i : i + BATCH]
+        pipe  = r.pipeline(transaction=False)
+        for k in batch:
+            pipe.type(k)
+        results = await pipe.execute()
+        types.extend(results)
+        log.info("  Types fetched: %d / %d", min(i + BATCH, total), total)
+
+    # ── Phase 2: fetch values grouped by type in batches ──────────────────
+    # Separate keys by type so we can use the right command per batch
+    by_type: dict[str, list] = {}
+    for key, t in zip(all_keys, types):
+        t_str = t.decode() if isinstance(t, bytes) else t
+        by_type.setdefault(t_str, []).append(key)
+
+    for t_str, keys in by_type.items():
+        log.info("  Fetching %d keys of type '%s'", len(keys), t_str)
+        for i in range(0, len(keys), BATCH):
+            batch = keys[i : i + BATCH]
+            pipe  = r.pipeline(transaction=False)
+            for k in batch:
+                if   t_str == "string": pipe.get(k)
+                elif t_str == "list":   pipe.lrange(k, 0, -1)
+                elif t_str == "hash":   pipe.hgetall(k)
+                elif t_str == "set":    pipe.smembers(k)
+                elif t_str == "zset":   pipe.zrange(k, 0, -1, withscores=True)
+                else:                   pipe.get(k)   # unknown — try string
+            values = await pipe.execute()
+
+            for key, value in zip(batch, values):
+                k_str = key.decode() if isinstance(key, bytes) else key
+                # Normalise bytes → str throughout
+                if isinstance(value, bytes):
+                    data[k_str] = value.decode(errors="replace")
+                elif isinstance(value, list):
+                    norm = []
+                    for item in value:
+                        if isinstance(item, (list, tuple)):
+                            # zset tuple: (member, score)
+                            norm.append([
+                                item[0].decode(errors="replace") if isinstance(item[0], bytes) else item[0],
+                                float(item[1])
+                            ])
+                        else:
+                            norm.append(item.decode(errors="replace") if isinstance(item, bytes) else item)
+                    data[k_str] = norm
+                elif isinstance(value, dict):
+                    data[k_str] = {
+                        (a.decode(errors="replace") if isinstance(a, bytes) else a):
+                        (b.decode(errors="replace") if isinstance(b, bytes) else b)
+                        for a, b in value.items()
+                    }
+                elif isinstance(value, set):
+                    data[k_str] = list(value)
+                elif value is None:
+                    data[k_str] = None
+                else:
+                    data[k_str] = value
+
+    return data
+
+
+async def backup(local_only: bool = False):
+    import redis.asyncio as aioredis
+
+    url = os.environ["REDIS_URL"]
+    is_tls = url.startswith("rediss://")
+    r = await aioredis.from_url(url, decode_responses=False,
+                                ssl_cert_reqs=None if is_tls else None)
+
+    t_start = datetime.datetime.utcnow()
+    data    = await dump_redis(r)
+    await r.aclose()
+
+    ts  = t_start.strftime("%Y-%m-%dT%H-%M-%S")
+    tmp = f"/tmp/redis_backup_{ts}.json"
+    with open(tmp, "w") as f:
+        json.dump(data, f)
+    size_kb = os.path.getsize(tmp) / 1024
+    elapsed = (datetime.datetime.utcnow() - t_start).total_seconds()
+    log.info("Backup file written: %s  (%.1f KB, %d keys, %.1fs)",
+             tmp, size_kb, len(data), elapsed)
+
+    if local_only:
+        log.info("--local flag set — skipping R2 upload")
+        return
+
+    # Upload to R2
+    from app.services.storage import upload_file
+    r2_key = f"backups/redis/{ts}.json"
+    url_out = await upload_file(tmp, r2_key)
+    log.info("Backup uploaded to R2: %s", url_out)
+    log.info("Done. %d keys backed up in %.1fs.", len(data), elapsed)
+
+
+if __name__ == "__main__":
+    local_only = "--local" in sys.argv
+    asyncio.run(backup(local_only=local_only))
