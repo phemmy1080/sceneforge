@@ -270,21 +270,37 @@ async def render_video(ctx, job_id: str, payload: dict):
             try:
                 from app.services.auth import deduct_tokens, get_token_balance
                 if not is_re_render:
+                    scene_count = len(req.scenes) if hasattr(req, 'scenes') else 0
+                    from app.services.auth_service import calculate_render_cost
+                    render_cost = calculate_render_cost(scene_count)
+                    proj_id    = payload.get("agency_project_id", "")
+                    proj_title = payload.get("project_title", "")
                     if ws_id:
                         # Agency workspace — deduct from shared pool
                         try:
-                            new_balance = await deduct_pool_tokens(redis, ws_id, 100)
+                            new_balance = await deduct_pool_tokens(
+                                redis, ws_id, render_cost,
+                                user_id=user_id, job_id=job_id,
+                                scene_count=scene_count,
+                                project_id=proj_id, project_title=proj_title,
+                            )
                             tokens_remaining = new_balance
                             logger.info("Pool tokens deducted ✓ — ws=%s remaining=%d",
                                         ws_id, tokens_remaining)
                         except ValueError:
                             # Pool exhausted — fall back to user tokens
                             logger.warning("Pool exhausted for ws=%s — falling back to user tokens", ws_id)
-                            user_out = await deduct_tokens(redis, user_id, job_id)
+                            user_out = await deduct_tokens(
+                                redis, user_id, job_id,
+                                scene_count=scene_count, project_id=proj_id, project_title=proj_title,
+                            )
                             tokens_remaining = user_out.tokens_remaining
                     else:
                         # Regular user — deduct from personal tokens
-                        user_out = await deduct_tokens(redis, user_id, job_id)
+                        user_out = await deduct_tokens(
+                            redis, user_id, job_id,
+                            scene_count=scene_count, project_id=proj_id, project_title=proj_title,
+                        )
                         tokens_remaining = user_out.tokens_remaining
                         logger.info("Tokens deducted ✓ — user=%s remaining=%d",
                                     user_id, tokens_remaining)
