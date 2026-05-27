@@ -44,6 +44,12 @@ class GenerateIdeasRequest(BaseModel):
     duration_hint: int = Field(default=60)       # target video duration in seconds
     scene_count_hint: int = Field(default=8)     # target number of scenes
     client_brief: str = Field(default="")        # full client brief text
+    # Brand kit fields — populated when generating for an agency project
+    brand_client_name: str = Field(default="")
+    brand_ai_tone: str = Field(default="")
+    brand_voice_notes: str = Field(default="")
+    brand_default_cta: str = Field(default="")
+    agency_project_id: str = Field(default="")  # set by frontend for agency projects
 
 
 class IdeaItem(BaseModel):
@@ -65,6 +71,11 @@ class GenerateScriptRequest(BaseModel):
     platform: str
     tone: str
     audience: str
+    # Brand kit fields — optional, populated for agency projects
+    brand_client_name: str = Field(default="")
+    brand_ai_tone: str = Field(default="")
+    brand_voice_notes: str = Field(default="")
+    brand_default_cta: str = Field(default="")
 
 
 class GenerateScriptResponse(BaseModel):
@@ -78,6 +89,12 @@ class GenerateScriptResponse(BaseModel):
 class GenerateScenesRequest(BaseModel):
     script: str
     platform: str
+    # Brand kit fields — optional, populated for agency projects
+    brand_client_name: str = Field(default="")
+    brand_ai_tone: str = Field(default="")
+    brand_voice_notes: str = Field(default="")
+    brand_default_cta: str = Field(default="")
+    agency_project_id: str = Field(default="")  # set by frontend for agency projects
 
 
 class Scene(BaseModel):
