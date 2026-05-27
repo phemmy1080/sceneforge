@@ -21,6 +21,12 @@ interface SceneReview {
   scenes?: { scene_index: number; text: string; author: string }[];
 }
 
+interface UsageEntry {
+  user_id: string; job_id: string; tokens_used: number; scene_count: number;
+  project_id: string; project_title: string; ts: string;
+  balance_after?: number;
+}
+
 interface DashboardData {
   active_projects: number; pending_approvals: number;
   team_members: number; pool_tokens: number;
@@ -70,6 +76,8 @@ export default function AgencyDashboard() {
   const setAgencyProjectId = useStore((s: any) => s.setAgencyProjectId);
   const currentUser = useAuthStore((s: any) => s.user);
   const [data, setData] = useState<DashboardData | null>(null);
+  const [usageLog, setUsageLog] = useState<UsageEntry[]>([]);
+  const [usageOpen, setUsageOpen] = useState(false);
   const [loading, setLoading] = useState(!!(currentUser?.workspace_suspended));
   const [error, setError] = useState("");
   // Derive immediately from cached user — no API round-trip needed
@@ -94,12 +102,14 @@ export default function AgencyDashboard() {
   async function load() {
     try {
       setLoading(true);
-      const [wsRes, dashRes] = await Promise.all([
+      const [wsRes, dashRes, usageRes] = await Promise.all([
         api.get("/api/agency/workspace"),
         api.get("/api/agency/workspace/dashboard"),
+        api.get("/api/agency/workspace/token-usage").catch(() => ({ data: { usage: [] } })),
       ]);
       setWorkspace(wsRes.data.workspace);
       setData(dashRes.data);
+      setUsageLog(usageRes.data.usage || []);
       setError("");
     } catch (e: any) {
       const detail = e.response?.data?.detail || "";
@@ -253,7 +263,57 @@ export default function AgencyDashboard() {
         </div>
       )}
 
-      {/* Recent projects */}
+              {/* ── Token usage log ── */}
+        {usageLog.length > 0 && (
+          <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+              <div>
+                <div className="text-sm font-bold text-white">Token usage</div>
+                <div className="text-xs text-white/30 mt-0.5">Last {usageLog.length} render{usageLog.length !== 1 ? "s" : ""}</div>
+              </div>
+              <button onClick={() => setUsageOpen(o => !o)}
+                className="text-xs border border-white/[0.1] text-white/40 hover:text-white px-3 py-1.5 rounded-lg transition">
+                {usageOpen ? "Hide" : "Show breakdown"}
+              </button>
+            </div>
+            {usageOpen && (
+              <div className="divide-y divide-white/[0.04] max-h-72 overflow-y-auto">
+                {usageLog.map((entry, i) => {
+                  const member = data?.members?.find((m: any) => m.user_id === entry.user_id);
+                  const name   = member?.name || member?.email || entry.user_id.slice(0, 8);
+                  const date   = new Date(entry.ts).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+                  return (
+                    <div key={i} className="flex items-center gap-3 px-5 py-3">
+                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                        {(member?.initials || name.slice(0,2)).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-semibold text-white/80 truncate">{name}</div>
+                        <div className="text-[11px] text-white/30 truncate">{entry.project_title || "Unknown project"}</div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-xs font-bold text-amber-300">{entry.tokens_used} tokens</div>
+                        <div className="text-[10px] text-white/25">{entry.scene_count} scenes · {date}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className="px-5 py-3 border-t border-white/[0.06] flex items-center justify-between">
+              <span className="text-xs text-white/30">
+                Total ({usageLog.length} renders): {usageLog.reduce((s, e) => s + e.tokens_used, 0).toLocaleString()} tokens
+              </span>
+              {data && (
+                <span className="text-xs font-semibold text-violet-300">
+                  {data.pool_tokens.toLocaleString()} remaining
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+{/* Recent projects */}
         <div className="lg:col-span-2 bg-white/[0.03] border border-white/[0.08] rounded-2xl overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
             <span className="text-sm font-bold text-white">Recent projects</span>
