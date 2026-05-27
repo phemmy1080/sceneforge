@@ -527,6 +527,16 @@ async def create_review_link(redis: aioredis.Redis, ws_id: str, proj_id: str,
         "status":      "pending",   # pending | approved | changes_requested
     }
     await redis.set(_review_key(token), json.dumps(review), ex=REVIEW_TTL)
+
+    # Store the latest review token on the project for easy retrieval
+    try:
+        proj = await get_project(redis, proj_id)
+        if proj:
+            proj["latest_review_token"] = token
+            await redis.set(_proj_key(proj_id), json.dumps(proj))
+    except Exception as e:
+        logger.warning("Failed to store review token on project: %s", e)
+
     await _log_activity(redis, ws_id, created_by, "review_link_created",
                         {"proj_id": proj_id, "token": token})
     return review
