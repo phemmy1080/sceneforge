@@ -448,13 +448,12 @@ async def process_voice_upload(
         raise HTTPException(413, detail="File too large. Maximum 50MB.")
 
     # Save to temp file
-    import tempfile as _tmp
     suffix = Path(file.filename or "voice.webm").suffix or ".webm"
-    with _tmp.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(data)
         tmp_path = tmp.name
 
-    work_dir = _tmp.mkdtemp(prefix="voice_proc_")
+    work_dir = tempfile.mkdtemp(prefix="voice_proc_")
 
     try:
         result = await process_and_upload(
