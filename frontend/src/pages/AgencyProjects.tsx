@@ -379,7 +379,9 @@ export function ProjectDetail() {
   // jobId used for sessionStorage persistence of patched scene URLs
   const lastJobIdRef = React.useRef<string>('');
   const [activeScene, setActiveScene] = useState<number | null>(null);
-  const [sceneCommentText, setSceneCommentText] = useState("");
+  const [sceneCommentText, setSceneCommentText] = useState("")
+  const [sceneCommentPriority, setSceneCommentPriority] = useState("medium")
+  const [sceneCommentDeadline, setSceneCommentDeadline] = useState("");
   const [rerenderingScene, setRerenderingScene] = useState<number | null>(null);
   const [patchedVideoUrl, setPatchedVideoUrl] = useState<string>("");
   const [jobCreatedBy, setJobCreatedBy]       = useState<string | null>(null);
@@ -635,9 +637,13 @@ export function ProjectDetail() {
       const res = await api.post(`/api/agency/projects/${id}/comments`, {
         text: sceneCommentText,
         scene_index: activeScene,
+        priority: sceneCommentPriority,
+        deadline: sceneCommentDeadline || undefined,
       });
       setComments(c => [...c, res.data.comment]);
       setSceneCommentText("");
+      setSceneCommentPriority("medium");
+      setSceneCommentDeadline("");
     } catch {}
   }
 
@@ -1653,18 +1659,38 @@ ${emailBody}`)}
                   </div>
                 )}
 
-                {/* Add scene comment */}
-                <div className="flex gap-2">
-                  <input type="text"
-                    placeholder={`Add note on Scene ${activeScene + 1}…`}
-                    value={sceneCommentText}
-                    onChange={e => setSceneCommentText(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && postSceneComment()}
-                    className="flex-1 bg-white/[0.06] border border-white/[0.1] rounded-xl px-3.5 py-2 text-white text-sm outline-none focus:border-amber-400/50 placeholder:text-white/20 transition" />
-                  <button onClick={postSceneComment} disabled={!sceneCommentText.trim()}
-                    className="bg-amber-400 hover:bg-amber-300 text-black font-bold px-4 py-2 rounded-xl text-sm transition disabled:opacity-40">
-                    Note
-                  </button>
+                {/* Add scene comment with priority + deadline */}
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <input type="text"
+                      placeholder={`Add note on Scene ${activeScene + 1}…`}
+                      value={sceneCommentText}
+                      onChange={e => setSceneCommentText(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && postSceneComment()}
+                      className="flex-1 bg-white/[0.06] border border-white/[0.1] rounded-xl px-3.5 py-2 text-white text-sm outline-none focus:border-amber-400/50 placeholder:text-white/20 transition" />
+                    <button onClick={postSceneComment} disabled={!sceneCommentText.trim()}
+                      className="bg-amber-400 hover:bg-amber-300 text-black font-bold px-4 py-2 rounded-xl text-sm transition disabled:opacity-40">
+                      Note
+                    </button>
+                  </div>
+                  {/* Priority + deadline */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex rounded-lg overflow-hidden border border-white/[0.08] text-[11px]">
+                      {([["urgent","🔴 Urgent"],["medium","🟡 Medium"],["low","🟢 Low"]] as [string,string][]).map(([p, label]) => (
+                        <button key={p} onClick={() => setSceneCommentPriority(p)}
+                          className={`px-2.5 py-1 font-semibold transition ${sceneCommentPriority === p ? "bg-white/15 text-white" : "text-white/30 hover:text-white/60"}`}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      type="datetime-local"
+                      value={sceneCommentDeadline}
+                      onChange={e => setSceneCommentDeadline(e.target.value)}
+                      className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-lg px-2 py-1 text-[11px] text-white/40 focus:outline-none focus:border-white/20 focus:text-white"
+                      title="Set a deadline (optional)"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
