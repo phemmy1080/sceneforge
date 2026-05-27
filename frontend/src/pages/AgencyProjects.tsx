@@ -7,6 +7,9 @@ interface Project {
   id: string; title: string; client_name: string; brand_kit_id: string;
   platform: string; status: string; notes: string; render_job_ids: string[];
   assigned_to: string[]; created_at: string; updated_at: string;
+  deadline?: string;
+  scene_counts?: { total: number; flagged: number; approved: number };
+  health?: string[];
 }
 interface Comment {
   id: string; author_name: string; author_id: string; scene_index: number | null;
@@ -141,8 +144,12 @@ export function AgencyProjects() {
     ? projects.filter(p => p.assigned_to?.includes(currentUser?.id || ''))
     : projects;
 
-  const allFiltered   = filter === "all" ? projects : projects.filter(p => p.status === filter);
-  const filtered      = allFiltered; // all projects visible to everyone for viewing
+  const filtered = (() => {
+    if (filter === "all")      return projects;
+    if (filter === "assigned") return myProjects;
+    if (filter === "overdue")  return projects.filter(p => p.health?.includes("Project overdue"));
+    return projects.filter(p => p.status === filter);
+  })();
 
   if (suspendedBlocked) return (
     <SuspendedScreen
@@ -173,17 +180,31 @@ export function AgencyProjects() {
 
       {/* Filter pills */}
       <div className="flex gap-2 flex-wrap">
-        {[{ key: "all", label: "All" }, ...STATUSES].map(s => (
-          <button key={s.key} onClick={() => setFilter(s.key)}
-            className={`text-xs px-3.5 py-1.5 rounded-full font-semibold border transition-all ${
-              filter === s.key
+        {[
+          { key: "all",         label: "All",            count: projects.length },
+          { key: "assigned",    label: "Assigned to me", count: myProjects.length, editorOnly: true },
+          { key: "in_review",   label: "Needs review",   count: projects.filter(p => p.status === "in_review").length },
+          { key: "overdue",     label: "Overdue",        count: projects.filter(p => p.health?.includes("Project overdue")).length },
+          { key: "client_review", label: "With client",  count: projects.filter(p => p.status === "client_review").length },
+          { key: "exported",    label: "Completed",      count: projects.filter(p => p.status === "exported").length },
+        ].filter(f => !f.editorOnly || wsRole === "editor").map(f => (
+          <button key={f.key} onClick={() => setFilter(f.key)}
+            className={`text-xs px-3.5 py-1.5 rounded-full font-semibold border transition-all flex items-center gap-1.5 ${
+              filter === f.key
                 ? "bg-amber-400 text-black border-amber-400 shadow-md shadow-amber-400/20"
-                : "border-white/[0.1] text-white/40 hover:border-white/[0.2] hover:text-white/60"
+                : "text-white/50 border-white/[0.1] hover:border-white/20 hover:text-white/80"
             }`}>
-            {s.label}
+            {f.label}
+            {f.count > 0 && (
+              <span className={`text-[10px] px-1.5 rounded-full font-bold ${
+                filter === f.key ? "bg-black/20 text-black/70" : "bg-white/[0.08] text-white/40"
+              }`}>{f.count}</span>
+            )}
           </button>
         ))}
       </div>
+
+      {loadingdiv>
 
       {loading ? (
         <div className="flex justify-center py-16">
@@ -220,7 +241,35 @@ export function AgencyProjects() {
                         <span className="text-[10px] bg-amber-400/15 text-amber-300 border border-amber-400/20 px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0">Assigned</span>
                       )}
                     </div>
-                    <div className="text-xs text-white/30 mt-0.5">{p.client_name || "No client"} · {p.platform}</div>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="text-xs text-white/30">{p.client_name || "No client"} · {p.platform}</span>
+                    {/* Scene counters */}
+                    {p.scene_counts && p.scene_counts.total > 0 && (
+                      <div className="flex items-center gap-1.5 text-[10px]">
+                        <span className="text-white/25">{p.scene_counts.total} scenes</span>
+                        {p.scene_counts.flagged > 0 && (
+                          <span className="bg-red-400/15 text-red-400 border border-red-400/20 px-1.5 py-0.5 rounded-full font-semibold">
+                            {p.scene_counts.flagged} flagged
+                          </span>
+                        )}
+                        {p.scene_counts.approved > 0 && (
+                          <span className="bg-teal-400/10 text-teal-400/70 border border-teal-400/15 px-1.5 py-0.5 rounded-full">
+                            {p.scene_counts.approved} resolved
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {/* Health warnings */}
+                  {p.health && p.health.length > 0 && (
+                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                      {p.health.map((w: string, i: number) => (
+                        <span key={i} className="text-[10px] bg-amber-400/10 text-amber-400/80 border border-amber-400/20 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                          ⚠ {w}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   </div>
                   {/* Assigned members avatars */}
                   {p.assigned_to && p.assigned_to.length > 0 && isAdminOrOwner && (
