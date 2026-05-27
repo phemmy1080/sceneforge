@@ -136,7 +136,7 @@ export default function AgencyDashboard() {
   const [error, setError] = useState("");
   // Derive immediately from cached user — no API round-trip needed
   const [suspendedBlocked, setSuspendedBlocked] = useState(!!(currentUser?.workspace_suspended));
-  const [workspace, setWorkspace] = useState<{ name: string } | null>(null);
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
 
   // Role — derived once, used everywhere in this component
   const wsRole = currentUser?.workspace_role || (currentUser?.plan === 'agency' ? 'owner' : 'editor');
