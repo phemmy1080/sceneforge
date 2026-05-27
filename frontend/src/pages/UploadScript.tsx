@@ -13,6 +13,7 @@ export default function UploadScript() {
   const markStepComplete = useStore((s) => s.markStepComplete)
   const setUploadedVoicePath = useStore((s) => s.setUploadedVoicePath)
   const config = useStore((s) => s.config)
+  const agencyProjectId = useStore((s: any) => s.agencyProjectId)
 
   const [mode, setMode] = useState<UploadMode>('script-only')
   const { canUploadFootage, isFree } = usePlanLimits()
