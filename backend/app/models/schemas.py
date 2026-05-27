@@ -109,6 +109,10 @@ class Scene(BaseModel):
     b_roll_note: Optional[str] = Field(default=None, max_length=300)
     custom_image_url: Optional[str] = Field(default=None, max_length=1000,
                                            description="User-uploaded image URL for this scene")
+    custom_voice_url: Optional[str] = Field(default=None, max_length=1000,
+                                           description="User-uploaded/recorded voice clip URL for this scene")
+    custom_voice_duration: Optional[float] = Field(default=None,
+                                           description="Detected duration of the custom voice clip in seconds")
 
 
 class GenerateScenesResponse(BaseModel):
