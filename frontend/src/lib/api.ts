@@ -74,7 +74,9 @@ api.interceptors.response.use(
     const url = error?.config?.url || ''
     const isSilent = error?.config?.silent === true
     const isExpiredJob = status === 404 && url.includes('/render/status/')
-    if (status !== 401 && !isSilent && !isExpiredJob) {
+    // Suppress 403 on token-usage — editors don't have access and that's expected
+    const isExpected403 = status === 403 && url.includes('/token-usage')
+    if (status !== 401 && !isSilent && !isExpiredJob && !isExpected403) {
       document.dispatchEvent(new CustomEvent('api-error', {
         detail: { message: friendly, status, raw: error?.response?.data }
       }))
