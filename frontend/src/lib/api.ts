@@ -188,6 +188,9 @@ export interface TokenBalance {
   can_render: boolean
   cost_per_video: number
   tokens_per_scene?: number
+  renders_today?: number
+  daily_limit?: number
+  renders_remaining?: number
   is_agency?: boolean
   ws_id?: string
 }
