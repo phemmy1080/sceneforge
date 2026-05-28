@@ -122,7 +122,7 @@ interface AppState {
 }
 
 const DEFAULT_CONFIG: ProjectConfig = {
-  niche: '', style: 'Educational', platform: 'TikTok (9:16, 60s)',
+  niche: '', style: 'Educational', platform: 'TikTok',
   tone: 'Energetic & punchy', audience: '', context: '', ideaHints: '', ideaTags: [],
 }
 
@@ -522,7 +522,8 @@ export const useStore = create<AppState>()(
             subtitle_style: voiceConfig.subtitle_style,
             music: voiceConfig.music,
             project_title: selectedIdea?.title ?? activeProject?.name ?? 'Untitled',
-            platform: config.platform,
+            // Use config.platform, fall back to active project's platform, then TikTok
+            platform: config.platform || activeProject?.platform || 'TikTok',
             uploaded_voice_path: uploadedVoicePath ?? null,
             project_id: activeProjectId ?? undefined,
             // Pass agency project ID so worker can load brand kit
