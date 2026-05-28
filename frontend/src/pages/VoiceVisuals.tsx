@@ -189,7 +189,6 @@ export default function VoiceVisuals() {
                 key={s} label={s}
                 selected={voiceConfig.subtitle_style === s}
                 onClick={() => setVoiceConfig({ subtitle_style: s as any })}
-                title={SUBTITLE_LABELS[s] || s}
               />
             ))}
           </div>
