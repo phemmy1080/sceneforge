@@ -276,23 +276,25 @@ async def render_scene(
                 .replace("\n", " ")
             )
 
-        # Use newline character between lines (works on most ffmpeg builds)
-        if len(lines) == 2:
-            safe = _sanitise(lines[0]) + "\n" + _sanitise(lines[1])
-        else:
-            safe = _sanitise(lines[0] if lines else "")
+        # Single line only — literal newlines in drawtext text break ffmpeg filter parser
+        # Join both lines with a space instead
+        safe = _sanitise(" ".join(lines) if lines else "")
 
         # Hard cap — safety net
         if len(safe) > 120:
             safe = safe[:117] + "..."
 
         # ── Styles ────────────────────────────────────────────────────────────
-        # x clamp: keep text inside frame with 20px margin on each side
-        _x = f"max(20, (w-text_w)/2)"
+        # Compute y positions as integer pixels (avoid h*0.80 expressions in drawtext)
+        _y_viral   = int(h * 0.80)
+        _y_minimal = int(h * 0.85)
+        _y_karaoke = int(h * 0.82)
+        # x: centre text; use (w-text_w)/2 which is valid drawtext arithmetic
+        _x = "(w-text_w)/2"
         style_map = {
-            "viral":   f"fontsize={_font_size_viral}:fontcolor=white:borderw=3:bordercolor=black:shadowx=2:shadowy=2:shadowcolor=black@0.6:x={_x}:y=h*0.80:line_spacing=4",
-            "minimal": f"fontsize={_font_size_minimal}:fontcolor=white:borderw=1:bordercolor=black@0.4:x={_x}:y=h*0.85:line_spacing=4",
-            "karaoke": f"fontsize={_font_size_karaoke}:fontcolor=yellow:borderw=2:bordercolor=black:shadowx=2:shadowy=2:shadowcolor=black@0.8:x={_x}:y=h*0.82:line_spacing=4",
+            "viral":   f"fontsize={_font_size_viral}:fontcolor=white:borderw=3:bordercolor=black:shadowx=2:shadowy=2:shadowcolor=black@0.6:x={_x}:y={_y_viral}",
+            "minimal": f"fontsize={_font_size_minimal}:fontcolor=white:borderw=1:bordercolor=black@0.4:x={_x}:y={_y_minimal}",
+            "karaoke": f"fontsize={_font_size_karaoke}:fontcolor=yellow:borderw=2:bordercolor=black:shadowx=2:shadowy=2:shadowcolor=black@0.8:x={_x}:y={_y_karaoke}",
             "none":    None,
         }
         sub_style = style_map.get(subtitle_style, style_map["viral"])
