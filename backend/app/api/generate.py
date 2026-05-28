@@ -29,7 +29,7 @@ settings = get_settings()
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-async def _get_user_plan(redis, authorization: Optional[str]) -> str:
+async def _get_user_plan(redis, authorization: Optional[str], agency_project_id: str = "") -> str:
     """
     Resolve effective plan for limits/feature gating.
     Agency workspace members inherit the workspace plan so they get
@@ -50,22 +50,22 @@ async def _get_user_plan(redis, authorization: Optional[str]) -> str:
         if raw:
             user_plan = _json.loads(raw).get("plan", "free")
 
-        # Check if user belongs to a workspace — if so, use workspace plan
-        # so agency editors get agency-tier limits, not their personal plan
-        try:
-            from app.services.agency_service import get_workspace_id_for_user
-            ws_id = await get_workspace_id_for_user(redis, user_id)
-            if ws_id:
-                ws_raw = await redis.get(f"workspace:{ws_id}")
-                if ws_raw:
-                    ws = _json.loads(ws_raw)
-                    ws_plan = ws.get("plan", user_plan)
-                    # Effective plan = best of user plan and workspace plan
-                    PLAN_RANK = {"free": 0, "pro": 1, "studio": 2, "agency": 3}
-                    if PLAN_RANK.get(ws_plan, 0) > PLAN_RANK.get(user_plan, 0):
-                        return ws_plan
-        except Exception:
-            pass  # workspace lookup failure is non-fatal
+        # Only use workspace plan when generating for an agency project
+        # In personal mode, always use the user's personal plan
+        if agency_project_id:
+            try:
+                from app.services.agency_service import get_workspace_id_for_user
+                ws_id = await get_workspace_id_for_user(redis, user_id)
+                if ws_id:
+                    ws_raw = await redis.get(f"workspace:{ws_id}")
+                    if ws_raw:
+                        ws = _json.loads(ws_raw)
+                        ws_plan = ws.get("plan", user_plan)
+                        PLAN_RANK = {"free": 0, "starter": 1, "pro": 2, "studio": 3, "agency": 4}
+                        if PLAN_RANK.get(ws_plan, 0) > PLAN_RANK.get(user_plan, 0):
+                            return ws_plan
+            except Exception:
+                pass
 
         return user_plan
     except Exception as e:
@@ -157,9 +157,9 @@ async def generate_ideas(
 ):
     await _check_tokens(authorization)
     try:
-        plan  = await _get_user_plan(redis, authorization)
-        # Inject brand kit fields if this is an agency project
         agency_proj_id = getattr(req, "agency_project_id", "") or ""
+        plan  = await _get_user_plan(redis, authorization, agency_project_id=agency_proj_id)
+        # Inject brand kit fields if this is an agency project
         if agency_proj_id:
             kit_fields = await _resolve_brand_kit(redis, authorization, agency_proj_id)
             for k, v in kit_fields.items():
