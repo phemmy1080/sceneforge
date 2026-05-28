@@ -186,6 +186,25 @@ async def _all_users(redis, force: bool = False) -> list[dict]:
                         pass
         if cursor == 0:
             break
+    # For workspace members, replace tokens_remaining with the agency pool balance
+    # so the admin panel always shows the same value as the user sees in the app
+    for u in users:
+        uid = u.get("id", "")
+        if not uid:
+            continue
+        try:
+            ws_raw = await redis.get(f"workspace:user:{uid}")
+            if ws_raw:
+                ws_id = ws_raw if isinstance(ws_raw, str) else ws_raw.decode()
+                pool_raw = await redis.get(f"agency:tokens:{ws_id}")
+                if pool_raw is not None:
+                    pool_bal = int(pool_raw)
+                    u["tokens_remaining"] = pool_bal
+                    u["tokens_total"]     = pool_bal
+                    u["_is_agency_member"] = True
+                    u["_ws_id"] = ws_id
+        except Exception:
+            pass
     _all_users_cache["ts"]   = now
     _all_users_cache["data"] = users
     return users
