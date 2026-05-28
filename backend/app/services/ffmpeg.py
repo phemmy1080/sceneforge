@@ -315,7 +315,7 @@ async def render_scene(
                 dt = (
                     f"drawtext=fontfile='{_FONT_PATH}':text='{safe}'"
                     f":{_base_style}"
-                    f":enable='between(t\,{t_start}\,{t_end})'"
+                    f":enable='between(t\\,{t_start}\\,{t_end})'"
                 )
                 drawtext_filters.append(dt)
 
