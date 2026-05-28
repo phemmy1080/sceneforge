@@ -30,9 +30,25 @@ PLATFORM_DIMS: dict[str, tuple[int, int]] = {
 def _dims(platform: str | None) -> tuple[int, int]:
     if not platform:
         return (1080, 1920)
-    key = (platform or "").lower().replace(" ", "_").replace("-", "_")
+    key = (
+        (platform or "")
+        .lower()
+        .replace(" ", "_")
+        .replace("-", "_")
+        .replace("/", "_")   # handles "Twitter/X" → "twitter_x"
+    )
+    # 1. Exact match first
+    if key in PLATFORM_DIMS:
+        return PLATFORM_DIMS[key]
+    # 2. Key starts with a known platform (e.g. "youtube_shorts" starts with "youtube")
+    #    — use longest matching key to avoid "youtube" matching "youtube_shorts"
+    matches = [(k, d) for k, d in PLATFORM_DIMS.items() if key.startswith(k) or k.startswith(key)]
+    if matches:
+        # Pick the longest key match (most specific)
+        return max(matches, key=lambda x: len(x[0]))[1]
+    # 3. Substring fallback
     for k, d in PLATFORM_DIMS.items():
-        if k in key or key in k:
+        if k in key:
             return d
     return (1080, 1920)
 
@@ -220,39 +236,63 @@ async def render_scene(
 
     # Add subtitles on top of motion filter
     if subtitle_style != "none" and _HAS_DRAWTEXT:
+        # ── Font size: scale by WIDTH not height — prevents overflow on portrait ──
+        # Use ~4.5% of frame width, capped so text fits comfortably
+        # Portrait 1080px wide → max ~42px; landscape 1920px wide → max ~48px
+        _font_size_viral   = max(24, min(48, int(w * 0.045)))
+        _font_size_minimal = max(20, min(38, int(w * 0.035)))
+        _font_size_karaoke = max(22, min(44, int(w * 0.040)))
+
+        # ── Word wrap: target ~40 chars per line, max 2 lines ────────────────
+        # Estimate chars per line based on font size and frame width
+        # Average char width ≈ font_size * 0.55
+        _chars_per_line = max(20, int(w * 0.85 / (_font_size_viral * 0.55)))
         words = scene.text.replace("\n", " ").split()
-        lines, current = [], []
+        lines, current, line_len = [], [], 0
         for word in words:
-            current.append(word)
-            if len(current) >= 8:
+            wlen = len(word) + 1
+            if line_len + wlen > _chars_per_line and current:
                 lines.append(" ".join(current))
-                current = []
-        if current:
+                current, line_len = [], 0
+                if len(lines) >= 2:   # max 2 lines shown at once
+                    break
+            current.append(word)
+            line_len += wlen
+        if current and len(lines) < 2:
             lines.append(" ".join(current))
-        import re as _re
-        safe = (
-            " ".join(lines[:3])           # flat line — newlines break drawtext on some builds
-            .replace("'",   "\u2019")    # smart quote instead of escaped apostrophe
-            .replace("\"", "\u201C")   # smart double quote
-            .replace(":",   "\\:")
-            .replace("%",   "\\%")
-            .replace("[",   "\\[")
-            .replace("]",   "\\]")
-            .replace("{",   "")
-            .replace("}",   "")
-            .replace("\n", " ")
-        )
-        # Truncate to 100 chars to avoid very long drawtext strings
-        if len(safe) > 100:
-            safe = safe[:97] + "..."
-        # Scale font size relative to frame height for consistent readability
-        _font_size_viral   = max(32, int(h * 0.054))   # ~52px at 1080p, ~38px at 720p
-        _font_size_minimal = max(26, int(h * 0.042))
-        _font_size_karaoke = max(30, int(h * 0.050))
+
+        # ── Sanitise text for drawtext ────────────────────────────────────────
+        def _sanitise(t: str) -> str:
+            return (
+                t
+                .replace("'",  "\u2019")
+                .replace("\"", "\u201C")
+                .replace(":",   "\\:")
+                .replace("%",   "\\%")
+                .replace("[",   "\\[")
+                .replace("]",   "\\]")
+                .replace("{",   "")
+                .replace("}",   "")
+                .replace("\n", " ")
+            )
+
+        # Use newline character between lines (works on most ffmpeg builds)
+        if len(lines) == 2:
+            safe = _sanitise(lines[0]) + "\n" + _sanitise(lines[1])
+        else:
+            safe = _sanitise(lines[0] if lines else "")
+
+        # Hard cap — safety net
+        if len(safe) > 120:
+            safe = safe[:117] + "..."
+
+        # ── Styles ────────────────────────────────────────────────────────────
+        # x clamp: keep text inside frame with 20px margin on each side
+        _x = f"max(20, (w-text_w)/2)"
         style_map = {
-            "viral":   f"fontsize={_font_size_viral}:fontcolor=white:borderw=4:bordercolor=black:shadowx=2:shadowy=2:shadowcolor=black@0.6:x=(w-text_w)/2:y=h*0.80",
-            "minimal": f"fontsize={_font_size_minimal}:fontcolor=white:borderw=1:bordercolor=black@0.4:x=(w-text_w)/2:y=h*0.85",
-            "karaoke": f"fontsize={_font_size_karaoke}:fontcolor=yellow:borderw=3:bordercolor=black:shadowx=2:shadowy=2:shadowcolor=black@0.8:x=(w-text_w)/2:y=h*0.82",
+            "viral":   f"fontsize={_font_size_viral}:fontcolor=white:borderw=3:bordercolor=black:shadowx=2:shadowy=2:shadowcolor=black@0.6:x={_x}:y=h*0.80:line_spacing=4",
+            "minimal": f"fontsize={_font_size_minimal}:fontcolor=white:borderw=1:bordercolor=black@0.4:x={_x}:y=h*0.85:line_spacing=4",
+            "karaoke": f"fontsize={_font_size_karaoke}:fontcolor=yellow:borderw=2:bordercolor=black:shadowx=2:shadowy=2:shadowcolor=black@0.8:x={_x}:y=h*0.82:line_spacing=4",
             "none":    None,
         }
         sub_style = style_map.get(subtitle_style, style_map["viral"])
