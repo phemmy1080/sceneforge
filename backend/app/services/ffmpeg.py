@@ -315,42 +315,78 @@ async def render_scene(
                 dt = (
                     f"drawtext=fontfile='{_FONT_PATH}':text='{safe}'"
                     f":{_base_style}"
-                    f":enable='between(t\\,{t_start}\\,{t_end})'"
+                    f":enable='between(t,{t_start},{t_end})'"
                 )
                 drawtext_filters.append(dt)
 
             if drawtext_filters:
-                vf = motion_vf + "," + ",".join(drawtext_filters)
+                # Use filter_complex with labelled streams when chaining multiple
+                # drawtext filters — avoids the option-parser ambiguity of -vf
+                # when enable='between(...)' contains commas
+                fc = motion_vf
+                for dt in drawtext_filters:
+                    fc = fc + "," + dt
+                use_filter_complex = True
             else:
-                vf = motion_vf
+                fc = motion_vf
+                use_filter_complex = False
     else:
-        vf = motion_vf
+        fc = motion_vf
+        use_filter_complex = False
 
-    cmd = [
-        "ffmpeg", "-y",
-        *(["-loop", "1", "-t", str(duration)] if is_image else []),
-        "-i", visual_path,
-        "-t", str(duration),
-        "-i", audio_path,
-        "-map", "0:v:0",
-        "-map", "1:a:0",
-        "-vf", vf,
-        "-c:v", "libx264",
-        "-preset", "ultrafast",
-        "-crf", "26",
-        "-threads", "2",
-        "-r", "30",
-        "-c:a", "aac",
-        "-ar", "44100",
-        "-ac", "2",
-        "-b:a", "128k",
-        "-pix_fmt", "yuv420p",
-        "-avoid_negative_ts", "make_zero",
-        "-async", "1",
-        "-vsync", "cfr",
-        "-shortest",
-        output_path,
-    ]
+    # Build ffmpeg command — use -filter_complex when multiple drawtext are chained
+    if use_filter_complex:
+        cmd = [
+            "ffmpeg", "-y",
+            *(["-loop", "1", "-t", str(duration)] if is_image else []),
+            "-i", visual_path,
+            "-t", str(duration),
+            "-i", audio_path,
+            "-filter_complex", f"[0:v]{fc}[vout]",
+            "-map", "[vout]",
+            "-map", "1:a:0",
+            "-c:v", "libx264",
+            "-preset", "ultrafast",
+            "-crf", "26",
+            "-threads", "2",
+            "-r", "30",
+            "-c:a", "aac",
+            "-ar", "44100",
+            "-ac", "2",
+            "-b:a", "128k",
+            "-pix_fmt", "yuv420p",
+            "-avoid_negative_ts", "make_zero",
+            "-async", "1",
+            "-vsync", "cfr",
+            "-shortest",
+            output_path,
+        ]
+    else:
+        cmd = [
+            "ffmpeg", "-y",
+            *(["-loop", "1", "-t", str(duration)] if is_image else []),
+            "-i", visual_path,
+            "-t", str(duration),
+            "-i", audio_path,
+            "-map", "0:v:0",
+            "-map", "1:a:0",
+            "-vf", fc,
+            "-c:v", "libx264",
+            "-preset", "ultrafast",
+            "-crf", "26",
+            "-threads", "2",
+            "-r", "30",
+            "-c:a", "aac",
+            "-ar", "44100",
+            "-ac", "2",
+            "-b:a", "128k",
+            "-pix_fmt", "yuv420p",
+            "-avoid_negative_ts", "make_zero",
+            "-async", "1",
+            "-vsync", "cfr",
+            "-shortest",
+            output_path,
+        ]
 
     logger.info("Scene %s | motion=%s | platform=%s | %dx%d | %.1fs",
                 scene.id, motion, platform, w, h, duration)
