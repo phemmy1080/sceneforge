@@ -315,21 +315,23 @@ async def render_scene(
                 safe    = _sanitise(chunk)
                 if not safe:
                     continue
-                # enable= uses ffmpeg expression — t is the current timestamp
+                # Build drawtext without any quotes — use backslash escaping
+                # fontfile= and text= must NOT be quoted in filter_complex list args
+                # spaces in text must be escaped as \  (backslash-space)
+                # commas in enable=between() must be escaped as \,
+                # No quotes around fontfile/text — spaces escaped as \space, commas as \,
+                safe_text = safe.replace(" ", "\\ ").replace(":", "\\:")
+                _comma = "\\,"
                 dt = (
-                    f"drawtext=fontfile='{_FONT_PATH}':text='{safe}'"
+                    f"drawtext=fontfile={_FONT_PATH}"
+                    f":text={safe_text}"
                     f":{_base_style}"
-                    f":enable=between(t,{t_start},{t_end})"
+                    f":enable=between(t{_comma}{t_start}{_comma}{t_end})"
                 )
                 drawtext_filters.append(dt)
 
             if drawtext_filters:
-                # Use filter_complex with labelled streams when chaining multiple
-                # drawtext filters — avoids the option-parser ambiguity of -vf
-                # when enable='between(...)' contains commas
-                fc = motion_vf
-                for dt in drawtext_filters:
-                    fc = fc + "," + dt
+                fc = motion_vf + "," + ",".join(drawtext_filters)
                 use_filter_complex = True
             else:
                 fc = motion_vf
@@ -338,7 +340,8 @@ async def render_scene(
         fc = motion_vf
         use_filter_complex = False
 
-    # Build ffmpeg command — use -filter_complex when multiple drawtext are chained
+    # Always use -filter_complex when subtitles are present (avoids -vf quoting issues)
+    # For no-subtitle case, use simpler -vf path
     if use_filter_complex:
         cmd = [
             "ffmpeg", "-y",
@@ -346,8 +349,8 @@ async def render_scene(
             "-i", visual_path,
             "-t", str(duration),
             "-i", audio_path,
-            "-filter_complex", f"[0:v]{fc}[vout]",
-            "-map", "[vout]",
+            "-filter_complex", fc,
+            "-map", "0:v",
             "-map", "1:a:0",
             "-c:v", "libx264",
             "-preset", "ultrafast",
