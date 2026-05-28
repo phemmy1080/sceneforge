@@ -1913,7 +1913,7 @@ async function loadDash(){
       row+='<td><div style="font-weight:600;color:var(--text);font-size:13px">'+(u.full_name||'-')+'</div>';
       row+='<div style="font-size:11px;color:var(--text3)">'+u.email+'</div></td>';
       row+='<td>'+planTag(u.plan)+'</td>';
-      row+='<td style="font-family:monospace;color:'+(u.tokens_remaining<100?'var(--rose)':'var(--text2)')+'">'+fmt(u.tokens_remaining)+'</td>';
+      row+='<td style="font-family:monospace;color:'+(u.tokens_remaining<100?'var(--rose)':'var(--text2)')+'">'+fmt(u.tokens_remaining)+(u._is_agency_member?'<span style="font-size:9px;background:rgba(124,58,237,.15);color:#a78bfa;border-radius:3px;padding:1px 4px;margin-left:4px">pool</span>':'')+'</td>';
       row+='<td>'+(u.videos_created||0)+'</td>';
       row+='<td style="color:var(--text3)">'+ago(u.created_at)+'</td>';
       row+='<td><button class="btn btn-ghost btn-xs" data-uid="'+u.id+'" onclick="openModal(this.dataset.uid)">Manage</button></td>';
@@ -1952,7 +1952,7 @@ function renderUsers(users){
       +'<td><div style="font-weight:600;color:var(--text);font-size:13px">'+(u.full_name||'—')+'</div>'
       +'<div style="font-size:11px;color:var(--text3);margin-top:2px">'+u.email+'</div></td>'
       +'<td>'+planTag(u.plan)+susp+'</td>'
-      +'<td style="font-family:DM Mono,monospace;font-size:12px;color:'+(u.tokens_remaining<100?'var(--rose)':'var(--text2)')+'">'+fmt(u.tokens_remaining)+'</td>'
+      +'<td style="font-family:DM Mono,monospace;font-size:12px;color:'+(u.tokens_remaining<100?'var(--rose)':'var(--text2)')+'">'+fmt(u.tokens_remaining)+(u._is_agency_member?'<span style="font-size:9px;background:rgba(124,58,237,.15);color:#a78bfa;border-radius:3px;padding:1px 4px;margin-left:4px">pool</span>':'')+'</td>'
       +'<td style="color:var(--text2);text-align:center">'+(u.videos_created||0)+'</td>'
       +'<td style="color:var(--text3);font-size:11px">'+ago(u.created_at)+'</td>'
       +'<td><button class="btn btn-ghost btn-xs" data-uid="'+u.id+'" onclick="openModal(this.dataset.uid)">Manage</button></td>'
