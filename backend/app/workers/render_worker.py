@@ -545,6 +545,13 @@ async def render_video(ctx, job_id: str, payload: dict):
             "status": "failed", "stage": "Failed",
             "pct": 0, "job_id": job_id, "error": str(e),
         }), ex=3600)
+        # Always free the concurrency slot — even on failure
+        if user_id:
+            try:
+                await unregister_active_job(redis, user_id, job_id)
+                logger.info("Freed concurrency slot for user %s after failed job %s", user_id, job_id)
+            except Exception as _ue:
+                logger.warning("unregister_active_job failed: %s", _ue)
         raise
 
 
