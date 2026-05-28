@@ -36,57 +36,67 @@ logger = logging.getLogger(__name__)
 _client: Optional[AsyncOpenAI] = None
 
 
-def get_client() -> AsyncOpenAI:
-    global _client
-    if _client is not None:
-        return _client
+# ── Plan-based model routing ──────────────────────────────────────────────────
+# free / starter  → Groq (fast, free tier)
+# pro / studio / agency → OpenAI GPT-4o-mini (higher quality, paid plans)
 
-    if settings.groq_api_key:
-        _client = AsyncOpenAI(
-            api_key=settings.groq_api_key,
-            base_url="https://api.groq.com/openai/v1",
-        )
-        logger.info("Using Groq — model: %s", settings.groq_model)
+_PREMIUM_PLANS = {"pro", "studio", "agency"}
 
-    elif settings.gemini_api_key:
-        # Gemini via OpenAI-compatible endpoint
-        _client = AsyncOpenAI(
-            api_key=settings.gemini_api_key,
-            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-        )
-        logger.info("Using Gemini — model: %s", settings.gemini_model)
-
-    elif settings.grok_api_key:
-        _client = AsyncOpenAI(
-            api_key=settings.grok_api_key,
-            base_url="https://api.x.ai/v1",
-        )
-        logger.info("Using Grok (xAI) — model: %s", settings.grok_model)
-
-    elif settings.anthropic_api_key:
-        _client = AsyncOpenAI(
-            api_key=settings.anthropic_api_key,
-            base_url="https://api.anthropic.com/v1",
-        )
-        logger.info("Using Anthropic compat — model: %s", settings.claude_model)
-
-    else:
-        raise ValueError(
-            "No AI API key found. Set GROQ_API_KEY in your .env file. "
-            "Get a free key at https://console.groq.com"
-        )
-
-    return _client
+# Cached clients — one per provider
+_groq_client: AsyncOpenAI | None = None
+_openai_client: AsyncOpenAI | None = None
 
 
-def _model() -> str:
+def _get_groq_client() -> AsyncOpenAI:
+    global _groq_client
+    if _groq_client is not None:
+        return _groq_client
+    if not settings.groq_api_key:
+        raise ValueError("GROQ_API_KEY not set — required for free/starter plans")
+    _groq_client = AsyncOpenAI(
+        api_key=settings.groq_api_key,
+        base_url="https://api.groq.com/openai/v1",
+    )
+    logger.info("Groq client initialised — model: %s", settings.groq_model)
+    return _groq_client
+
+
+def _get_openai_client() -> AsyncOpenAI:
+    global _openai_client
+    if _openai_client is not None:
+        return _openai_client
+    if not settings.openai_api_key:
+        # Fallback to Groq if OpenAI key not configured
+        logger.warning("OPENAI_API_KEY not set — falling back to Groq for premium plan")
+        return _get_groq_client()
+    _openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
+    logger.info("OpenAI client initialised — model: %s", settings.openai_model)
+    return _openai_client
+
+
+def get_client(plan: str = "free") -> AsyncOpenAI:
+    """Return the appropriate AI client for the given plan."""
+    if plan in _PREMIUM_PLANS:
+        return _get_openai_client()
+    return _get_groq_client()
+
+
+def _model(plan: str = "free") -> str:
+    """Return the model name for the given plan."""
+    if plan in _PREMIUM_PLANS:
+        if settings.openai_api_key:
+            return settings.openai_model
+        # Fallback to Groq if OpenAI not configured
+        return settings.groq_model
     if settings.groq_api_key:
         return settings.groq_model
     if settings.gemini_api_key:
         return settings.gemini_model
-    if settings.grok_api_key:
-        return settings.grok_model
-    return settings.claude_model
+    return settings.groq_model
+
+
+def get_client() -> AsyncOpenAI:  # kept for backward compat (non-plan callers)
+    return _get_groq_client()
 
 
 def _clean_json(raw: str) -> str:
@@ -100,8 +110,9 @@ def _clean_json(raw: str) -> str:
     return raw
 
 
-async def generate_ideas(req: GenerateIdeasRequest) -> list[IdeaItem]:
-    client = get_client()
+async def generate_ideas(req: GenerateIdeasRequest, plan: str = "free") -> list[IdeaItem]:
+    client = get_client(plan)
+    logger.info("Using %s (%s) for plan=%s", "OpenAI" if plan in _PREMIUM_PLANS and settings.openai_api_key else "Groq", _model(plan), plan)
 
     # Build hints section from user-supplied topic tags
     hints_section = ""
@@ -129,7 +140,7 @@ Return ONLY a valid JSON array of 6 objects — no explanation, no markdown:
 - angle: unique approach or angle (max 60 chars)"""
 
     response = await client.chat.completions.create(
-        model=_model(),
+        model=_model(plan),
         max_tokens=1024,
         temperature=0.8,
         messages=[
@@ -150,8 +161,9 @@ Return ONLY a valid JSON array of 6 objects — no explanation, no markdown:
     return [IdeaItem(**item) for item in data]
 
 
-async def generate_script(req: GenerateScriptRequest) -> str:
-    client = get_client()
+async def generate_script(req: GenerateScriptRequest, plan: str = "free") -> str:
+    client = get_client(plan)
+    logger.info("Using %s (%s) for plan=%s", "OpenAI" if plan in _PREMIUM_PLANS and settings.openai_api_key else "Groq", _model(plan), plan)
     is_long = "YouTube" in req.platform and "Shorts" not in req.platform
     duration = "3-5 minutes (450-700 words)" if is_long else "45-60 seconds (120-160 words)"
 
@@ -170,7 +182,7 @@ Add visual cues like [SHOW: chart] or [CUT TO: talking head].
 Short punchy sentences for voiceover. No markdown."""
 
     response = await client.chat.completions.create(
-        model=_model(),
+        model=_model(plan),
         max_tokens=2048,
         temperature=0.7,
         messages=[
@@ -182,8 +194,9 @@ Short punchy sentences for voiceover. No markdown."""
     return response.choices[0].message.content or ""
 
 
-async def stream_script(req: GenerateScriptRequest) -> AsyncGenerator[str, None]:
-    client = get_client()
+async def stream_script(req: GenerateScriptRequest, plan: str = "free") -> AsyncGenerator[str, None]:
+    client = get_client(plan)
+    logger.info("Streaming script via %s for plan=%s", "openai" if plan in _PREMIUM_PLANS and settings.openai_api_key else "groq", plan)
     is_long = "YouTube" in req.platform and "Shorts" not in req.platform
     duration = "3-5 minutes" if is_long else "45-60 seconds"
 
@@ -196,7 +209,7 @@ Use [HOOK] [INTRO] [MAIN] [CTA] section labels.
 Add [SHOW: ...] visual cues. Short punchy sentences."""
 
     stream = await client.chat.completions.create(
-        model=_model(),
+        model=_model(plan),
         max_tokens=2048,
         temperature=0.7,
         stream=True,
@@ -212,8 +225,9 @@ Add [SHOW: ...] visual cues. Short punchy sentences."""
             yield delta
 
 
-async def generate_scenes(req: GenerateScenesRequest) -> list[Scene]:
-    client = get_client()
+async def generate_scenes(req: GenerateScenesRequest, plan: str = "free") -> list[Scene]:
+    client = get_client(plan)
+    logger.info("Using %s (%s) for plan=%s", "OpenAI" if plan in _PREMIUM_PLANS and settings.openai_api_key else "Groq", _model(plan), plan)
 
     brand_ctx = _brand_context(req)
     cta_note = f"\n- End the final scene with this call-to-action: {req.brand_default_cta}" if getattr(req, 'brand_default_cta', '') else ""
@@ -250,7 +264,7 @@ Rules:
 - Each scene text = one complete thought or paragraph from the script{cta_note}"""
 
     response = await client.chat.completions.create(
-        model=_model(),
+        model=_model(plan),
         max_tokens=8192,
         temperature=0.1,
         messages=[
