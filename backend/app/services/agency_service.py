@@ -326,6 +326,34 @@ async def update_workspace_branding(redis: aioredis.Redis, ws_id: str, user_id: 
     await _log_activity(redis, ws_id, user_id, "workspace_branding_updated", {"fields": list(data.keys())})
     return ws
 
+
+async def mark_scene_comments_actioned(
+    redis: aioredis.Redis, proj_id: str, scene_index: int
+) -> int:
+    """Mark all unresolved comments on a scene as actioned (editor has re-rendered).
+    Returns number of comments marked."""
+    raw_list = await redis.lrange(_comments_key(proj_id), 0, -1)
+    count = 0
+    new_list = []
+    for r in raw_list:
+        c = json.loads(r)
+        if (
+            c.get("scene_index") == scene_index
+            and not c.get("resolved", False)
+            and not c.get("actioned_at")
+        ):
+            c["actioned_at"] = _now()
+            count += 1
+        new_list.append(json.dumps(c))
+    if count > 0:
+        # Replace the list atomically
+        pipe = redis.pipeline()
+        pipe.delete(_comments_key(proj_id))
+        for item in new_list:
+            pipe.rpush(_comments_key(proj_id), item)
+        await pipe.execute()
+    return count
+
 async def rename_workspace(redis: aioredis.Redis, ws_id: str,
                             owner_id: str, new_name: str) -> dict:
     """Update workspace display name."""
@@ -706,6 +734,7 @@ async def add_comment(redis: aioredis.Redis, proj_id: str, author_id: str,
         "is_client":        is_client,
         "is_scene_update":  is_scene_update,
         "resolved":     False,
+        "actioned_at":  None,        # set when editor re-renders the scene
         "created_at":   _now(),
         "priority":     priority,    # "urgent" | "medium" | "low"
         "deadline":     deadline,    # ISO datetime string or None
@@ -824,6 +853,7 @@ async def get_dashboard(redis: aioredis.Redis, ws_id: str, user_id: str = "") ->
     # ── My Tasks: unresolved scene comments on projects assigned to this user ──
     scenes_needing_review: list[dict] = []
     my_tasks: list[dict] = []
+    actioned_tasks: list[dict] = []
     if user_id:
         for proj in projects:
             if user_id not in proj.get("assigned_to", []):
@@ -832,7 +862,16 @@ async def get_dashboard(redis: aioredis.Redis, ws_id: str, user_id: str = "") ->
             scene_comments = []
             for r in comments_raw:
                 c = json.loads(r)
-                if c.get("scene_index") is not None and not c.get("resolved", False):
+                # Collect actioned (re-rendered but awaiting owner review)
+                if c.get("scene_index") is not None and not c.get("resolved", False) and c.get("actioned_at"):
+                    actioned_tasks.append({
+                        "scene_index":   c["scene_index"],
+                        "text":          c.get("text", ""),
+                        "project_id":    proj["id"],
+                        "project_title": proj.get("title", "Untitled"),
+                        "actioned_at":   c["actioned_at"],
+                    })
+                if c.get("scene_index") is not None and not c.get("resolved", False) and not c.get("actioned_at"):
                     sc = {
                         "scene_index": c["scene_index"],
                         "text":        c.get("text", ""),
@@ -1015,6 +1054,7 @@ async def get_dashboard(redis: aioredis.Redis, ws_id: str, user_id: str = "") ->
         "scenes_needing_review": scenes_needing_review,
         "scenes_updated":        scenes_updated,
         "my_tasks":              my_tasks,
+        "actioned_tasks":         actioned_tasks,
         "editor_metrics":        editor_metrics,
         "recent_scene_updates":  recent_scene_updates[:20],
     }
