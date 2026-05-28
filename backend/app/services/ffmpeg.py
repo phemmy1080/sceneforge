@@ -87,7 +87,7 @@ def _find_font() -> str | None:
 
 
 _FONT_PATH = _find_font()
-_HAS_DRAWTEXT = _FONT_PATH is not None  # Enabled when a font is available
+_HAS_DRAWTEXT = False  # Disabled — subtitle rendering disabled
 logger.info("FFmpeg drawtext available: %s (font: %s)", _HAS_DRAWTEXT, _FONT_PATH)
 
 
