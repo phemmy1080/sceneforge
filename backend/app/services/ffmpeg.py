@@ -234,39 +234,39 @@ async def render_scene(
     else:
         motion_vf = f"scale=w={w}:h={h}:force_original_aspect_ratio=increase,crop={w}:{h},setsar=1"
 
-    # Add subtitles on top of motion filter
-    if subtitle_style != "none" and _HAS_DRAWTEXT:
-        # ── Font size: scale by WIDTH not height — prevents overflow on portrait ──
-        # Use ~4.5% of frame width, capped so text fits comfortably
-        # Portrait 1080px wide → max ~42px; landscape 1920px wide → max ~48px
-        _font_size_viral   = max(24, min(48, int(w * 0.045)))
-        _font_size_minimal = max(20, min(38, int(w * 0.035)))
-        _font_size_karaoke = max(22, min(44, int(w * 0.040)))
+    # ── Kinetic word-by-word subtitles ──────────────────────────────────────────
+    # Shows 3-4 words at a time, centred, timed across the scene duration.
+    # Each chunk has its own drawtext with enable='between(t,start,end)'.
+    # This prevents overflow completely and looks like CapCut/Reels style.
+    if subtitle_style != "none" and _HAS_DRAWTEXT and _FONT_PATH:
+        # Font size scales by frame width
+        _fs = {
+            "viral":   max(24, min(52, int(w * 0.048))),
+            "minimal": max(20, min(40, int(w * 0.036))),
+            "karaoke": max(22, min(48, int(w * 0.043))),
+        }.get(subtitle_style, max(24, min(52, int(w * 0.048))))
 
-        # ── Word wrap: target ~40 chars per line, max 2 lines ────────────────
-        # Estimate chars per line based on font size and frame width
-        # Average char width ≈ font_size * 0.55
-        _chars_per_line = max(20, int(w * 0.85 / (_font_size_viral * 0.55)))
-        words = scene.text.replace("\n", " ").split()
-        lines, current, line_len = [], [], 0
-        for word in words:
-            wlen = len(word) + 1
-            if line_len + wlen > _chars_per_line and current:
-                lines.append(" ".join(current))
-                current, line_len = [], 0
-                if len(lines) >= 2:   # max 2 lines shown at once
-                    break
-            current.append(word)
-            line_len += wlen
-        if current and len(lines) < 2:
-            lines.append(" ".join(current))
+        # Y position as integer pixels
+        _y = {
+            "viral":   int(h * 0.80),
+            "minimal": int(h * 0.85),
+            "karaoke": int(h * 0.82),
+        }.get(subtitle_style, int(h * 0.80))
 
-        # ── Sanitise text for drawtext ────────────────────────────────────────
+        # Style string (no y= here — added per drawtext call)
+        _x = "(w-text_w)/2"
+        _styles = {
+            "viral":   f"fontsize={_fs}:fontcolor=white:borderw=3:bordercolor=black:shadowx=2:shadowy=2:shadowcolor=black@0.6:x={_x}:y={_y}",
+            "minimal": f"fontsize={_fs}:fontcolor=white:borderw=1:bordercolor=black@0.4:x={_x}:y={_y}",
+            "karaoke": f"fontsize={_fs}:fontcolor=yellow:borderw=2:bordercolor=black:shadowx=2:shadowy=2:shadowcolor=black@0.8:x={_x}:y={_y}",
+        }
+        _base_style = _styles.get(subtitle_style, _styles["viral"])
+
         def _sanitise(t: str) -> str:
             return (
                 t
                 .replace("'",  "\u2019")
-                .replace("\"", "\u201C")
+                .replace("\"",  "\u201C")
                 .replace(":",   "\\:")
                 .replace("%",   "\\%")
                 .replace("[",   "\\[")
@@ -274,34 +274,55 @@ async def render_scene(
                 .replace("{",   "")
                 .replace("}",   "")
                 .replace("\n", " ")
+                .replace("\\", "")
             )
 
-        # Single line only — literal newlines in drawtext text break ffmpeg filter parser
-        # Join both lines with a space instead
-        safe = _sanitise(" ".join(lines) if lines else "")
+        # ── Split text into chunks of 3-4 words ───────────────────────────────
+        # Aim for chunks whose rendered width fits ~80% of frame
+        # Average char width ≈ font_size * 0.55 for LiberationSans Bold
+        _max_chars = max(12, int(w * 0.78 / (_fs * 0.55)))
+        words = scene.text.replace("\n", " ").split()
+        chunks: list[str] = []
+        cur: list[str] = []
+        cur_len = 0
+        for word in words:
+            wl = len(word) + 1
+            if cur and (cur_len + wl > _max_chars or len(cur) >= 4):
+                chunks.append(" ".join(cur))
+                cur, cur_len = [], 0
+            cur.append(word)
+            cur_len += wl
+        if cur:
+            chunks.append(" ".join(cur))
 
-        # Hard cap — safety net
-        if len(safe) > 120:
-            safe = safe[:117] + "..."
-
-        # ── Styles ────────────────────────────────────────────────────────────
-        # Compute y positions as integer pixels (avoid h*0.80 expressions in drawtext)
-        _y_viral   = int(h * 0.80)
-        _y_minimal = int(h * 0.85)
-        _y_karaoke = int(h * 0.82)
-        # x: centre text; use (w-text_w)/2 which is valid drawtext arithmetic
-        _x = "(w-text_w)/2"
-        style_map = {
-            "viral":   f"fontsize={_font_size_viral}:fontcolor=white:borderw=3:bordercolor=black:shadowx=2:shadowy=2:shadowcolor=black@0.6:x={_x}:y={_y_viral}",
-            "minimal": f"fontsize={_font_size_minimal}:fontcolor=white:borderw=1:bordercolor=black@0.4:x={_x}:y={_y_minimal}",
-            "karaoke": f"fontsize={_font_size_karaoke}:fontcolor=yellow:borderw=2:bordercolor=black:shadowx=2:shadowy=2:shadowcolor=black@0.8:x={_x}:y={_y_karaoke}",
-            "none":    None,
-        }
-        sub_style = style_map.get(subtitle_style, style_map["viral"])
-        if _FONT_PATH and sub_style:
-            vf = f"{motion_vf},drawtext=fontfile='{_FONT_PATH}':text='{safe}':{sub_style}"
-        else:
+        if not chunks:
             vf = motion_vf
+        else:
+            # ── Assign time windows ───────────────────────────────────────────
+            # Each chunk gets equal time, with a small 0.05s gap between them
+            n = len(chunks)
+            gap = 0.05
+            slot = max(0.3, (duration - gap * (n - 1)) / n)
+
+            drawtext_filters: list[str] = []
+            for i, chunk in enumerate(chunks):
+                t_start = round(i * (slot + gap), 3)
+                t_end   = round(t_start + slot, 3)
+                safe    = _sanitise(chunk)
+                if not safe:
+                    continue
+                # enable= uses ffmpeg expression — t is the current timestamp
+                dt = (
+                    f"drawtext=fontfile='{_FONT_PATH}':text='{safe}'"
+                    f":{_base_style}"
+                    f":enable='between(t\,{t_start}\,{t_end})'"
+                )
+                drawtext_filters.append(dt)
+
+            if drawtext_filters:
+                vf = motion_vf + "," + ",".join(drawtext_filters)
+            else:
+                vf = motion_vf
     else:
         vf = motion_vf
 
