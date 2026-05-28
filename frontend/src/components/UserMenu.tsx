@@ -74,14 +74,19 @@ export default function UserMenu({ onLogout }: UserMenuProps) {
   function switchToPersonal() {
     setOpen(false)
     const store = useStore.getState()
-    // Clear agency project context AND reset config so agency
-    // niche/industry keys don't bleed into the personal workflow
+    // Clear ALL agency context so nothing bleeds into personal mode
     store.setAgencyProjectId('')
     store.setConfig({
-      niche: '', style: '', platform: '', tone: '', audience: '',
+      niche: '', style: '', platform: 'TikTok', tone: '', audience: '',
       context: '', ideaHints: '', ideaTags: [],
       objective: '', duration_hint: 60, scene_count_hint: 8, client_brief: '',
     } as any)
+    // Reset agency workflow sub-steps
+    if ((store as any).setAgencyWorkflowStep) {
+      (store as any).setAgencyWorkflowStep('setup')
+    }
+    // Reload personal projects from backend so the sidebar shows them
+    store.loadProjectsFromBackend()
     setStep('projects' as any)
   }
 
