@@ -578,7 +578,7 @@ tr:hover td{background:rgba(255,255,255,0.018)}
         <div class="stat gold"><div class="stat-label">Total users</div><div class="stat-val">—</div><div class="stat-meta">Registered accounts</div><div class="stat-icon">👤</div></div>
         <div class="stat teal"><div class="stat-label">Videos created</div><div class="stat-val">—</div><div class="stat-meta">All-time renders</div><div class="stat-icon">🎬</div></div>
         <div class="stat rose"><div class="stat-label">Transactions</div><div class="stat-val">—</div><div class="stat-meta">Paid purchases</div><div class="stat-icon">💳</div></div>
-        <div class="stat violet"><div class="stat-label">Tokens in use</div><div class="stat-val">—</div><div class="stat-meta">Circulation balance</div><div class="stat-icon">🪙</div></div>
+        <div class="stat violet"><div class="stat-label">Tokens in use</div><div class="stat-val" id="stat-tokens-total">—</div><div class="stat-meta" id="stat-tokens-meta">Personal + workspace pools</div><div class="stat-icon">🪙</div></div>
       </div>
       <div class="card">
         <div class="card-hdr"><span class="card-title">Recent users</span></div>
@@ -1861,6 +1861,7 @@ function nav(id,btn){
   if(loaders[id])loaders[id]();
 }
 
+function escHtml(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 function fmt(n){return Number(n||0).toLocaleString();}
 function ago(ts){if(!ts)return'—';var s=Math.floor((new Date()-new Date(ts))/1000);if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
 function planTag(p){
@@ -1889,6 +1890,22 @@ async function loadDash(){
     cards[1].querySelector('.stat-val').textContent=fmt(s.total_videos_created);
     cards[2].querySelector('.stat-val').textContent=fmt(s.total_transactions);
     cards[3].querySelector('.stat-val').textContent=fmt(s.total_tokens_in_circulation);
+    // Show breakdown of personal vs workspace pool tokens
+    var tokenMeta = document.getElementById('stat-tokens-meta');
+    if(tokenMeta && s.user_tokens_total !== undefined){
+      tokenMeta.textContent = fmt(s.user_tokens_total)+' personal · '+fmt(s.workspace_pool_total)+' agency pools';
+    }
+    // Render workspace pools table if pools exist
+    if(s.workspace_pools && s.workspace_pools.length > 0){
+      var poolHtml = '<div style="margin-top:16px"><div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Agency Workspace Pools</div><table class="tbl"><thead><tr><th>Workspace</th><th>Owner</th><th style="text-align:right">Token Balance</th></tr></thead><tbody>';
+      s.workspace_pools.forEach(function(p){
+        var lowColor = p.balance < 200 ? 'var(--rose)' : p.balance < 500 ? 'var(--gold)' : 'var(--teal)';
+        poolHtml += '<tr><td style="font-weight:600">'+escHtml(p.name||p.ws_id)+'</td><td style="color:var(--text3);font-size:12px">'+escHtml(p.owner_email||'—')+'</td><td style="text-align:right;font-family:DM Mono,monospace;color:'+lowColor+'">'+fmt(p.balance)+'</td></tr>';
+      });
+      poolHtml += '</tbody></table></div>';
+      var poolContainer = document.getElementById('workspace-pools-container');
+      if(poolContainer) poolContainer.innerHTML = poolHtml;
+    }
     var u=await apiFetch('/users');ALL_USERS=u.users||[];
     var rows=ALL_USERS.slice(0,8).map(function(u){
       USER_CACHE[u.id]=u;
