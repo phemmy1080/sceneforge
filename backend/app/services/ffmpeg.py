@@ -316,7 +316,7 @@ async def render_scene(
                 if not safe:
                     continue
                 # No quotes. Spaces → \ , colons → \: , enable commas → \,
-                safe_text = safe.replace(" ", "\\ ").replace(":", "\\:")
+                safe_text = safe.replace(",", "\\,").replace(" ", "\\ ").replace(":", "\\:")
                 _comma = "\\,"
                 dt = (
                     f"drawtext=fontfile={_FONT_PATH}"
