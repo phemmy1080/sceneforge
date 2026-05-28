@@ -159,13 +159,13 @@ def _motion_filter(motion: str, w: int, h: int, duration: float) -> str:
     if motion == "kenburns_in":
         return (
             f"{safe_scale},"
-            f"zoompan=z=min(zoom+0.0006\\\\,1.12):x=iw/2-(iw/zoom/2):y=ih/2-(ih/zoom/2)"
+            f"zoompan=z=min(zoom+0.0006,1.12):x=iw/2-(iw/zoom/2):y=ih/2-(ih/zoom/2)"
             f":d={frames}:s={w}x{h}:fps={fps}"
         )
     elif motion == "kenburns_out":
         return (
             f"{safe_scale},"
-            f"zoompan=z=if(gte(on\\\\,1)\\\\,1.12\\\\,max(zoom-0.0006\\\\,1.0)):x=iw/2-(iw/zoom/2):y=ih/2-(ih/zoom/2)"
+            f"zoompan=z=if(gte(on,1),1.12,max(zoom-0.0006,1.0)):x=iw/2-(iw/zoom/2):y=ih/2-(ih/zoom/2)"
             f":d={frames}:s={w}x{h}:fps={fps}"
         )
     elif motion == "pan_left":
@@ -176,7 +176,7 @@ def _motion_filter(motion: str, w: int, h: int, duration: float) -> str:
         )
         return (
             f"{pan_scale},"
-            f"zoompan=z=1.0:x=if(gte(on\\\\,1)\\\\,iw*0.15\\\\,x-iw*0.15/{frames})"
+            f"zoompan=z=1.0:x=if(gte(on,1),iw*0.15,x-iw*0.15/{frames})"
             f":y=(ih-{h})/2:d={frames}:s={w}x{h}:fps={fps}"
         )
     elif motion == "pan_right":
@@ -186,7 +186,7 @@ def _motion_filter(motion: str, w: int, h: int, duration: float) -> str:
         )
         return (
             f"{pan_scale},"
-            f"zoompan=z=1.0:x=if(gte(on\\\\,1)\\\\,0\\\\,x+iw*0.15/{frames})"
+            f"zoompan=z=1.0:x=if(gte(on,1),0,x+iw*0.15/{frames})"
             f":y=(ih-{h})/2:d={frames}:s={w}x{h}:fps={fps}"
         )
     else:
@@ -269,7 +269,7 @@ async def render_scene(
                 .replace("__", "")       # strip markdown underline
                 .replace("*",  "")       # strip markdown italic
                 .replace("#",  "")       # strip markdown headers
-                .replace("'",  "\u2019")
+                .replace("'",  "")         # remove apostrophes — breaks text= delimiter
                 .replace("\"",  "\u201C")
                 .replace(":",   "\\:")
                 .replace("%",   "\\%")
@@ -319,7 +319,7 @@ async def render_scene(
                 dt = (
                     f"drawtext=fontfile='{_FONT_PATH}':text='{safe}'"
                     f":{_base_style}"
-                    f":enable=between(t\\,{t_start}\\,{t_end})"
+                    f":enable=between(t,{t_start},{t_end})"
                 )
                 drawtext_filters.append(dt)
 
