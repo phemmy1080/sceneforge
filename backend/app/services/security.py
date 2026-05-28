@@ -257,9 +257,39 @@ async def check_user_concurrency(
     user_id: str,
     plan: str = "free",
 ) -> None:
-    """Raise 429 if user already has too many active jobs."""
+    """Raise 429 if user already has too many active jobs.
+    Self-heals by removing stale jobs whose status is failed/complete."""
     limit = MAX_JOBS_PER_USER_FREE if plan == "free" else MAX_JOBS_PER_USER
     key   = f"{USER_JOBS_PREFIX}{user_id}"
+
+    # Scan the set and remove any jobs that are no longer actually running
+    job_ids = await redis.smembers(key)
+    import json as _json
+    stale = []
+    for jid in job_ids:
+        jid_str = jid if isinstance(jid, str) else jid.decode()
+        try:
+            raw = await redis.get(f"job:{jid_str}:progress")
+            if raw:
+                progress = _json.loads(raw)
+                status = progress.get("status", "")
+                if status in ("complete", "failed", "error"):
+                    stale.append(jid_str)
+            else:
+                # No progress key — job is orphaned, remove it
+                stale.append(jid_str)
+        except Exception:
+            stale.append(jid_str)
+
+    if stale:
+        import logging as _log
+        _log.getLogger(__name__).info(
+            "Removing %d stale job(s) from concurrency set for user %s: %s",
+            len(stale), user_id, stale
+        )
+        for jid_str in stale:
+            await redis.srem(key, jid_str)
+
     count = await redis.scard(key)
     if count >= limit:
         raise HTTPException(
