@@ -70,9 +70,8 @@ def _find_font() -> str | None:
     return None
 
 
-_HAS_DRAWTEXT = _ffmpeg_has_filter("drawtext")
 _FONT_PATH = _find_font()
-_HAS_DRAWTEXT = False  # Disabled to reduce memory usage on Railway free tier
+_HAS_DRAWTEXT = _FONT_PATH is not None  # Enabled when a font is available
 logger.info("FFmpeg drawtext available: %s (font: %s)", _HAS_DRAWTEXT, _FONT_PATH)
 
 
@@ -230,19 +229,37 @@ async def render_scene(
                 current = []
         if current:
             lines.append(" ".join(current))
+        import re as _re
         safe = (
-            "\n".join(lines[:2])
-            .replace("\'",  "\u2019")
+            " ".join(lines[:3])           # flat line — newlines break drawtext on some builds
+            .replace("'",   "\u2019")    # smart quote instead of escaped apostrophe
+            .replace("\"", "\u201C")   # smart double quote
             .replace(":",   "\\:")
             .replace("%",   "\\%")
+            .replace("[",   "\\[")
+            .replace("]",   "\\]")
+            .replace("{",   "")
+            .replace("}",   "")
+            .replace("\n", " ")
         )
+        # Truncate to 100 chars to avoid very long drawtext strings
+        if len(safe) > 100:
+            safe = safe[:97] + "..."
+        # Scale font size relative to frame height for consistent readability
+        _font_size_viral   = max(32, int(h * 0.054))   # ~52px at 1080p, ~38px at 720p
+        _font_size_minimal = max(26, int(h * 0.042))
+        _font_size_karaoke = max(30, int(h * 0.050))
         style_map = {
-            "viral":   "fontsize=52:fontcolor=white:borderw=4:bordercolor=black:x=(w-text_w)/2:y=h*0.80",
-            "minimal": "fontsize=40:fontcolor=white:borderw=1:bordercolor=black@0.4:x=(w-text_w)/2:y=h*0.85",
-            "karaoke": "fontsize=48:fontcolor=yellow:borderw=3:bordercolor=black:x=(w-text_w)/2:y=h*0.82",
+            "viral":   f"fontsize={_font_size_viral}:fontcolor=white:borderw=4:bordercolor=black:shadowx=2:shadowy=2:shadowcolor=black@0.6:x=(w-text_w)/2:y=h*0.80",
+            "minimal": f"fontsize={_font_size_minimal}:fontcolor=white:borderw=1:bordercolor=black@0.4:x=(w-text_w)/2:y=h*0.85",
+            "karaoke": f"fontsize={_font_size_karaoke}:fontcolor=yellow:borderw=3:bordercolor=black:shadowx=2:shadowy=2:shadowcolor=black@0.8:x=(w-text_w)/2:y=h*0.82",
+            "none":    None,
         }
         sub_style = style_map.get(subtitle_style, style_map["viral"])
-        vf = f"{motion_vf},drawtext=fontfile='{_FONT_PATH}':text='{safe}':{sub_style}"
+        if _FONT_PATH and sub_style:
+            vf = f"{motion_vf},drawtext=fontfile='{_FONT_PATH}':text='{safe}':{sub_style}"
+        else:
+            vf = motion_vf
     else:
         vf = motion_vf
 
