@@ -436,6 +436,31 @@ async def rerender_scene(
             except Exception as _e:
                 logger.warning("Failed to update progress with patched url: %s", _e)
 
+            # Mark all unresolved comments on this scene as actioned
+            # (editor has re-rendered → task disappears from My Tasks)
+            try:
+                from app.services.agency_service import (
+                    mark_scene_comments_actioned as _mark_actioned,
+                    list_projects as _list_projs,
+                )
+                # Find the project that owns this job
+                if user_id:
+                    async for key in redis.scan_iter(f"agency:project:*", count=200):
+                        raw_proj = await redis.get(key)
+                        if not raw_proj:
+                            continue
+                        proj = json.loads(raw_proj)
+                        if job_id in proj.get("render_job_ids", []):
+                            n = await _mark_actioned(redis, proj["id"], scene_index)
+                            if n:
+                                logger.info(
+                                    "Marked %d comment(s) actioned — proj=%s scene=%d",
+                                    n, proj["id"], scene_index
+                                )
+                            break
+            except Exception as _ae:
+                logger.warning("mark_scene_comments_actioned failed (non-fatal): %s", _ae)
+
             logger.info("Partial re-render complete — job=%s scene=%d url=%s", job_id, scene_index, video_url)
             return {
                 "video_url":  video_url,
