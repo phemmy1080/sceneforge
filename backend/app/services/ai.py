@@ -76,6 +76,24 @@ def _model() -> str:
     return settings.groq_model
 
 
+# ── Brand context ─────────────────────────────────────────────────────────────
+
+def _brand_context(req) -> str:
+    """Build a brand context block from optional brand kit fields on a request."""
+    lines = []
+    if getattr(req, "brand_client_name", ""):
+        lines.append(f"Client: {req.brand_client_name}")
+    if getattr(req, "brand_ai_tone", ""):
+        lines.append(f"Brand tone: {req.brand_ai_tone}")
+    if getattr(req, "brand_voice_notes", ""):
+        lines.append(f"Brand voice rules: {req.brand_voice_notes}")
+    if getattr(req, "brand_default_cta", ""):
+        lines.append(f"Default call-to-action: {req.brand_default_cta}")
+    if not lines:
+        return ""
+    return "\n\nBRAND GUIDELINES (follow strictly):\n" + "\n".join(lines)
+
+
 # ── JSON cleaning ─────────────────────────────────────────────────────────────
 
 def _clean_json(raw: str) -> str:
@@ -112,6 +130,7 @@ async def generate_ideas(req: GenerateIdeasRequest, plan: str = "free") -> list[
         extra_parts.append(f"Additional context: {req.context}")
 
     hints_section = ("\n\n" + "\n\n".join(extra_parts)) if extra_parts else ""
+    brand_ctx = _brand_context(req)
 
     # Duration / scene guidance
     dur = getattr(req, "duration_hint", 60) or 60
@@ -123,7 +142,7 @@ async def generate_ideas(req: GenerateIdeasRequest, plan: str = "free") -> list[
 Platform: {req.platform}
 Audience: {req.audience or "general audience"}
 Tone: {req.tone}
-{duration_note}{hints_section}
+{duration_note}{hints_section}{brand_ctx}
 
 Return ONLY a valid JSON array of 6 objects — no explanation, no markdown:
 [{{"title": "...", "hook": "...", "angle": "..."}}]
@@ -158,6 +177,7 @@ async def generate_script(req: GenerateScriptRequest, plan: str = "free") -> str
     client, model = _client_and_model(plan)
     is_long  = "YouTube" in req.platform and "Shorts" not in req.platform
     duration = "3-5 minutes (450-700 words)" if is_long else "45-60 seconds (120-160 words)"
+    brand_ctx = _brand_context(req)
 
     prompt = f"""Write a complete {req.style} video script for {req.platform}.
 
@@ -170,7 +190,7 @@ Target length: {duration}
 Format with section labels on their own lines: [HOOK] [INTRO] [MAIN] [CTA]
 Add [PAUSE] for dramatic effect.
 Add visual cues like [SHOW: chart] or [CUT TO: talking head].
-Short punchy sentences for voiceover. No markdown."""
+Short punchy sentences for voiceover. No markdown.{brand_ctx}"""
 
     response = await client.chat.completions.create(
         model=model,
@@ -190,13 +210,14 @@ async def stream_script(
     client, model = _client_and_model(plan)
     is_long  = "YouTube" in req.platform and "Shorts" not in req.platform
     duration = "3-5 minutes" if is_long else "45-60 seconds"
+    brand_ctx = _brand_context(req)
 
     prompt = f"""Write a complete {req.style} video script.
 Title: "{req.idea.title}" | Hook: "{req.idea.hook}"
 Platform: {req.platform} | Duration: {duration}
 Tone: {req.tone} | Niche: {req.niche}
 Use [HOOK] [INTRO] [MAIN] [CTA] section labels.
-Add [SHOW: ...] visual cues. Short punchy sentences."""
+Add [SHOW: ...] visual cues. Short punchy sentences.{brand_ctx}"""
 
     stream = await client.chat.completions.create(
         model=model,
@@ -217,6 +238,7 @@ Add [SHOW: ...] visual cues. Short punchy sentences."""
 
 async def generate_scenes(req: GenerateScenesRequest, plan: str = "free") -> list[Scene]:
     client, model = _client_and_model(plan)
+    brand_ctx = _brand_context(req)
 
     prompt = f"""You are a professional video editor. Break this script into scenes.
 
@@ -248,7 +270,7 @@ Rules:
 - duration: calculate from word count — approximately 2.5 words per second. A 20-word scene = 8s, 30-word scene = 12s, 40-word scene = 16s
 - Do NOT cap duration at 8 seconds — use however many seconds the words require
 - Create enough scenes to cover every word — 6 to 20 scenes depending on script length
-- Each scene text = one complete thought or paragraph from the script"""
+- Each scene text = one complete thought or paragraph from the script{brand_ctx}"""
 
     response = await client.chat.completions.create(
         model=model,
