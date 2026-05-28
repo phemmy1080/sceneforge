@@ -51,6 +51,7 @@ interface DashboardData {
   scenes_needing_review?: SceneReview[];
   scenes_updated?: SceneReview[];
   my_tasks?: MyTask[];
+  actioned_tasks?: { scene_index: number; text: string; project_id: string; project_title: string; actioned_at: string }[];
   editor_metrics?: EditorMetrics;
   recent_scene_updates?: {
     project_id: string; project_title: string; scene_index: number;
@@ -408,7 +409,14 @@ export default function AgencyDashboard() {
           <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
             <div>
               <div className="text-sm font-bold text-white">My Tasks</div>
-              <div className="text-xs text-white/30 mt-0.5">{data.my_tasks!.length} task{data.my_tasks!.length !== 1 ? "s" : ""} need your attention</div>
+              <div className="text-xs text-white/30 mt-0.5">
+                {data.my_tasks!.length} task{data.my_tasks!.length !== 1 ? "s" : ""} need your attention
+                {(data.actioned_tasks?.length ?? 0) > 0 && (
+                  <span className="ml-2 text-[10px] bg-teal-400/10 text-teal-400/60 border border-teal-400/15 px-1.5 py-0.5 rounded-full">
+                    {data.actioned_tasks!.length} re-rendered, awaiting review
+                  </span>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-2 text-[11px]">
               {["urgent","medium","low"].map(p => {
@@ -463,7 +471,14 @@ export default function AgencyDashboard() {
           <div className="text-2xl">✅</div>
           <div>
             <div className="text-sm font-bold text-white">All caught up!</div>
-            <div className="text-xs text-white/30 mt-0.5">No tasks assigned to you right now.</div>
+            <div className="text-xs text-white/30 mt-0.5">
+              No tasks pending action.
+              {(data.actioned_tasks?.length ?? 0) > 0 && (
+                <span className="ml-1 text-white/25">
+                  {data.actioned_tasks!.length} scene{data.actioned_tasks!.length !== 1 ? "s" : ""} re-rendered — awaiting owner review.
+                </span>
+              )}
+            </div>
           </div>
         </div>
       )}
