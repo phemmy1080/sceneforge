@@ -163,7 +163,7 @@ class CreateCouponRequest(BaseModel):
 
 # Cache _all_users for 60 seconds to avoid repeated full Redis scans
 _all_users_cache: dict = {"ts": 0.0, "data": []}
-_ALL_USERS_TTL = 60  # seconds
+_ALL_USERS_TTL = 10  # seconds — short TTL so token balances stay current
 
 async def _all_users(redis, force: bool = False) -> list[dict]:
     import time
@@ -253,9 +253,34 @@ async def get_stats(redis=Depends(get_redis), admin: dict = Depends(_require_adm
             break
 
     avg_scenes = round(total_scenes / total_videos, 1) if total_videos > 0 else 0
+
+    # Sum workspace token pools (agency:tokens:{ws_id})
+    workspace_pool_total = 0
+    workspace_pools: list[dict] = []
+    cursor3 = 0
+    while True:
+        cursor3, wkeys = await redis.scan(cursor3, match="agency:tokens:*", count=200)
+        for wkey in wkeys:
+            raw_pool = await redis.get(wkey)
+            if raw_pool:
+                try:
+                    pool_bal = int(raw_pool)
+                    ws_id = wkey.split("agency:tokens:")[-1]
+                    workspace_pool_total += pool_bal
+                    workspace_pools.append({"ws_id": ws_id, "balance": pool_bal})
+                except (ValueError, TypeError):
+                    pass
+        if cursor3 == 0:
+            break
+
+    user_token_total = sum(u.get("tokens_remaining", 0) for u in users)
+
     return {
         "total_users": len(users),
-        "total_tokens_in_circulation": sum(u.get("tokens_remaining", 0) for u in users),
+        "total_tokens_in_circulation": user_token_total + workspace_pool_total,
+        "user_tokens_total": user_token_total,
+        "workspace_pool_total": workspace_pool_total,
+        "workspace_pools": sorted(workspace_pools, key=lambda x: x["balance"], reverse=True),
         "total_videos_created": total_videos,
         "total_transactions": tx_count,
         "users_by_plan": plans,
@@ -266,6 +291,41 @@ async def get_stats(redis=Depends(get_redis), admin: dict = Depends(_require_adm
 
 
 # ─── Users ────────────────────────────────────────────────────────────────────
+
+
+@router.get("/workspaces/pools")
+async def get_workspace_pools(redis=Depends(get_redis), admin: dict = Depends(_require_admin)):
+    """Return all agency workspace token pools with workspace name and balance."""
+    pools = []
+    cursor = 0
+    while True:
+        cursor, wkeys = await redis.scan(cursor, match="agency:tokens:*", count=200)
+        for wkey in wkeys:
+            ws_id = wkey.split("agency:tokens:")[-1] if "agency:tokens:" in wkey else wkey
+            raw_pool = await redis.get(wkey)
+            balance = int(raw_pool) if raw_pool else 0
+            # Try to get workspace name
+            ws_raw = await redis.get(f"workspace:{ws_id}")
+            ws_name = ""
+            owner_email = ""
+            if ws_raw:
+                try:
+                    ws = json.loads(ws_raw)
+                    ws_name = ws.get("name", "")
+                    owner_email = ws.get("owner_email", "")
+                except Exception:
+                    pass
+            pools.append({
+                "ws_id": ws_id,
+                "name": ws_name,
+                "owner_email": owner_email,
+                "balance": balance,
+            })
+        if cursor == 0:
+            break
+    pools.sort(key=lambda x: x["balance"], reverse=True)
+    return {"pools": pools, "total": sum(p["balance"] for p in pools)}
+
 
 @router.get("/users")
 async def list_users(redis=Depends(get_redis), admin: dict = Depends(_require_admin)):
