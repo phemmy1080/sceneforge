@@ -213,6 +213,15 @@ async def get_user_out_with_workspace(redis: aioredis.Redis, user_id: str,
             user_out.workspace_role = role
             suspended_raw = await redis.get(f"workspace:suspended:{ws_id}:{user_id}")
             user_out.workspace_suspended = bool(suspended_raw)
+            # Replace tokens_remaining with the actual agency pool balance
+            # so /me always reflects the same value as /tokens for workspace members
+            try:
+                pool_raw = await redis.get(f"agency:tokens:{ws_id}")
+                if pool_raw is not None:
+                    user_out.tokens_remaining = int(pool_raw)
+                    user_out.tokens_total     = int(pool_raw)
+            except Exception:
+                pass
     except Exception:
         pass
     return user_out
