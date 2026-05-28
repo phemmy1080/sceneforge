@@ -300,10 +300,10 @@ async def render_scene(
             chunks.append(" ".join(cur))
 
         if not chunks:
-            vf = motion_vf
+            use_filter_complex = False
+            fc = motion_vf
         else:
             # ── Assign time windows ───────────────────────────────────────────
-            # Each chunk gets equal time, with a small 0.05s gap between them
             n = len(chunks)
             gap = 0.05
             slot = max(0.3, (duration - gap * (n - 1)) / n)
@@ -315,11 +315,7 @@ async def render_scene(
                 safe    = _sanitise(chunk)
                 if not safe:
                     continue
-                # Build drawtext without any quotes — use backslash escaping
-                # fontfile= and text= must NOT be quoted in filter_complex list args
-                # spaces in text must be escaped as \  (backslash-space)
-                # commas in enable=between() must be escaped as \,
-                # No quotes around fontfile/text — spaces escaped as \space, commas as \,
+                # No quotes. Spaces → \ , colons → \: , enable commas → \,
                 safe_text = safe.replace(" ", "\\ ").replace(":", "\\:")
                 _comma = "\\,"
                 dt = (
@@ -331,17 +327,21 @@ async def render_scene(
                 drawtext_filters.append(dt)
 
             if drawtext_filters:
-                fc = motion_vf + "," + ",".join(drawtext_filters)
+                # ── Semicolon-separated filter graph ──────────────────────────
+                # zoompan cannot be chained directly with drawtext in one filtergraph.
+                # Solution: zoompan outputs to [zoomed], drawtext reads from [zoomed].
+                # Format: [0:v]motion_vf[zoomed];[zoomed]drawtext,...[out]
+                motion_part = f"[0:v]{motion_vf}[zoomed]"
+                subtitle_part = f"[zoomed]{','.join(drawtext_filters)}[out]"
+                fc = motion_part + ";" + subtitle_part
                 use_filter_complex = True
             else:
-                fc = motion_vf
                 use_filter_complex = False
+                fc = motion_vf
     else:
-        fc = motion_vf
         use_filter_complex = False
+        fc = motion_vf
 
-    # Always use -filter_complex when subtitles are present (avoids -vf quoting issues)
-    # For no-subtitle case, use simpler -vf path
     if use_filter_complex:
         cmd = [
             "ffmpeg", "-y",
@@ -350,7 +350,7 @@ async def render_scene(
             "-t", str(duration),
             "-i", audio_path,
             "-filter_complex", fc,
-            "-map", "0:v",
+            "-map", "[out]",
             "-map", "1:a:0",
             "-c:v", "libx264",
             "-preset", "ultrafast",
