@@ -15,6 +15,12 @@ const VISUAL_SOURCES = [
   { value: 'dalle',        label: 'AI images (DALL-E 3)',   plan: 'pro'  },
 ]
 const SUBTITLE_STYLES = ['viral', 'minimal', 'karaoke', 'none']
+const SUBTITLE_LABELS: Record<string, string> = {
+  viral:   'Viral (kinetic)',
+  minimal: 'Minimal (kinetic)',
+  karaoke: 'Karaoke (kinetic)',
+  none:    'None',
+}
 const MUSIC_OPTIONS   = ['none', 'upbeat', 'cinematic', 'lofi', 'inspiring']
 
 const MOTION_OPTIONS = [
@@ -183,6 +189,7 @@ export default function VoiceVisuals() {
                 key={s} label={s}
                 selected={voiceConfig.subtitle_style === s}
                 onClick={() => setVoiceConfig({ subtitle_style: s as any })}
+                title={SUBTITLE_LABELS[s] || s}
               />
             ))}
           </div>
@@ -272,7 +279,7 @@ export default function VoiceVisuals() {
             </span> total
           </span>
           <span>Voice: <span className="text-white/80 font-medium">{voiceConfig.voice_name}</span></span>
-          <span>Subs: <span className="text-white/80 font-medium">{voiceConfig.subtitle_style}</span></span>
+          <span>Subs: <span className="text-white/80 font-medium">{SUBTITLE_LABELS[voiceConfig.subtitle_style] || voiceConfig.subtitle_style}</span></span>
         </div>
       </div>
 
