@@ -180,22 +180,25 @@ async def start_render(
     # Store user_id alongside the job so the worker can deduct after success
     if user_id:
         await redis.set(f"job:{job_id}:user_id", user_id, ex=86400)
-        # Store workspace_id so worker can deduct from shared pool
-        try:
-            ws_id = await get_workspace_id_for_user(redis, user_id)
-            if ws_id:
-                # Block suspended members from rendering
-                suspended = await redis.get(f"workspace:suspended:{ws_id}:{user_id}")
-                if suspended:
-                    raise HTTPException(
-                        status_code=403,
-                        detail="Your workspace access has been suspended. Contact the workspace owner."
-                    )
-                await redis.set(f"job:{job_id}:ws_id", ws_id, ex=86400)
-        except HTTPException:
-            raise
-        except Exception:
-            pass
+        # Only store workspace_id when rendering an agency project — NOT in personal mode
+        # This ensures personal-mode renders always deduct from personal tokens
+        agency_proj_id = req.agency_project_id if hasattr(req, "agency_project_id") else None
+        if agency_proj_id:
+            try:
+                ws_id = await get_workspace_id_for_user(redis, user_id)
+                if ws_id:
+                    # Block suspended members from rendering
+                    suspended = await redis.get(f"workspace:suspended:{ws_id}:{user_id}")
+                    if suspended:
+                        raise HTTPException(
+                            status_code=403,
+                            detail="Your workspace access has been suspended. Contact the workspace owner."
+                        )
+                    await redis.set(f"job:{job_id}:ws_id", ws_id, ex=86400)
+            except HTTPException:
+                raise
+            except Exception:
+                pass
     if prev_job_id:
         await redis.set(f"job:{job_id}:prev_job_id", prev_job_id, ex=86400)
     # Store niche for analytics
