@@ -1639,42 +1639,69 @@ tr:hover td{background:rgba(255,255,255,0.018)}
           </div>
         </div>
         <div class="card">
-          <div class="card-hdr"><span class="card-title">Campaign emails</span></div>
-          <div style="padding:14px 20px;display:flex;flex-direction:column;gap:10px">
+          <div class="card-hdr">
+            <span class="card-title">Campaign emails</span>
+            <span style="font-size:11px;color:var(--text3)">Click Preview to see the full email</span>
+          </div>
+          <div style="padding:10px 16px;margin-bottom:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--border)">
+            <span style="font-size:11px;color:var(--text3)">Preview as:</span>
+            <input id="preview-name" value="Sarah Johnson" placeholder="Name"
+              style="background:var(--ink2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:11.5px;padding:4px 10px;width:130px;outline:none">
+            <input id="preview-tokens" value="850" placeholder="Tokens"
+              style="background:var(--ink2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:11.5px;padding:4px 10px;width:72px;outline:none">
+            <input id="preview-niche" value="fitness" placeholder="Niche"
+              style="background:var(--ink2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:11.5px;padding:4px 10px;width:90px;outline:none">
+          </div>
+          <div style="padding:10px 16px;display:flex;flex-direction:column;gap:8px">
             <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--ink2);border-radius:8px">
               <div>
                 <div style="font-size:13px;font-weight:700;color:#fff">🎉 Welcome email</div>
                 <div style="font-size:11px;color:var(--text3);margin-top:2px">Sent 2 min after signup · Features overview · 1,000 token highlight</div>
               </div>
-              <span style="font-size:10px;background:rgba(45,212,191,.1);color:#2dd4bf;border-radius:4px;padding:3px 8px">Auto</span>
+              <div style="display:flex;gap:6px;align-items:center">
+                <span style="font-size:10px;background:rgba(45,212,191,.1);color:#2dd4bf;border-radius:4px;padding:3px 8px">Auto</span>
+                <button class="btn btn-ghost btn-xs" onclick="previewEmail('welcome')">Preview</button>
+              </div>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--ink2);border-radius:8px">
               <div>
                 <div style="font-size:13px;font-weight:700;color:#fff">⏳ Zero-render nudge</div>
-                <div style="font-size:11px;color:var(--text3);margin-top:2px">24h after signup if no videos yet · Quick start encouragement</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px">24h after signup · No videos yet · Quick start encouragement</div>
               </div>
-              <span style="font-size:10px;background:rgba(124,58,237,.15);color:#a78bfa;border-radius:4px;padding:3px 8px">Campaign</span>
+              <div style="display:flex;gap:6px;align-items:center">
+                <span style="font-size:10px;background:rgba(124,58,237,.15);color:#a78bfa;border-radius:4px;padding:3px 8px">Campaign</span>
+                <button class="btn btn-ghost btn-xs" onclick="previewEmail('zero_render')">Preview</button>
+              </div>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--ink2);border-radius:8px">
               <div>
                 <div style="font-size:13px;font-weight:700;color:#fff">🔔 5-day inactive</div>
                 <div style="font-size:11px;color:var(--text3);margin-top:2px">5 days since last render · Content ideas + token reminder</div>
               </div>
-              <span style="font-size:10px;background:rgba(124,58,237,.15);color:#a78bfa;border-radius:4px;padding:3px 8px">Campaign</span>
+              <div style="display:flex;gap:6px;align-items:center">
+                <span style="font-size:10px;background:rgba(124,58,237,.15);color:#a78bfa;border-radius:4px;padding:3px 8px">Campaign</span>
+                <button class="btn btn-ghost btn-xs" onclick="previewEmail('inactive_5d')">Preview</button>
+              </div>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--ink2);border-radius:8px">
               <div>
                 <div style="font-size:13px;font-weight:700;color:#fff">💤 14-day inactive</div>
                 <div style="font-size:11px;color:var(--text3);margin-top:2px">2 weeks inactive · Blocker-busting messaging</div>
               </div>
-              <span style="font-size:10px;background:rgba(201,168,76,.15);color:#f59e0b;border-radius:4px;padding:3px 8px">Campaign</span>
+              <div style="display:flex;gap:6px;align-items:center">
+                <span style="font-size:10px;background:rgba(201,168,76,.15);color:#f59e0b;border-radius:4px;padding:3px 8px">Campaign</span>
+                <button class="btn btn-ghost btn-xs" onclick="previewEmail('inactive_14d')">Preview</button>
+              </div>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--ink2);border-radius:8px">
               <div>
                 <div style="font-size:13px;font-weight:700;color:#fff">🌟 30-day final</div>
                 <div style="font-size:11px;color:var(--text3);margin-top:2px">1 month inactive · What's new + final nudge</div>
               </div>
-              <span style="font-size:10px;background:rgba(248,113,113,.15);color:#f87171;border-radius:4px;padding:3px 8px">Campaign</span>
+              <div style="display:flex;gap:6px;align-items:center">
+                <span style="font-size:10px;background:rgba(248,113,113,.15);color:#f87171;border-radius:4px;padding:3px 8px">Campaign</span>
+                <button class="btn btn-ghost btn-xs" onclick="previewEmail('inactive_30d')">Preview</button>
+              </div>
             </div>
           </div>
         </div>
@@ -2009,7 +2036,7 @@ function nav(id,btn){
 
 function escHtml(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 function fmt(n){return Number(n||0).toLocaleString();}
-function ago(ts){if(!ts)return'—';var s=Math.floor((new Date()-new Date(ts))/1000);if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
+function ago(ts){if(!ts)return'--';var s=Math.floor((new Date()-new Date(ts))/1000);if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
 function planTag(p){
   // Built-in plans use CSS classes; any admin-added custom plan gets
   // a generated colour from a hash so it always renders correctly.
@@ -2046,7 +2073,7 @@ async function loadDash(){
       var poolHtml = '<div style="margin-top:16px"><div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Agency Workspace Pools</div><table class="tbl"><thead><tr><th>Workspace</th><th>Owner</th><th style="text-align:right">Token Balance</th></tr></thead><tbody>';
       s.workspace_pools.forEach(function(p){
         var lowColor = p.balance < 200 ? 'var(--rose)' : p.balance < 500 ? 'var(--gold)' : 'var(--teal)';
-        poolHtml += '<tr><td style="font-weight:600">'+escHtml(p.name||p.ws_id)+'</td><td style="color:var(--text3);font-size:12px">'+escHtml(p.owner_email||'—')+'</td><td style="text-align:right;font-family:DM Mono,monospace;color:'+lowColor+'">'+fmt(p.balance)+'</td></tr>';
+        poolHtml += '<tr><td style="font-weight:600">'+escHtml(p.name||p.ws_id)+'</td><td style="color:var(--text3);font-size:12px">'+escHtml(p.owner_email||'--')+'</td><td style="text-align:right;font-family:DM Mono,monospace;color:'+lowColor+'">'+fmt(p.balance)+'</td></tr>';
       });
       poolHtml += '</tbody></table></div>';
       var poolContainer = document.getElementById('workspace-pools-container');
@@ -2095,7 +2122,7 @@ function renderUsers(users){
     USER_CACHE[u.id]=u;
     var susp=u.suspended?'<span class="tag tag-red" style="margin-left:4px">Suspended</span>':'';
     return '<tr>'
-      +'<td><div style="font-weight:600;color:var(--text);font-size:13px">'+(u.full_name||'—')+'</div>'
+      +'<td><div style="font-weight:600;color:var(--text);font-size:13px">'+(u.full_name||'--')+'</div>'
       +'<div style="font-size:11px;color:var(--text3);margin-top:2px">'+u.email+'</div></td>'
       +'<td>'+planTag(u.plan)+susp+'</td>'
       +'<td style="font-family:DM Mono,monospace;font-size:12px;color:'+(u.tokens_remaining<100?'var(--rose)':'var(--text2)')+'">'+fmt(u.tokens_remaining)+(u._token_label?'<span style="font-size:9px;background:'+(u._token_label==="pool"?'rgba(124,58,237,.15)':'rgba(45,212,191,.12)')+';color:'+(u._token_label==="pool"?'#a78bfa':'#2dd4bf')+';border-radius:3px;padding:1px 4px;margin-left:4px">'+u._token_label+'</span>':'')+'</td>'
@@ -2283,7 +2310,7 @@ function checkAiHints(){
       BC_AI_HINT_ACTION='cta';
       hint.style.display='flex';
     } else if(text.length>200 && text.split(' ').length>60){
-      document.getElementById('bc-ai-hint-text').textContent='This email is quite long — AI can shorten it while keeping the key message';
+      document.getElementById('bc-ai-hint-text').textContent='This email is quite long -- AI can shorten it while keeping the key message';
       BC_AI_HINT_ACTION='shorten';
       hint.style.display='flex';
     }
@@ -2361,7 +2388,7 @@ function useCampaign(){
   var editor=document.getElementById('bc-editor');
   editor.innerText=window._campResult.body||'';
   switchBcTab('compose');
-  showAlert('broadcast','Campaign loaded — review and send when ready','success');
+  showAlert('broadcast','Campaign loaded -- review and send when ready','success');
 }
 
 // ── AI Writing assistant ───────────────────────────────────────────────────────
@@ -2488,7 +2515,7 @@ function bcReuseIdx(idx){
   if(b.html)editor.innerHTML=b.html;
   else editor.innerText=b.message||b.body||'';
   switchBcTab('compose');
-  showAlert('broadcast','Template loaded — edit and send when ready','success');
+  showAlert('broadcast','Template loaded -- edit and send when ready','success');
 }
 function bcReuseTemplate(){if(BC_DETAIL)bcReuseIdx(0);}
 function bcLoadTemplate(){
@@ -2529,7 +2556,7 @@ async function loadRevenue(){
 }
 
 async function loadTx(){
-  try{var d=await apiFetch('/transactions'),txns=d.transactions||[];TX_DATA=txns;document.getElementById('tx-tbody').innerHTML=txns.length?txns.map(function(t){return '<tr><td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text3)">'+(t.transaction_id||'—')+'</td><td>'+(t.plan?'<span class="tag tag-green">'+t.plan+'</span>':'—')+'</td><td style="font-family:DM Mono,monospace;color:var(--teal)">'+(t.amount?'N'+fmt(t.amount):'—')+'</td><td style="font-family:DM Mono,monospace">'+(t.tokens?fmt(t.tokens):'—')+'</td><td style="color:var(--text3)">'+(t.email||'—')+'</td><td style="color:var(--text3)">'+ago(t.ts)+'</td></tr>';}).join(''):'<tr><td colspan="6" class="loading">No transactions yet</td></tr>';}
+  try{var d=await apiFetch('/transactions'),txns=d.transactions||[];TX_DATA=txns;document.getElementById('tx-tbody').innerHTML=txns.length?txns.map(function(t){return '<tr><td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text3)">'+(t.transaction_id||'--')+'</td><td>'+(t.plan?'<span class="tag tag-green">'+t.plan+'</span>':'--')+'</td><td style="font-family:DM Mono,monospace;color:var(--teal)">'+(t.amount?'N'+fmt(t.amount):'--')+'</td><td style="font-family:DM Mono,monospace">'+(t.tokens?fmt(t.tokens):'--')+'</td><td style="color:var(--text3)">'+(t.email||'--')+'</td><td style="color:var(--text3)">'+ago(t.ts)+'</td></tr>';}).join(''):'<tr><td colspan="6" class="loading">No transactions yet</td></tr>';}
   catch(e){document.getElementById('tx-tbody').innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--rose);padding:20px">Failed to load</td></tr>';}
 }
 
@@ -2787,7 +2814,7 @@ function logDetails(l) {
   if(l.amount)  parts.push('₦' + fmt(l.amount));
   if(l.email)   parts.push(l.email);
   if(l.user_id) parts.push('uid:' + l.user_id.slice(0,8));
-  return parts.join(' · ') || '—';
+  return parts.join(' · ') || '--';
 }
 
 function renderLogs(logs) {
@@ -2967,7 +2994,7 @@ async function exportRevenueExcel(){
     ['Total revenue (NGN)', '₦'+fmt(Math.round(REV_TOTAL))],
     ['Total revenue (USD)', '$'+(REV_TOTAL/rate).toFixed(2)],
     ['Total transactions', REV_TX],
-    ['Avg per transaction (NGN)', REV_TX>0?'₦'+fmt(Math.round(REV_TOTAL/REV_TX)):'—'],
+    ['Avg per transaction (NGN)', REV_TX>0?'₦'+fmt(Math.round(REV_TOTAL/REV_TX)):'--'],
     ['Exchange rate used', '₦'+Math.round(rate)+'/$1'],
   ].forEach(function(r){ws2.addRow(r);});
 
@@ -3107,7 +3134,7 @@ async function exportFeedbackExcel(){
   FB_DATA.forEach(function(i){
     var u=USER_CACHE[i.user_id]||{};
     ws.addRow([i.rating,STARS[i.rating]||'',i.trigger||'',(i.tags||[]).join(', '),i.comment||'',
-      u.full_name||i.user_name||'—',u.email||i.email||'—',
+      u.full_name||i.user_name||'--',u.email||i.email||'--',
       i.ts?new Date(i.ts).toLocaleString():'']);
   });
 
@@ -3168,7 +3195,51 @@ async function exportFeedbackPdf(){
     html+='</div>';
   });
 
-  html+='</body></html>';
+  html+='
+<!-- Generic cost detail modal -->
+<div class="modal-overlay" id="cost-detail-modal" onclick="if(event.target===this)closeCostModal()">
+  <div class="modal" style="max-width:640px;max-height:88vh;overflow-y:auto">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;position:sticky;top:0;background:var(--ink1);padding-bottom:12px;z-index:1">
+      <div class="modal-title" style="font-size:16px">Render cost detail</div>
+      <button onclick="closeCostModal()" style="background:rgba(255,255,255,0.07);border:1px solid var(--border2);border-radius:50%;width:28px;height:28px;cursor:pointer;color:var(--text3);font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0">&times;</button>
+    </div>
+    <div id="cost-detail-body"></div>
+  </div>
+</div>
+
+<!-- Email campaign preview modal -->
+<div class="modal-overlay" id="email-preview-modal" onclick="if(event.target===this)closeEmailPreview()">
+  <div class="modal" style="max-width:660px;width:96%;max-height:92vh;display:flex;flex-direction:column;padding:0;overflow:hidden">
+    <!-- Modal header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="modal-title" style="font-size:15px" id="email-preview-title">Email preview</div>
+        <span id="email-preview-badge" style="font-size:10px;border-radius:4px;padding:2px 8px"></span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-ghost btn-sm" onclick="openEmailInTab()" title="Open in new tab">&#8599; Open in tab</button>
+        <button onclick="closeEmailPreview()" style="background:rgba(255,255,255,0.07);border:1px solid var(--border2);border-radius:50%;width:28px;height:28px;cursor:pointer;color:var(--text3);font-size:16px;display:flex;align-items:center;justify-content:center">&times;</button>
+      </div>
+    </div>
+    <!-- Email meta bar -->
+    <div id="email-preview-meta" style="padding:10px 20px;background:var(--ink2);border-bottom:1px solid var(--border);flex-shrink:0;font-size:12px;display:flex;flex-direction:column;gap:3px">
+    </div>
+    <!-- Size toggle -->
+    <div style="display:flex;gap:6px;padding:8px 20px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <button class="btn btn-ghost btn-xs" onclick="setPreviewWidth(540)" id="pw-desktop">Desktop</button>
+      <button class="btn btn-ghost btn-xs" onclick="setPreviewWidth(375)" id="pw-mobile">Mobile</button>
+      <span style="font-size:11px;color:var(--text3);margin-left:4px;align-self:center" id="pw-label">540px</span>
+    </div>
+    <!-- iframe -->
+    <div style="flex:1;overflow:auto;background:#080810;display:flex;justify-content:center;padding:16px 0" id="email-preview-scroll">
+      <iframe id="email-preview-frame"
+        style="width:540px;min-height:600px;border:none;border-radius:8px;background:#080810;display:block;transition:width .2s"
+        sandbox="allow-same-origin">
+      </iframe>
+    </div>
+  </div>
+</div>
+</body></html>';
   var w=window.open('','_blank');
   w.document.write(html);
   w.document.close();
@@ -3317,6 +3388,7 @@ async function fetchCsrfToken() {
 var COST_DATA = {};
 
 var COST_LOG_ALL = [];
+var COST_LOG_INDEX = {};
 
 function mCol(pct) {
   return pct >= 50 ? 'var(--teal)' : pct >= 20 ? 'var(--gold)' : 'var(--rose)';
@@ -3359,10 +3431,11 @@ function renderCostLog(records) {
     var aiBadge = r.ai_provider === 'openai'
       ? '<span style="background:rgba(124,58,237,.15);color:#a78bfa;border-radius:3px;padding:1px 5px;font-size:10px">GPT</span>'
       : '<span style="background:rgba(45,212,191,.1);color:#2dd4bf;border-radius:3px;padding:1px 5px;font-size:10px">Groq</span>';
-    return '<tr style="cursor:pointer" onclick="showJobCostDetail('+JSON.stringify(r)+')">'
+    COST_LOG_INDEX[i] = r;
+    return '<tr style="cursor:pointer" onclick="showJobCostDetail('+i+')">'
       + '<td style="color:var(--text3);font-size:11px;white-space:nowrap">' + ago(r.ts) + '</td>'
       + '<td style="font-family:DM Mono,monospace;font-size:10px;color:var(--text3)">' + (r.job_id||'').slice(0,8) + '…</td>'
-      + '<td style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="font-weight:600;color:var(--text)">' + escHtml(r.full_name||r.user_id||'—') + '</span><br><span style="color:var(--text3);font-size:10px">' + escHtml(r.email||'') + '</span></td>'
+      + '<td style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="font-weight:600;color:var(--text)">' + escHtml(r.full_name||r.user_id||'--') + '</span><br><span style="color:var(--text3);font-size:10px">' + escHtml(r.email||'') + '</span></td>'
       + '<td>' + planTag(r.plan || 'free') + '</td>'
       + '<td style="text-align:center;color:var(--text2)">' + (r.scenes||0) + '</td>'
       + '<td>' + voiceBadge + '</td>'
@@ -3381,57 +3454,77 @@ function renderCostLog(records) {
   }).join('');
 }
 
-function showJobCostDetail(r) {
+function showJobCostDetail(idx) {
+  var r = COST_LOG_INDEX[idx];
+  if (!r) return;
   var mc = mCol(r.margin_pct);
-  var html = '<div style="padding:4px 0">';
-  // Render metadata section if available
-  if (r.niche || r.platform || r.project_title || r.tokens_consumed) {
-    html += '<div style="background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.25);border-radius:8px;padding:14px 16px;margin-bottom:14px">'
-      + '<div style="font-size:10px;font-weight:700;color:#a78bfa;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Render metadata</div>'
-      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
-      + (r.project_title ? kv('Project title', r.project_title) : '')
-      + (r.niche ? kv('Niche', r.niche) : '')
-      + (r.platform ? kv('Platform', '<span style="background:rgba(45,212,191,.1);color:#2dd4bf;border-radius:4px;padding:2px 8px;font-size:11px">'+r.platform+'</span>') : '')
-      + kv('Tokens consumed', '<span style="color:#f59e0b;font-weight:700;font-family:DM Mono,monospace">'+fmt(r.tokens_consumed||100)+'</span>')
-      + (r.full_name ? kv('User', r.full_name + (r.email ? '<br><span style=\'font-size:10px;color:var(--text3)\'>'+r.email+'</span>' : '')) : '')
-      + '</div>'
-      + (r.scenes_detail && r.scenes_detail.length ? '<div style="margin-top:10px"><div style="font-size:10px;color:var(--text3);margin-bottom:6px">Scene preview (first 5)</div>'
-        + r.scenes_detail.map(function(s,i){
-          return '<div style="font-size:11px;color:var(--text3);padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04)">'
-            + '<span style="color:#a78bfa;margin-right:6px">S'+s.id+'</span>' + escHtml(s.text) + '</div>';
-        }).join('') + '</div>'
-        : '')
-      + '</div>';
-  }
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'
-    + kv('Job ID', '<span style="font-family:DM Mono,monospace;font-size:11px">' + (r.job_id||'') + '</span>')
-    + kv('Time', ago(r.ts))
+
+  var html = '';
+
+  // ── Render metadata ───────────────────────────────────────────────────────
+  html += '<div style="background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.25);border-radius:8px;padding:14px 16px;margin-bottom:14px">'
+    + '<div style="font-size:10px;font-weight:700;color:#a78bfa;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Render metadata</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    + kv('User', (r.full_name||r.user_id||'--') + (r.email ? '<br><span style="font-size:10px;color:var(--text3)">'+escHtml(r.email)+'</span>' : ''))
     + kv('Plan', planTag(r.plan||'free'))
+    + kv('Tokens consumed', '<span style="color:#f59e0b;font-weight:700;font-family:DM Mono,monospace">'+fmt(r.tokens_consumed||100)+'</span>')
+    + kv('Platform', r.platform ? '<span style="background:rgba(45,212,191,.1);color:#2dd4bf;border-radius:4px;padding:2px 8px;font-size:11px">'+escHtml(r.platform)+'</span>' : '--')
+    + kv('Niche', r.niche ? escHtml(r.niche) : '--')
+    + kv('Project', r.project_title ? escHtml(r.project_title) : '--')
+    + '</div>';
+
+  if (r.scenes_detail && r.scenes_detail.length) {
+    html += '<div style="margin-top:12px"><div style="font-size:10px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Scene text preview</div>'
+      + r.scenes_detail.map(function(s) {
+          return '<div style="font-size:11px;color:var(--text3);padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04)">'
+            + '<span style="color:#a78bfa;margin-right:8px;font-family:DM Mono,monospace">S'+s.id+'</span>' + escHtml(s.text||'') + '</div>';
+        }).join('');
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // ── Job & render info ─────────────────────────────────────────────────────
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'
+    + kv('Job ID', '<span style="font-family:DM Mono,monospace;font-size:10px;word-break:break-all">'+(r.job_id||'')+'</span>')
+    + kv('Time', ago(r.ts))
     + kv('Scenes', r.scenes||0)
-    + kv('Voice', r.voice_provider||'—')
-    + kv('AI provider', r.ai_provider||'—')
-    + kv('Render time', (r.render_seconds||0).toFixed(2) + 's')
+    + kv('Render time', (r.render_seconds||0).toFixed(2)+'s')
+    + kv('Voice', r.voice_provider||'--')
+    + kv('AI provider', r.ai_provider||'--')
     + kv('Total chars', fmt(r.total_chars||0))
-    + kv('AI input tokens', fmt(r.ai_input_tokens||0))
-    + kv('AI output tokens', fmt(r.ai_output_tokens||0))
-    + '</div>'
-    + '<div style="background:var(--ink2);border-radius:8px;padding:14px;margin-bottom:12px">'
-    + '<div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">Cost breakdown</div>'
+    + kv('AI tokens in/out', fmt(r.ai_input_tokens||0)+' / '+fmt(r.ai_output_tokens||0))
+    + '</div>';
+
+  // ── Cost breakdown bar chart ──────────────────────────────────────────────
+  html += '<div style="background:var(--ink2);border-radius:8px;padding:14px 16px;margin-bottom:14px">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:12px;text-transform:uppercase;letter-spacing:.05em">Cost breakdown</div>'
     + costBar('Voice',   r.cost_voice_usd,  r.total_cost_usd, 'var(--violet)')
     + costBar('Visual',  r.cost_visual_usd, r.total_cost_usd, 'var(--teal)')
     + costBar('AI gen',  r.cost_ai_usd,     r.total_cost_usd, 'var(--gold)')
     + costBar('Compute', r.cost_compute_usd,r.total_cost_usd, 'var(--rose)')
     + costBar('Storage', r.cost_storage_usd,r.total_cost_usd, '#64748b')
-    + '</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">'
+    + '</div>';
+
+  // ── Summary metrics ───────────────────────────────────────────────────────
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">'
     + metricBox('Total cost', usd(r.total_cost_usd,5), 'var(--rose)')
     + metricBox('Revenue/render', usd(r.revenue_per_render,5), 'var(--teal)')
-    + metricBox('Margin', usd(r.margin_usd,5) + ' (' + (r.margin_pct||0).toFixed(1) + '%)', mc)
-    + '</div>'
-    + '<div style="margin-top:12px;font-size:11px;color:var(--text3)">Plan: ₦' + fmt(r.plan_price_ngn||0) + ' · ' + fmt(r.plan_tokens||100) + ' tokens · ' + (r.renders_per_plan||1).toFixed(0) + ' renders/plan · Rate: ₦' + fmt(r.exchange_rate||1600) + '/$</div>'
+    + metricBox('Margin', usd(r.margin_usd,5)+' ('+( r.margin_pct||0).toFixed(1)+'%)', mc)
     + '</div>';
-  showModal('<b>Render cost detail</b>', html);
+
+  html += '<div style="font-size:11px;color:var(--text3);padding:8px 0">'
+    + 'Plan: ₦'+fmt(r.plan_price_ngn||0)+' &nbsp;·&nbsp; '
+    + fmt(r.plan_tokens||100)+' tokens/plan &nbsp;·&nbsp; '
+    + (r.renders_per_plan||1).toFixed(0)+' renders/plan &nbsp;·&nbsp; '
+    + 'Rate: ₦'+fmt(r.exchange_rate||1600)+'/$'
+    + '</div>';
+
+  document.getElementById('cost-detail-body').innerHTML = html;
+  document.getElementById('cost-detail-modal').classList.add('on');
+}
+
+function closeCostModal() {
+  document.getElementById('cost-detail-modal').classList.remove('on');
 }
 
 function kv(label, val) {
@@ -3545,7 +3638,7 @@ async function loadCosts() {
           + '<span style="color:var(--text3);font-size:11px">' + fmt(p.plan_tokens||100) + ' tokens → ' + (p.renders_per_plan||1).toFixed(0) + ' renders</span>'
           + '<span style="color:var(--text3);font-size:11px">' + fmt(p.renders||0) + ' renders tracked</span>'
           + '</div></div>';
-      }).join('') || '<div style="padding:16px;color:var(--text3)">No cost data yet — costs are recorded after each render</div>';
+      }).join('') || '<div style="padding:16px;color:var(--text3)">No cost data yet -- costs are recorded after each render</div>';
     }
 
     // ── Breakdown table ───────────────────────────────────────────────────
@@ -3602,6 +3695,83 @@ async function loadCosts() {
 }
 
 
+
+// ── Email preview ─────────────────────────────────────────────────────────────
+
+var CURRENT_PREVIEW_URL = '';
+
+var EMAIL_META = {
+  welcome:      {label:'Welcome email', badge:'Auto', badgeBg:'rgba(45,212,191,.1)', badgeCol:'#2dd4bf', trigger:'2 min after signup'},
+  zero_render:  {label:'Zero-render nudge', badge:'Campaign', badgeBg:'rgba(124,58,237,.15)', badgeCol:'#a78bfa', trigger:'24h after signup, no videos'},
+  inactive_5d:  {label:'5-day inactive', badge:'Campaign', badgeBg:'rgba(124,58,237,.15)', badgeCol:'#a78bfa', trigger:'5-14 days since last render'},
+  inactive_14d: {label:'14-day inactive', badge:'Campaign', badgeBg:'rgba(201,168,76,.15)', badgeCol:'#f59e0b', trigger:'14-30 days since last render'},
+  inactive_30d: {label:'30-day final', badge:'Final', badgeBg:'rgba(248,113,113,.15)', badgeCol:'#f87171', trigger:'30+ days inactive'},
+};
+
+async function previewEmail(type) {
+  var name   = (document.getElementById('preview-name')   || {}).value || 'Sarah Johnson';
+  var tokens = (document.getElementById('preview-tokens') || {}).value || '850';
+  var niche  = (document.getElementById('preview-niche')  || {}).value || 'fitness';
+
+  var url = '/campaigns/preview/'+type
+    +'?name='+encodeURIComponent(name)
+    +'&tokens='+encodeURIComponent(tokens)
+    +'&niche='+encodeURIComponent(niche);
+
+  CURRENT_PREVIEW_URL = url;
+
+  var meta = EMAIL_META[type] || {};
+  document.getElementById('email-preview-title').textContent = meta.label || type;
+  var badge = document.getElementById('email-preview-badge');
+  badge.textContent = meta.badge || '';
+  badge.style.background = meta.badgeBg || '';
+  badge.style.color = meta.badgeCol || '';
+
+  var metaDiv = document.getElementById('email-preview-meta');
+  metaDiv.innerHTML =
+    '<div style="display:flex;gap:16px;flex-wrap:wrap">'
+    +'<span><span style="color:var(--text3)">From </span><span style="color:var(--text2)">SceneForge &lt;hello@scenraforge.com&gt;</span></span>'
+    +'<span><span style="color:var(--text3)">To </span><span style="color:var(--text2)">'+escHtml(name)+'</span></span>'
+    +'<span><span style="color:var(--text3)">Tokens </span><span style="color:var(--teal)">'+tokens+'</span></span>'
+    +'<span><span style="color:var(--text3)">Trigger </span><span style="color:var(--text2)">'+(meta.trigger||'')+'</span></span>'
+    +'</div>';
+
+  // Show modal with loading state
+  var frame = document.getElementById('email-preview-frame');
+  frame.srcdoc = '<html><body style="background:#080810;display:flex;align-items:center;justify-content:center;height:400px"><p style="color:rgba(255,255,255,0.4);font-family:Arial;font-size:14px">Loading preview&#8230;</p></body></html>';
+  document.getElementById('email-preview-modal').classList.add('on');
+
+  try {
+    var resp = await fetch('/api/admin' + url, {
+      headers: {'Authorization': 'Bearer ' + (localStorage.getItem('admin_token') || '')}
+    });
+    if (!resp.ok) throw new Error('Preview failed: ' + resp.status);
+    var html = await resp.text();
+    frame.srcdoc = html;
+  } catch(e) {
+    frame.srcdoc = '<html><body style="background:#080810;padding:40px;font-family:Arial;color:#f87171"><b>Preview error:</b> ' + escHtml(e.message) + '</body></html>';
+  }
+}
+
+function closeEmailPreview() {
+  document.getElementById('email-preview-modal').classList.remove('on');
+}
+
+function setPreviewWidth(w) {
+  var frame = document.getElementById('email-preview-frame');
+  frame.style.width = w + 'px';
+  document.getElementById('pw-label').textContent = w + 'px';
+  document.getElementById('pw-desktop').style.opacity = w === 540 ? '1' : '0.5';
+  document.getElementById('pw-mobile').style.opacity  = w === 375 ? '1' : '0.5';
+}
+
+function openEmailInTab() {
+  if (!CURRENT_PREVIEW_URL) return;
+  var token = localStorage.getItem('admin_token') || '';
+  var sep = CURRENT_PREVIEW_URL.includes('?') ? '&' : '?';
+  window.open('/api/admin' + CURRENT_PREVIEW_URL + sep + 'token=' + encodeURIComponent(token), '_blank');
+}
+
 // ── Campaigns ─────────────────────────────────────────────────────────────────
 
 async function loadCampaigns() {
@@ -3612,8 +3782,8 @@ async function loadCampaigns() {
       scanned: ['👥', 'Total users scanned', ''],
       unverified: ['📧', 'Unverified email', 'Excluded from campaigns'],
       zero_render: ['⏳', 'Never rendered', '24h+ since signup'],
-      inactive_5d: ['🔔', '5-day inactive', '5–14 days since last render'],
-      inactive_14d: ['💤', '14-day inactive', '14–30 days since last render'],
+      inactive_5d: ['🔔', '5-day inactive', '5-14 days since last render'],
+      inactive_14d: ['💤', '14-day inactive', '14-30 days since last render'],
       inactive_30d: ['🌟', '30-day inactive', '30+ days since last render'],
       healthy: ['✅', 'Active users', 'Rendered in last 5 days'],
     };
@@ -3640,7 +3810,7 @@ async function loadCampaigns() {
       if (lastRun.status === 'never_run') {
         lr.innerHTML = '<p style="color:var(--text3);font-size:13px">No campaign has been run yet. Click "Run Campaign Now" to start.</p>';
       } else {
-        lr.innerHTML = '<div style="font-size:11px;color:var(--text3);margin-bottom:10px">Run at: ' + (lastRun.ts ? new Date(lastRun.ts).toLocaleString() : '—') + '</div>'
+        lr.innerHTML = '<div style="font-size:11px;color:var(--text3);margin-bottom:10px">Run at: ' + (lastRun.ts ? new Date(lastRun.ts).toLocaleString() : '--') + '</div>'
           + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'
           + [['scanned','Users scanned','var(--text2)'],
              ['welcome_sent','Welcome sent','var(--teal)'],
@@ -3667,7 +3837,7 @@ async function runCampaign() {
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Running…'; }
   try {
     var r = await apiFetch('/campaigns/run', {method:'POST'});
-    showToast('Campaign started — '+r.message, 'success');
+    showToast('Campaign started -- '+r.message, 'success');
     setTimeout(loadCampaigns, 3000);
   } catch(e) {
     showToast('Campaign failed: '+e.message, 'error');
@@ -3706,7 +3876,7 @@ function auditDetails(e) {
   if (e.reason)     parts.push(e.reason.slice(0,50));
   if (e.email)      parts.push(e.email);
   if (e.old !== undefined) parts.push(fmt(e.old) + ' → ' + fmt(e.tokens));
-  return parts.join(' · ') || '—';
+  return parts.join(' · ') || '--';
 }
 
 function renderAuditTable(entries) {
@@ -3725,7 +3895,7 @@ function renderAuditTable(entries) {
       + '<span>' + ic.i + '</span>' + (e.action || '').replace(/_/g,' ') + '</span></td>'
       + '<td><div style="font-size:12.5px;font-weight:600;color:var(--text)">' + (e.performed_by_name || e.performed_by_email || 'unknown') + '</div>'
       + '<div style="font-size:11px;color:var(--text3)">' + (e.performed_by_email || '') + '</div></td>'
-      + '<td><span style="font-size:11px;font-weight:600;color:' + roleColor + ';text-transform:capitalize">' + (e.performed_by_role || '—') + '</span></td>'
+      + '<td><span style="font-size:11px;font-weight:600;color:' + roleColor + ';text-transform:capitalize">' + (e.performed_by_role || '--') + '</span></td>'
       + '<td style="font-size:12px;color:var(--text2)">' + auditDetails(e) + '</td>'
       + '</tr>';
   }).join('');
@@ -3876,7 +4046,7 @@ async function loadUserRenderCosts(uid) {
       return '<tr>'
         + '<td style="font-size:11px;color:var(--text3);white-space:nowrap">' + ago(r.ts) + '</td>'
         + '<td>' + planTag(r.plan || 'free') + '</td>'
-        + '<td style="text-align:center;color:var(--text2)">' + (r.scenes || '—') + '</td>'
+        + '<td style="text-align:center;color:var(--text2)">' + (r.scenes || '--') + '</td>'
         + '<td>' + voiceLabel + '<br>' + visualLabel + '</td>'
         + '<td style="font-family:DM Mono,monospace;font-size:12px;color:var(--rose)">$' + (r.total_cost_usd || 0).toFixed(5) + '</td>'
         + '<td style="font-family:DM Mono,monospace;font-size:12px;color:' + mc + '">' + mp2.toFixed(1) + '%</td>'
@@ -3974,5 +4144,49 @@ async function unblockIp(ip) {
   }
 }
 </script>
+
+<!-- Generic cost detail modal -->
+<div class="modal-overlay" id="cost-detail-modal" onclick="if(event.target===this)closeCostModal()">
+  <div class="modal" style="max-width:640px;max-height:88vh;overflow-y:auto">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;position:sticky;top:0;background:var(--ink1);padding-bottom:12px;z-index:1">
+      <div class="modal-title" style="font-size:16px">Render cost detail</div>
+      <button onclick="closeCostModal()" style="background:rgba(255,255,255,0.07);border:1px solid var(--border2);border-radius:50%;width:28px;height:28px;cursor:pointer;color:var(--text3);font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0">&times;</button>
+    </div>
+    <div id="cost-detail-body"></div>
+  </div>
+</div>
+
+<!-- Email campaign preview modal -->
+<div class="modal-overlay" id="email-preview-modal" onclick="if(event.target===this)closeEmailPreview()">
+  <div class="modal" style="max-width:660px;width:96%;max-height:92vh;display:flex;flex-direction:column;padding:0;overflow:hidden">
+    <!-- Modal header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="modal-title" style="font-size:15px" id="email-preview-title">Email preview</div>
+        <span id="email-preview-badge" style="font-size:10px;border-radius:4px;padding:2px 8px"></span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-ghost btn-sm" onclick="openEmailInTab()" title="Open in new tab">&#8599; Open in tab</button>
+        <button onclick="closeEmailPreview()" style="background:rgba(255,255,255,0.07);border:1px solid var(--border2);border-radius:50%;width:28px;height:28px;cursor:pointer;color:var(--text3);font-size:16px;display:flex;align-items:center;justify-content:center">&times;</button>
+      </div>
+    </div>
+    <!-- Email meta bar -->
+    <div id="email-preview-meta" style="padding:10px 20px;background:var(--ink2);border-bottom:1px solid var(--border);flex-shrink:0;font-size:12px;display:flex;flex-direction:column;gap:3px">
+    </div>
+    <!-- Size toggle -->
+    <div style="display:flex;gap:6px;padding:8px 20px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <button class="btn btn-ghost btn-xs" onclick="setPreviewWidth(540)" id="pw-desktop">Desktop</button>
+      <button class="btn btn-ghost btn-xs" onclick="setPreviewWidth(375)" id="pw-mobile">Mobile</button>
+      <span style="font-size:11px;color:var(--text3);margin-left:4px;align-self:center" id="pw-label">540px</span>
+    </div>
+    <!-- iframe -->
+    <div style="flex:1;overflow:auto;background:#080810;display:flex;justify-content:center;padding:16px 0" id="email-preview-scroll">
+      <iframe id="email-preview-frame"
+        style="width:540px;min-height:600px;border:none;border-radius:8px;background:#080810;display:block;transition:width .2s"
+        sandbox="allow-same-origin">
+      </iframe>
+    </div>
+  </div>
+</div>
 </body>
 </html>
