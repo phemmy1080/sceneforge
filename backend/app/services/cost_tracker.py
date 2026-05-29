@@ -61,7 +61,7 @@ def build_cost_record(
     plan: str,
     scenes: int,
     visual_source: str,          # "pexels_video" | "pexels_photo" | "dalle" | "mixed"
-    voice_provider: str,         # "gtts" | "elevenlabs"
+    voice_provider: str,         # "edge_tts" | "elevenlabs"
     total_chars: int,            # total text chars across all scenes
     ai_provider: str,            # "groq" | "openai"
     ai_input_tokens: int,        # tokens used for script/idea gen
@@ -69,18 +69,18 @@ def build_cost_record(
     render_seconds: float,       # wall-clock FFmpeg time
     dalle_images: int = 0,       # number of DALL-E images generated
     plan_price_ngn: float = 0.0,
+    plan_tokens: int = 100,      # tokens included in this plan purchase
     exchange_rate: float = 1600.0,
 ) -> dict:
     """Compute itemised cost breakdown for one render job."""
 
     # Voice cost
-    # Microsoft Edge TTS (edge-tts library) is free — no API key, no usage charges
-    # ElevenLabs is paid and only used if explicitly configured
+    # Microsoft Edge TTS is free; ElevenLabs is $0.30/1k chars
     if voice_provider == "elevenlabs":
         voice_cost = total_chars * ELEVENLABS_COST_PER_CHAR
     else:
-        # edge-tts, gtts, or any other free provider
-        voice_cost = EDGE_TTS_COST_PER_CHAR
+        # edge_tts / gtts — free
+        voice_cost = total_chars * EDGE_TTS_COST_PER_CHAR  # = 0.0
 
     # Visual cost
     if visual_source == "dalle" or dalle_images > 0:
@@ -104,8 +104,11 @@ def build_cost_record(
     total_cost_usd = voice_cost + visual_cost + ai_cost + compute_cost + storage_cost
 
     # Revenue per render
+    # plan_price covers `plan_tokens` tokens; each render costs TOKENS_PER_VIDEO tokens
+    # so revenue per render = (plan_price / plan_tokens) * TOKENS_PER_VIDEO
     plan_price_usd = plan_price_ngn / exchange_rate
-    revenue_per_render_usd = plan_price_usd  # one render per token bundle purchase
+    renders_per_plan = max(plan_tokens / TOKENS_PER_VIDEO, 1)
+    revenue_per_render_usd = plan_price_usd / renders_per_plan
     margin_usd = revenue_per_render_usd - total_cost_usd
     margin_pct  = (margin_usd / revenue_per_render_usd * 100) if revenue_per_render_usd > 0 else 0
 
@@ -127,7 +130,9 @@ def build_cost_record(
         # Revenue & margin
         "plan_price_ngn":      plan_price_ngn,
         "plan_price_usd":      round(plan_price_usd, 4),
-        "revenue_per_render":  round(revenue_per_render_usd, 4),
+        "plan_tokens":         plan_tokens,
+        "renders_per_plan":    round(renders_per_plan, 1),
+        "revenue_per_render":  round(revenue_per_render_usd, 6),
         "margin_usd":          round(margin_usd, 4),
         "margin_pct":          round(margin_pct, 1),
         # Raw inputs
