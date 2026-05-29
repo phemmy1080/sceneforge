@@ -217,9 +217,17 @@ def _make_ass_file(
 
     s = STYLES.get(style, STYLES["viral"])
 
-    # ── Word chunking: 3–4 words per caption card ─────────────────────────────
-    # Max chars per line based on font size and frame width (Arial ~0.55× fontsize per char)
-    max_chars = max(10, int(w * 0.75 / (s["size"] * 0.55)))
+    # ── Side margins: keep text well inside frame edges ───────────────────────
+    # 8% of width on each side so subtitles never touch the edges on any platform
+    side_margin = max(40, int(w * 0.08))
+
+    # ── Word chunking: max 3 words OR ~55% of usable line width ──────────────
+    # usable width = frame - 2×side_margin; avg char ≈ fontsize × 0.58
+    usable_px  = w - 2 * side_margin
+    max_chars  = max(8, int(usable_px / (s["size"] * 0.58)))
+    # Hard cap: never more than 3 words per card for punchy, readable captions
+    max_words  = 3
+
     words = text.replace("\n", " ").split()
     if not words:
         return False
@@ -229,7 +237,7 @@ def _make_ass_file(
     cur_len = 0
     for word in words:
         wl = len(word) + 1
-        if cur and (cur_len + wl > max_chars or len(cur) >= 4):
+        if cur and (cur_len + wl > max_chars or len(cur) >= max_words):
             chunks.append(" ".join(cur))
             cur, cur_len = [], 0
         cur.append(word)
@@ -240,7 +248,7 @@ def _make_ass_file(
     if not chunks:
         return False
 
-    # ── Timing: divide duration evenly, 50ms gap between cards ──────────────
+    # ── Timing: divide duration evenly, 50ms gap between cards ───────────────
     n    = len(chunks)
     gap  = 0.05
     slot = max(0.3, (duration - gap * (n - 1)) / n)
@@ -254,6 +262,7 @@ def _make_ass_file(
         return f"{hh}:{mm:02d}:{ss:05.2f}"
 
     # ── ASS header ────────────────────────────────────────────────────────────
+    # WrapStyle 0 = smart word-wrap (fallback if a single word is still too wide)
     ass = (
         f"[Script Info]\n"
         f"ScriptType: v4.00+\n"
@@ -261,7 +270,7 @@ def _make_ass_file(
         f"PlayResX: {w}\n"
         f"PlayResY: {h}\n"
         f"Timer: 100.0000\n"
-        f"WrapStyle: 1\n"
+        f"WrapStyle: 0\n"
         f"\n"
         f"[V4+ Styles]\n"
         f"Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, "
@@ -280,7 +289,7 @@ def _make_ass_file(
         f"{s['outline']},"
         f"{s['shadow']},"
         f"{s['alignment']},"
-        f"10,10,{s['margin_v']},1\n"
+        f"{side_margin},{side_margin},{s['margin_v']},1\n"
         f"\n"
         f"[Events]\n"
         f"Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
@@ -289,7 +298,7 @@ def _make_ass_file(
     for i, chunk in enumerate(chunks):
         t_start = i * (slot + gap)
         t_end   = min(t_start + slot, duration - 0.05)
-        # ASS is safe with apostrophes/commas/quotes — only strip braces (ASS tags)
+        # ASS handles apostrophes/commas/quotes natively — only strip ASS tag braces
         safe = (
             chunk
             .replace("{", "")
