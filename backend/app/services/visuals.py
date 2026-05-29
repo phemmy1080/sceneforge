@@ -87,21 +87,56 @@ async def download_pexels_video(video_url: str, output_path: str) -> str:
     return output_path
 
 
+def _score_pexels_result(result: "VisualResult", target_duration: float, prefer_portrait: bool) -> float:
+    """Score a Pexels result 0–1. Higher = better match for this scene."""
+    score = 0.0
+
+    # Orientation score (0–0.5): portrait (h > w) preferred for 9:16 platforms
+    w, h = result.width or 1, result.height or 1
+    is_portrait = h >= w
+    if prefer_portrait:
+        score += 0.5 if is_portrait else 0.1
+    else:
+        score += 0.5 if not is_portrait else 0.2
+
+    # Resolution bonus (0–0.3): prefer higher resolution source
+    px = w * h
+    if px >= 1920 * 1080:
+        score += 0.3
+    elif px >= 1280 * 720:
+        score += 0.2
+    elif px >= 854 * 480:
+        score += 0.1
+
+    # Position bonus (0–0.2): earlier results from Pexels API = more relevant
+    # (already handled by Pexels relevance ranking — we just don't always pick [0])
+    score += 0.2  # baseline, same for all; differentiated by above factors
+
+    return score
+
+
 async def fetch_pexels_for_scene(scene: Scene, output_dir: str) -> VisualFile:
     """Search and download best Pexels video for a scene.
-    Tries the exact keyword first, then progressively simpler fallback terms.
+
+    Scoring priority:
+      1. Portrait orientation (height ≥ width) for 9:16 platforms
+      2. Higher source resolution
+    Among the top 3 scored results, one is picked at random — this gives
+    variety across re-renders of the same scene.
     """
-    # Build a chain of fallback keywords — from specific to generic
+    import random
+
     keyword = scene.visual_keyword or "business"
-    # Strip down to just the first word as a last resort
     first_word = keyword.split()[0] if keyword else "people"
-    fallbacks = [keyword, first_word, "people talking", "city background", "nature"]
+    # Fallback chain: specific → simpler → generic content
+    fallbacks = [keyword, first_word, "professional people", "city background", "nature"]
 
     results = []
     used_keyword = keyword
     for kw in fallbacks:
         try:
-            results = await search_pexels_videos(kw, per_page=3)
+            # Fetch 6 results so scoring has more options to work with
+            results = await search_pexels_videos(kw, per_page=6)
             if results:
                 used_keyword = kw
                 break
@@ -113,9 +148,23 @@ async def fetch_pexels_for_scene(scene: Scene, output_dir: str) -> VisualFile:
     if not results:
         raise ValueError(f"No Pexels results found after fallbacks for: {keyword}")
 
-    best = results[0]
+    # Score all results and pick randomly from top 3 for variety on re-renders
+    target_dur = float(getattr(scene, "duration", 10) or 10)
+    prefer_portrait = True  # default: most renders are 9:16
+
+    scored = sorted(
+        results,
+        key=lambda r: _score_pexels_result(r, target_dur, prefer_portrait),
+        reverse=True,
+    )
+    top3 = scored[:min(3, len(scored))]
+    best = random.choice(top3)
+
     out_path = str(Path(output_dir) / f"scene_{scene.id:02d}_visual.mp4")
-    logger.info("Pexels ✓ scene %s | keyword: '%s' → %s", scene.id, used_keyword, Path(out_path).name)
+    logger.info(
+        "Pexels ✓ scene %s | keyword: '%s' | picked %dx%d from top-%d",
+        scene.id, used_keyword, best.width, best.height, len(top3),
+    )
     await download_pexels_video(best.preview_url, out_path)
     return VisualFile(path=out_path, media_type="video", source="pexels")
 
