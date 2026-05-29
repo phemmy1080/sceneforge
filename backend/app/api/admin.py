@@ -1508,10 +1508,12 @@ async def run_engagement_campaign(
         result = await _run(redis)
         logger.info("Campaign run complete: %s", result)
         # Store last run result
+        import datetime as _dt
         await redis.set("campaign:last_run",
-                        json.dumps({**result, "ts": __import__("datetime").datetime.utcnow().isoformat()}),
+                        json.dumps({**result, "ts": _dt.datetime.utcnow().isoformat()}),
                         ex=60*60*24*7)
-    background_tasks.add_task(asyncio.create_task, _bg())
+
+    background_tasks.add_task(_bg)
     return {"status": "started", "message": "Campaign running in background — check /campaigns/last-run for results"}
 
 
