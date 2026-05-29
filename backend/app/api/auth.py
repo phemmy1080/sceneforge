@@ -46,6 +46,20 @@ async def signup(req: SignupWithCouponRequest, redis=Depends(get_redis)):
         except Exception as email_err:
             logger.error("Failed to send verification OTP at signup: %s", email_err)
 
+        # Send welcome email (delayed 2 minutes so verification lands first)
+        try:
+            from app.services.email_campaigns import send_welcome_email
+            asyncio.create_task(send_welcome_email(user.email, user.full_name))
+            logger.info("Welcome email queued for %s", user.email)
+        except Exception as we:
+            logger.warning("Welcome email failed (non-fatal): %s", we)
+
+        # Mark welcome_sent flag for re-engagement tracking
+        try:
+            await redis.set(f"user:{user.id}:welcome_sent", "1", ex=60*60*24*365)
+        except Exception:
+            pass
+
         token = auth_service.issue_token(user.id)
         return TokenResponse(access_token=token, user=user)
     except ValueError as e:
