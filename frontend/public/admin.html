@@ -523,6 +523,10 @@ tr:hover td{background:rgba(255,255,255,0.018)}
       <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4h10M3 8h7M3 12h5"/></svg>
       Activity logs
     </button>
+    <button class="nb" id="nb-campaigns" onclick="nav('campaigns',this)">
+      <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4l6-2 6 2v5c0 3-2.5 4.5-6 5.5C4.5 13.5 2 12 2 9z"/><path d="M6 8l2 2 3-3"/></svg>
+      Email campaigns
+    </button>
     <button class="nb" id="nb-feedback" onclick="nav('feedback',this)">
       <svg class="nb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H2a1 1 0 00-1 1v8a1 1 0 001 1h3l3 3 3-3h3a1 1 0 001-1V3a1 1 0 00-1-1z"/><path d="M5 7h6M5 5h4"/></svg>
       User feedback
@@ -1609,6 +1613,81 @@ tr:hover td{background:rgba(255,255,255,0.018)}
       </div>
     </div>
 
+    <!-- CAMPAIGNS -->
+    <div class="pg" id="pg-campaigns">
+      <div class="ph">
+        <div class="ph-top">
+          <div><div class="ph-title">Email Campaigns</div><div class="ph-sub">Lifecycle emails — welcome, re-engagement, inactive users</div></div>
+          <div class="ph-actions">
+            <button class="btn btn-ghost btn-sm" onclick="loadCampaigns()">Refresh</button>
+            <button class="btn btn-primary btn-sm" onclick="runCampaign()" id="run-campaign-btn">▶ Run Campaign Now</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI buckets -->
+      <div id="campaign-bucket-grid" class="stat-row" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:20px">
+        <div class="loading"></div>
+      </div>
+
+      <!-- Last run result -->
+      <div class="two-col" style="margin-bottom:18px">
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Last campaign run</span></div>
+          <div id="campaign-last-run" style="padding:16px 20px">
+            <div class="loading"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Campaign emails</span></div>
+          <div style="padding:14px 20px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--ink2);border-radius:8px">
+              <div>
+                <div style="font-size:13px;font-weight:700;color:#fff">🎉 Welcome email</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px">Sent 2 min after signup · Features overview · 1,000 token highlight</div>
+              </div>
+              <span style="font-size:10px;background:rgba(45,212,191,.1);color:#2dd4bf;border-radius:4px;padding:3px 8px">Auto</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--ink2);border-radius:8px">
+              <div>
+                <div style="font-size:13px;font-weight:700;color:#fff">⏳ Zero-render nudge</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px">24h after signup if no videos yet · Quick start encouragement</div>
+              </div>
+              <span style="font-size:10px;background:rgba(124,58,237,.15);color:#a78bfa;border-radius:4px;padding:3px 8px">Campaign</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--ink2);border-radius:8px">
+              <div>
+                <div style="font-size:13px;font-weight:700;color:#fff">🔔 5-day inactive</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px">5 days since last render · Content ideas + token reminder</div>
+              </div>
+              <span style="font-size:10px;background:rgba(124,58,237,.15);color:#a78bfa;border-radius:4px;padding:3px 8px">Campaign</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--ink2);border-radius:8px">
+              <div>
+                <div style="font-size:13px;font-weight:700;color:#fff">💤 14-day inactive</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px">2 weeks inactive · Blocker-busting messaging</div>
+              </div>
+              <span style="font-size:10px;background:rgba(201,168,76,.15);color:#f59e0b;border-radius:4px;padding:3px 8px">Campaign</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--ink2);border-radius:8px">
+              <div>
+                <div style="font-size:13px;font-weight:700;color:#fff">🌟 30-day final</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px">1 month inactive · What's new + final nudge</div>
+              </div>
+              <span style="font-size:10px;background:rgba(248,113,113,.15);color:#f87171;border-radius:4px;padding:3px 8px">Campaign</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Idempotency note -->
+      <div style="background:rgba(45,212,191,0.06);border:1px solid rgba(45,212,191,0.15);border-radius:8px;padding:12px 16px;font-size:12.5px;color:rgba(255,255,255,0.5);line-height:1.6">
+        <strong style="color:#2dd4bf">ℹ️ Safe to run anytime.</strong>
+        Each campaign email is sent at most once per user per period — Redis flags prevent duplicates.
+        Running the campaign again only picks up newly eligible users.
+      </div>
+    </div>
+
     <!-- AUDIT TRAIL -->
     <div class="pg" id="pg-audit">
       <div class="ph">
@@ -1924,7 +2003,7 @@ function nav(id,btn){
   var pg=document.getElementById('pg-'+id);
   if(pg)pg.classList.add('on');
   btn.classList.add('on');
-  var loaders={dashboard:loadDash,analytics:loadAnalytics,users:loadUsers,broadcast:loadBroadcasts,revenue:loadRevenue,tx:loadTx,pricing:loadPricing,niches:loadNiches,coupons:loadCoupons,queue:loadQueue,logs:loadLogs,admins:loadAdmins,feedback:loadFeedback,costs:loadCosts,audit:loadAudit,security:loadSecurity};
+  var loaders={dashboard:loadDash,analytics:loadAnalytics,users:loadUsers,broadcast:loadBroadcasts,revenue:loadRevenue,tx:loadTx,pricing:loadPricing,niches:loadNiches,coupons:loadCoupons,queue:loadQueue,logs:loadLogs,admins:loadAdmins,feedback:loadFeedback,costs:loadCosts,campaigns:loadCampaigns,audit:loadAudit,security:loadSecurity};
   if(loaders[id])loaders[id]();
 }
 
@@ -3283,7 +3362,7 @@ function renderCostLog(records) {
     return '<tr style="cursor:pointer" onclick="showJobCostDetail('+JSON.stringify(r)+')">'
       + '<td style="color:var(--text3);font-size:11px;white-space:nowrap">' + ago(r.ts) + '</td>'
       + '<td style="font-family:DM Mono,monospace;font-size:10px;color:var(--text3)">' + (r.job_id||'').slice(0,8) + '…</td>'
-      + '<td style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(r.user_id||'—').slice(0,16) + '</td>'
+      + '<td style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="font-weight:600;color:var(--text)">' + escHtml(r.full_name||r.user_id||'—') + '</span><br><span style="color:var(--text3);font-size:10px">' + escHtml(r.email||'') + '</span></td>'
       + '<td>' + planTag(r.plan || 'free') + '</td>'
       + '<td style="text-align:center;color:var(--text2)">' + (r.scenes||0) + '</td>'
       + '<td>' + voiceBadge + '</td>'
@@ -3304,7 +3383,27 @@ function renderCostLog(records) {
 
 function showJobCostDetail(r) {
   var mc = mCol(r.margin_pct);
-  var html = '<div style="padding:4px 0">'
+  var html = '<div style="padding:4px 0">';
+  // Render metadata section if available
+  if (r.niche || r.platform || r.project_title || r.tokens_consumed) {
+    html += '<div style="background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.25);border-radius:8px;padding:14px 16px;margin-bottom:14px">'
+      + '<div style="font-size:10px;font-weight:700;color:#a78bfa;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Render metadata</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+      + (r.project_title ? kv('Project title', r.project_title) : '')
+      + (r.niche ? kv('Niche', r.niche) : '')
+      + (r.platform ? kv('Platform', '<span style="background:rgba(45,212,191,.1);color:#2dd4bf;border-radius:4px;padding:2px 8px;font-size:11px">'+r.platform+'</span>') : '')
+      + kv('Tokens consumed', '<span style="color:#f59e0b;font-weight:700;font-family:DM Mono,monospace">'+fmt(r.tokens_consumed||100)+'</span>')
+      + (r.full_name ? kv('User', r.full_name + (r.email ? '<br><span style=\'font-size:10px;color:var(--text3)\'>'+r.email+'</span>' : '')) : '')
+      + '</div>'
+      + (r.scenes_detail && r.scenes_detail.length ? '<div style="margin-top:10px"><div style="font-size:10px;color:var(--text3);margin-bottom:6px">Scene preview (first 5)</div>'
+        + r.scenes_detail.map(function(s,i){
+          return '<div style="font-size:11px;color:var(--text3);padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04)">'
+            + '<span style="color:#a78bfa;margin-right:6px">S'+s.id+'</span>' + escHtml(s.text) + '</div>';
+        }).join('') + '</div>'
+        : '')
+      + '</div>';
+  }
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'
     + kv('Job ID', '<span style="font-family:DM Mono,monospace;font-size:11px">' + (r.job_id||'') + '</span>')
     + kv('Time', ago(r.ts))
@@ -3499,6 +3598,81 @@ async function loadCosts() {
     console.error('loadCosts error:', e);
     var g = document.getElementById('cost-plan-grid');
     if (g) g.innerHTML = '<div style="padding:16px;color:var(--rose)">Failed to load cost data: ' + e.message + '</div>';
+  }
+}
+
+
+// ── Campaigns ─────────────────────────────────────────────────────────────────
+
+async function loadCampaigns() {
+  try {
+    var status = await apiFetch('/campaigns/status');
+    var colors = {zero_render:'violet', inactive_5d:'gold', inactive_14d:'gold', inactive_30d:'rose', healthy:'teal', unverified:'text3'};
+    var labels = {
+      scanned: ['👥', 'Total users scanned', ''],
+      unverified: ['📧', 'Unverified email', 'Excluded from campaigns'],
+      zero_render: ['⏳', 'Never rendered', '24h+ since signup'],
+      inactive_5d: ['🔔', '5-day inactive', '5–14 days since last render'],
+      inactive_14d: ['💤', '14-day inactive', '14–30 days since last render'],
+      inactive_30d: ['🌟', '30-day inactive', '30+ days since last render'],
+      healthy: ['✅', 'Active users', 'Rendered in last 5 days'],
+    };
+    var grid = document.getElementById('campaign-bucket-grid');
+    if (grid) {
+      grid.innerHTML = Object.entries(labels).map(function(e) {
+        var k=e[0], l=e[1];
+        var val = status[k] || 0;
+        var col = colors[k] || 'violet';
+        var flagKey = 'flag_'+k;
+        var flagLine = status[flagKey] !== undefined
+          ? '<span style="color:var(--text3);font-size:10px">'+status[flagKey]+' already sent</span>'
+          : '';
+        return '<div class="stat '+col+'">'
+          + '<div class="stat-label">'+l[0]+' '+l[1]+'</div>'
+          + '<div class="stat-val" style="font-size:24px">'+fmt(val)+'</div>'
+          + '<div class="stat-meta">'+l[2]+'<br>'+flagLine+'</div></div>';
+      }).join('');
+    }
+
+    var lastRun = await apiFetch('/campaigns/last-run');
+    var lr = document.getElementById('campaign-last-run');
+    if (lr) {
+      if (lastRun.status === 'never_run') {
+        lr.innerHTML = '<p style="color:var(--text3);font-size:13px">No campaign has been run yet. Click "Run Campaign Now" to start.</p>';
+      } else {
+        lr.innerHTML = '<div style="font-size:11px;color:var(--text3);margin-bottom:10px">Run at: ' + (lastRun.ts ? new Date(lastRun.ts).toLocaleString() : '—') + '</div>'
+          + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'
+          + [['scanned','Users scanned','var(--text2)'],
+             ['welcome_sent','Welcome sent','var(--teal)'],
+             ['zero_render_sent','Zero-render sent','var(--violet)'],
+             ['inactive_5d_sent','5-day sent','var(--gold)'],
+             ['inactive_14d_sent','14-day sent','var(--gold)'],
+             ['inactive_30d_sent','30-day sent','var(--rose)'],
+             ['errors','Errors','var(--rose)']
+            ].map(function(m){
+              return '<div style="background:var(--ink2);border-radius:6px;padding:8px 10px;text-align:center">'
+                + '<div style="font-size:18px;font-weight:700;color:'+m[2]+'">'+fmt(lastRun[m[0]]||0)+'</div>'
+                + '<div style="font-size:10px;color:var(--text3)">'+m[1]+'</div></div>';
+            }).join('')
+          + '</div>';
+      }
+    }
+  } catch(e) {
+    console.error('loadCampaigns error:', e);
+  }
+}
+
+async function runCampaign() {
+  var btn = document.getElementById('run-campaign-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Running…'; }
+  try {
+    var r = await apiFetch('/campaigns/run', {method:'POST'});
+    showToast('Campaign started — '+r.message, 'success');
+    setTimeout(loadCampaigns, 3000);
+  } catch(e) {
+    showToast('Campaign failed: '+e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '▶ Run Campaign Now'; }
   }
 }
 
