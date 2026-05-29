@@ -1505,13 +1505,26 @@ async def run_engagement_campaign(
     from app.services.email_campaigns import run_engagement_campaign as _run
     import asyncio
     async def _bg():
-        result = await _run(redis)
-        logger.info("Campaign run complete: %s", result)
-        # Store last run result
+        # Get a fresh Redis connection — the request-scoped one is closed after response
+        import redis.asyncio as _aioredis
         import datetime as _dt
-        await redis.set("campaign:last_run",
-                        json.dumps({**result, "ts": _dt.datetime.utcnow().isoformat()}),
-                        ex=60*60*24*7)
+        from app.config import get_settings as _gs
+        _settings = _gs()
+        _r = await _aioredis.from_url(
+            _settings.redis_url,
+            decode_responses=True,
+            ssl_cert_reqs=None,
+        )
+        try:
+            result = await _run(_r)
+            logger.info("Campaign run complete: %s", result)
+            await _r.set("campaign:last_run",
+                         json.dumps({**result, "ts": _dt.datetime.utcnow().isoformat()}),
+                         ex=60*60*24*7)
+        except Exception as _e:
+            logger.error("Campaign background task failed: %s", _e)
+        finally:
+            await _r.aclose()
 
     background_tasks.add_task(_bg)
     return {"status": "started", "message": "Campaign running in background — check /campaigns/last-run for results"}
