@@ -427,7 +427,7 @@ async def run_engagement_campaign(redis) -> dict:
     Returns a summary of actions taken.
     Safe to run repeatedly — Redis flags prevent double-sending.
     """
-    from app.services.auth_service import TOKENS_ON_SIGNUP
+    TOKENS_ON_SIGNUP = 1000  # default signup token grant
     now = datetime.now(timezone.utc)
     results = {
         "scanned": 0,
