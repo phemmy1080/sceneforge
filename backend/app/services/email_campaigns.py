@@ -20,12 +20,12 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from app.config import get_settings
-from app.services.email_service import _send
+from app.services.email import _send
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
-APP_URL = getattr(settings, "frontend_origin", "https://sceneraforge.com")
+APP_URL = getattr(settings, "frontend_origin", "https://scenraforge.com")
 
 # ─── Email helpers ────────────────────────────────────────────────────────────
 
@@ -42,7 +42,7 @@ def _footer() -> str:
     return f"""
     <tr><td style="padding:20px 40px;border-top:1px solid rgba(255,255,255,0.06);text-align:center">
       <p style="margin:0 0 6px;font-size:12px;color:rgba(255,255,255,0.25)">
-        SceneForge · AI Video Studio · <a href="{APP_URL}" style="color:rgba(167,139,250,0.6);text-decoration:none">sceneraforge.com</a>
+        SceneForge · AI Video Studio · <a href="{APP_URL}" style="color:rgba(167,139,250,0.6);text-decoration:none">scenraforge.com</a>
       </p>
       <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.15)">
         You're receiving this because you created a SceneForge account.
@@ -144,7 +144,7 @@ async def send_welcome_email(to_email: str, full_name: str) -> None:
 
           <p style="margin:24px 0 0;font-size:12px;color:rgba(255,255,255,0.3);text-align:center;line-height:1.6">
             Questions? Reply to this email — we read every one.<br>
-            <a href="{APP_URL}" style="color:rgba(167,139,250,0.5);text-decoration:none">sceneraforge.com</a>
+            <a href="{APP_URL}" style="color:rgba(167,139,250,0.5);text-decoration:none">scenraforge.com</a>
           </p>
         </td></tr>""" +
         _footer()
