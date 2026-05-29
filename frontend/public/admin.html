@@ -3770,21 +3770,32 @@ async function loadCampaigns() {
       if (lastRun.status === 'never_run') {
         lr.innerHTML = '<p style="color:var(--text3);font-size:13px">No campaign has been run yet. Click "Run Campaign Now" to start.</p>';
       } else {
-        lr.innerHTML = '<div style="font-size:11px;color:var(--text3);margin-bottom:10px">Run at: ' + (lastRun.ts ? new Date(lastRun.ts).toLocaleString() : '--') + '</div>'
-          + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'
-          + [['scanned','Users scanned','var(--text2)'],
-             ['welcome_sent','Welcome sent','var(--teal)'],
-             ['zero_render_sent','Zero-render sent','var(--violet)'],
-             ['inactive_5d_sent','5-day sent','var(--gold)'],
-             ['inactive_14d_sent','14-day sent','var(--gold)'],
-             ['inactive_30d_sent','30-day sent','var(--rose)'],
-             ['errors','Errors','var(--rose)']
-            ].map(function(m){
-              return '<div style="background:var(--ink2);border-radius:6px;padding:8px 10px;text-align:center">'
-                + '<div style="font-size:18px;font-weight:700;color:'+m[2]+'">'+fmt(lastRun[m[0]]||0)+'</div>'
-                + '<div style="font-size:10px;color:var(--text3)">'+m[1]+'</div></div>';
-            }).join('')
-          + '</div>';
+        lr.innerHTML = (function(){
+            var totalSent = (lastRun.welcome_sent||0)+(lastRun.zero_render_sent||0)
+              +(lastRun.inactive_5d_sent||0)+(lastRun.inactive_14d_sent||0)+(lastRun.inactive_30d_sent||0);
+            var runTime = lastRun.ts ? new Date(lastRun.ts).toLocaleString() : '--';
+            var items = [
+              ['scanned',          'Users scanned',    'var(--text2)'],
+              ['welcome_sent',     'Welcome',          'var(--teal)'],
+              ['zero_render_sent', 'Zero-render nudge','var(--violet)'],
+              ['inactive_5d_sent', '5-day inactive',   'var(--gold)'],
+              ['inactive_14d_sent','14-day inactive',  'var(--gold)'],
+              ['inactive_30d_sent','30-day final',     'var(--rose)'],
+              ['skipped',          'Skipped',          'var(--text3)'],
+              ['errors',           'Errors',           'var(--rose)']
+            ];
+            return '<div style="background:rgba(45,212,191,0.08);border:1px solid rgba(45,212,191,0.2);border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">'
+              + '<span style="font-size:13px;font-weight:700;color:#2dd4bf">\u2713 ' + totalSent + ' email' + (totalSent!==1?'s':'') + ' sent</span>'
+              + '<span style="font-size:11px;color:var(--text3)">Run at ' + runTime + '</span>'
+              + '</div>'
+              + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">'
+              + items.map(function(m){
+                  return '<div style="background:var(--ink2);border-radius:6px;padding:8px 10px;text-align:center">'
+                    + '<div style="font-size:18px;font-weight:700;color:'+m[2]+'">'+fmt(lastRun[m[0]]||0)+'</div>'
+                    + '<div style="font-size:10px;color:var(--text3)">'+m[1]+'</div></div>';
+                }).join('')
+              + '</div>';
+          })();
       }
     }
   } catch(e) {
