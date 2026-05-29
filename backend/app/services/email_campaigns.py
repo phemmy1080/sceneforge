@@ -173,8 +173,7 @@ Create your first video: {APP_URL}
 
 — The SceneForge Team
 """
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _send, to_email,
+    await _send(to_email,
                                f"🎬 Welcome to SceneForge, {first}! Here's what you can do", html, text)
     logger.info("Welcome email sent to %s", to_email)
 
@@ -234,8 +233,7 @@ Create your first video: {APP_URL}
 
 — The SceneForge Team
 """
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _send, to_email,
+    await _send(to_email,
                                f"⏳ {first}, your first SceneForge video is 3 minutes away", html, text)
     logger.info("Zero-render nudge sent to %s", to_email)
 
@@ -287,8 +285,7 @@ Back to SceneForge: {APP_URL}
 
 — The SceneForge Team
 """
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _send, to_email,
+    await _send(to_email,
                                f"🎬 {first}, it's been 5 days — ready to create again?", html, text)
     logger.info("5-day inactive email sent to %s", to_email)
 
@@ -354,8 +351,7 @@ Back to SceneForge: {APP_URL}
 
 — The SceneForge Team
 """
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _send, to_email,
+    await _send(to_email,
                                f"📹 {first}, still thinking about SceneForge?", html, text)
     logger.info("14-day inactive email sent to %s", to_email)
 
@@ -413,8 +409,7 @@ Your account stays active indefinitely.
 
 — The SceneForge Team
 """
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _send, to_email,
+    await _send(to_email,
                                f"🌟 {first}, one last note from SceneForge", html, text)
     logger.info("30-day inactive email sent to %s", to_email)
 
