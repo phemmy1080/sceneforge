@@ -1120,9 +1120,13 @@ async def get_recent_costs(
             except Exception:
                 pass
 
-        # Tokens consumed = render cost derived from scene count
-        from app.services.auth_service import calculate_render_cost
-        rec["tokens_consumed"] = calculate_render_cost(rec.get("scenes", 0))
+        # Tokens consumed — each scene costs TOKENS_PER_VIDEO tokens
+        if "tokens_consumed" not in rec or not rec["tokens_consumed"]:
+            try:
+                from app.services.cost_tracker import TOKENS_PER_VIDEO
+                rec["tokens_consumed"] = rec.get("scenes", 0) * TOKENS_PER_VIDEO
+            except Exception:
+                rec["tokens_consumed"] = rec.get("scenes", 0) * 100
 
     return {"records": records, "total": len(records)}
 
