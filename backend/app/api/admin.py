@@ -1536,3 +1536,202 @@ async def send_welcome_to_user(
     asyncio.create_task(send_welcome_email(ud["email"], ud.get("full_name", "")))
     await _log_admin_action(redis, admin["email"], "campaign_welcome", user_id, {"email": ud["email"]})
     return {"status": "queued", "email": ud["email"]}
+
+
+@router.get("/campaigns/preview/{campaign_type}")
+async def preview_campaign_email(
+    campaign_type: str,
+    name: str = "Sarah Johnson",
+    tokens: int = 850,
+    niche: str = "fitness",
+    token: str = "",
+    admin: dict = Depends(_require_admin),
+):
+    """
+    Return rendered HTML for a campaign email so admin can preview it before sending.
+    campaign_type: welcome | zero_render | inactive_5d | inactive_14d | inactive_30d
+    """
+    from fastapi.responses import HTMLResponse
+    from app.services.email_campaigns import _wrap, _header, _footer, _cta, _feature_row, APP_URL
+
+    first = name.split()[0] if name else "there"
+    BLOCKERS = [
+        ('"I don\'t know what to make"', '&#8594; SceneForge generates 6 ideas for you'),
+        ('"I don\'t have time"',         '&#8594; A full video takes 3&#8211;5 minutes'),
+        ('"Not sure quality is good"',   '&#8594; Try one scene preview &#8212; it\'s free'),
+        ('"I\'m not a video person"',    '&#8594; You don\'t need to be &#8212; AI handles it'),
+    ]
+    IDEAS = [
+        ("&#127947;", "5-minute home workout &#8212; fitness creators"),
+        ("&#128176;", "How to save money fast &#8212; finance creators"),
+        ("&#128241;", "3 apps I use every day &#8212; tech creators"),
+        ("&#127859;", "Quick 15-minute recipe &#8212; food creators"),
+    ]
+
+    def idea_row(e, t):
+        return (f'<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;'
+                f'background:rgba(255,255,255,0.03);border-radius:8px;margin-bottom:8px">'
+                f'<span style="font-size:20px">{e}</span>'
+                f'<span style="font-size:13px;color:rgba(255,255,255,0.65)">{t}</span></div>')
+
+    def blocker_row(issue, fix):
+        return (f'<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)">'
+                f'<span style="font-size:12px;color:#a78bfa;font-weight:700">{issue}</span>'
+                f'<span style="font-size:12.5px;color:rgba(255,255,255,0.5);margin-left:8px">{fix}</span></div>')
+
+    if campaign_type == "welcome":
+        features = (
+            _feature_row("&#127916;", "AI Script Generation",
+                "Describe your topic and watch a full voiceover script appear in real time.") +
+            _feature_row("&#128444;", "Auto Stock Footage",
+                "Every scene matched with Pexels stock footage automatically.") +
+            _feature_row("&#127897;", "Voice Synthesis + Custom Recording",
+                "AI voices or record your own. Noise-reduced automatically.") +
+            _feature_row("&#128241;", "Every Platform, Perfect Dimensions",
+                "TikTok, Reels, YouTube Shorts, LinkedIn &#8212; exactly the right size.") +
+            _feature_row("&#127909;", "Ken Burns & Pan Motion Effects",
+                "Cinematic zoom and pan make static images feel alive.") +
+            _feature_row("&#127970;", "Agency Mode",
+                "Client projects, brand kits, teams, and shared token pools.")
+        )
+        body = (
+            f'<tr><td style="padding:36px 40px">'
+            f'<p style="margin:0 0 6px;font-size:17px;color:#fff;font-weight:700">Hey {first} &#128075;</p>'
+            f'<p style="margin:0 0 20px;font-size:14px;color:rgba(255,255,255,0.55);line-height:1.7">'
+            f'Welcome to SceneForge &#8212; turn ideas into publish-ready videos.'
+            f' Your account is live with <strong style="color:#2DD4BF">1,000 free tokens</strong>.</p>'
+            f'<div style="background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.3);'
+            f'border-radius:12px;padding:18px 24px;margin-bottom:24px;text-align:center">'
+            f'<p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#a78bfa;text-transform:uppercase;letter-spacing:.1em">Your starting balance</p>'
+            f'<p style="margin:0;font-size:40px;font-weight:800;color:#fff">1,000 <span style="font-size:18px;color:rgba(255,255,255,0.4)">tokens</span></p>'
+            f'<p style="margin:6px 0 0;font-size:12px;color:rgba(255,255,255,0.35)">Each video render = 100 tokens = 10 free videos</p></div>'
+            f'<p style="margin:0 0 14px;font-size:13px;font-weight:700;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:.08em">What you can do</p>'
+            f'<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:22px">{features}</table>'
+            f'<div style="background:rgba(45,212,191,0.07);border:1px solid rgba(45,212,191,0.2);border-radius:12px;padding:20px 24px;margin-bottom:24px">'
+            f'<p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#2DD4BF;text-transform:uppercase;letter-spacing:.08em">&#128640; 5 steps to your first video</p>'
+            f'<ol style="margin:0;padding-left:18px;color:rgba(255,255,255,0.6);font-size:13px;line-height:1.8">'
+            f'<li>Choose niche and target platform</li>'
+            f'<li>Pick an AI-generated concept</li>'
+            f'<li>Generate or write your script</li>'
+            f'<li>Review your auto-generated scenes</li>'
+            f'<li>Pick a voice, hit Render &#8212; done</li>'
+            f'</ol></div>'
+            f'{_cta("Create My First Video &#8594;", APP_URL)}'
+            f'</td></tr>'
+        )
+        subject = f"&#127916; Welcome to SceneForge, {first}! Here\'s what you can do"
+
+    elif campaign_type == "zero_render":
+        ideas_html = "".join(idea_row(e, t) for e, t in IDEAS)
+        body = (
+            f'<tr><td style="padding:36px 40px">'
+            f'<p style="margin:0 0 6px;font-size:17px;color:#fff;font-weight:700">Hey {first} &#128075;</p>'
+            f'<p style="margin:0 0 20px;font-size:14px;color:rgba(255,255,255,0.55);line-height:1.7">'
+            f'You signed up but haven\'t created your first video yet.'
+            f' Your <strong style="color:#2DD4BF">{tokens:,} tokens</strong> are ready.</p>'
+            f'<div style="background:rgba(124,58,237,0.1);border-left:3px solid #7C3AED;'
+            f'border-radius:0 8px 8px 0;padding:16px 20px;margin-bottom:22px">'
+            f'<p style="margin:0;font-size:13.5px;color:rgba(255,255,255,0.75);line-height:1.7">'
+            f'&#9201; <strong style="color:#fff">3 minutes</strong> from blank page to ready-to-post video.</p></div>'
+            f'<p style="margin:0 0 10px;font-size:13px;font-weight:700;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:.08em">Most popular first videos</p>'
+            f'{ideas_html}'
+            f'{_cta("Create My First Video &#8594;", APP_URL)}'
+            f'</td></tr>'
+        )
+        subject = f"&#9203; {first}, your first SceneForge video is 3 minutes away"
+
+    elif campaign_type == "inactive_5d":
+        niche_line = (f"We noticed your last video was in the <strong style=\"color:#a78bfa\">{niche}</strong> space. "
+                      if niche else "")
+        body = (
+            f'<tr><td style="padding:36px 40px">'
+            f'<p style="margin:0 0 6px;font-size:17px;color:#fff;font-weight:700">Hey {first},</p>'
+            f'<p style="margin:0 0 20px;font-size:14px;color:rgba(255,255,255,0.55);line-height:1.7">'
+            f'It\'s been 5 days since your last video. {niche_line}'
+            f'You have <strong style="color:#2DD4BF">{tokens:,} tokens</strong> ready.</p>'
+            f'<div style="background:rgba(45,212,191,0.08);border:1px solid rgba(45,212,191,0.2);border-radius:12px;padding:20px 24px;margin-bottom:22px">'
+            f'<p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#2DD4BF">&#128161; What creators are making this week</p>'
+            f'<ul style="margin:0;padding-left:16px;color:rgba(255,255,255,0.6);font-size:13px;line-height:1.9">'
+            f'<li>Quick tutorial videos &#8212; 10x more saves than long content</li>'
+            f'<li>"Did you know?" clips &#8212; easiest to script with AI</li>'
+            f'<li>Behind-the-scenes &#8212; authentic and fast</li>'
+            f'<li>Product demos with screen capture visuals</li>'
+            f'</ul></div>'
+            f'<p style="margin:0 0 22px;font-size:13px;color:rgba(255,255,255,0.45);line-height:1.6">'
+            f'Consistency is the key. Even one video a week compounds over time.</p>'
+            f'{_cta("Jump Back In &#8594;", APP_URL)}'
+            f'</td></tr>'
+        )
+        subject = f"&#127916; {first}, it\'s been 5 days &#8212; ready to create again?"
+
+    elif campaign_type == "inactive_14d":
+        blockers_html = "".join(blocker_row(i, f) for i, f in BLOCKERS)
+        body = (
+            f'<tr><td style="padding:36px 40px">'
+            f'<p style="margin:0 0 6px;font-size:17px;color:#fff;font-weight:700">Hey {first},</p>'
+            f'<p style="margin:0 0 20px;font-size:14px;color:rgba(255,255,255,0.55);line-height:1.7">'
+            f'Two weeks is a long time in the content game.'
+            f' Your <strong style="color:#2DD4BF">{tokens:,} tokens</strong> never expire.</p>'
+            f'<div style="background:rgba(255,255,255,0.04);border-radius:12px;padding:20px 24px;margin-bottom:22px">'
+            f'<p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#fff">&#129300; Is something holding you back?</p>'
+            f'<p style="margin:0 0 12px;font-size:12.5px;color:rgba(255,255,255,0.5);line-height:1.55">Common reasons people pause &#8212; and what helps:</p>'
+            f'{blockers_html}</div>'
+            f'{_cta("Come Back and Create &#8594;", APP_URL)}'
+            f'<p style="margin:18px 0 0;font-size:12px;color:rgba(255,255,255,0.25);text-align:center">Reply to this email if there\'s anything we can help with.</p>'
+            f'</td></tr>'
+        )
+        subject = f"&#127909; {first}, still thinking about SceneForge?"
+
+    elif campaign_type == "inactive_30d":
+        body = (
+            f'<tr><td style="padding:36px 40px">'
+            f'<p style="margin:0 0 6px;font-size:17px;color:#fff;font-weight:700">Hey {first},</p>'
+            f'<p style="margin:0 0 20px;font-size:14px;color:rgba(255,255,255,0.55);line-height:1.7">'
+            f'It\'s been a month. This is our last re-engagement email for a while.'
+            f' Your <strong style="color:#2DD4BF">{tokens:,} tokens</strong> never expire.</p>'
+            f'<div style="background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.25);border-radius:12px;padding:20px 24px;margin-bottom:22px">'
+            f'<p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#a78bfa">&#10024; What\'s new since you left</p>'
+            f'<ul style="margin:0;padding-left:16px;color:rgba(255,255,255,0.6);font-size:13px;line-height:1.9">'
+            f'<li>Faster rendering &#8212; most videos under 2 minutes</li>'
+            f'<li>Custom voice recording in the browser</li>'
+            f'<li>Agency Mode &#8212; manage clients, brand kits, teams</li>'
+            f'<li>More platforms &#8212; LinkedIn, Pinterest, Snapchat</li>'
+            f'</ul></div>'
+            f'{_cta("Take Another Look &#8594;", APP_URL)}'
+            f'<p style="margin:18px 0 0;font-size:12px;color:rgba(255,255,255,0.2);text-align:center">We won\'t send re-engagement emails after this. Your account stays active forever.</p>'
+            f'</td></tr>'
+        )
+        subject = f"&#127775; {first}, one last note from SceneForge"
+
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown campaign type: {campaign_type}")
+
+    full_html = _wrap(_header("", "") + body + _footer())
+
+    page = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Email preview</title>
+  <style>
+    body{{margin:0;padding:20px;background:#080810;font-family:Arial,sans-serif}}
+    .bar{{background:#1a1a2e;border:1px solid rgba(255,255,255,0.1);border-radius:8px;
+      padding:12px 16px;margin-bottom:20px}}
+    .bar .row{{display:flex;gap:8px;font-size:12px;margin-bottom:3px}}
+    .bar .lbl{{color:rgba(255,255,255,0.35);min-width:60px;flex-shrink:0}}
+    .bar .val{{color:rgba(255,255,255,0.65)}}
+    .bar .subj{{color:#a78bfa;font-size:13px;font-weight:700;margin-top:6px}}
+  </style>
+</head>
+<body>
+  <div class="bar">
+    <div class="row"><span class="lbl">From</span><span class="val">SceneForge &lt;hello@scenraforge.com&gt;</span></div>
+    <div class="row"><span class="lbl">To</span><span class="val">{name} &lt;preview@example.com&gt;</span></div>
+    <div class="row"><span class="lbl">Campaign</span><span class="val">{campaign_type.replace("_"," ").title()}</span></div>
+    <div class="subj">{subject}</div>
+  </div>
+  {full_html}
+</body>
+</html>"""
+
+    return HTMLResponse(content=page)
