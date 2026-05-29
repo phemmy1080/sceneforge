@@ -1462,78 +1462,145 @@ tr:hover td{background:rgba(255,255,255,0.018)}
         </div>
       </div>
 
-      <!-- Plan margin cards -->
-      <div id="cost-plan-grid" class="stat-row" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-bottom:24px">
+      <!-- KPI summary bar -->
+      <div id="cost-kpi-bar" class="stat-row" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:20px">
         <div class="loading"></div>
       </div>
 
-      <!-- Cost breakdown table -->
+      <!-- Plan margin cards -->
+      <div id="cost-plan-grid" class="stat-row" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr));margin-bottom:20px">
+        <div class="loading"></div>
+      </div>
+
+      <!-- Per-plan breakdown table -->
       <div class="card" style="margin-bottom:18px">
         <div class="card-hdr">
-          <span class="card-title">Cost breakdown per render</span>
-          <span style="font-size:11px;color:var(--text3)">Avg across all renders on each plan</span>
+          <span class="card-title">Cost & margin breakdown — per render (average)</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="font-size:11px;color:var(--text3)" id="cost-rate-label"></span>
+            <button class="btn btn-ghost btn-sm" onclick="exportCostCSV()">⬇ Export CSV</button>
+          </div>
         </div>
         <div class="tbl-wrap">
           <table>
             <thead><tr>
-              <th>Plan</th><th>Revenue/render</th><th>Voice</th>
-              <th>Visuals</th><th>AI gen</th><th>Compute</th>
-              <th>Storage</th><th>Total cost</th><th>Margin</th><th>Margin %</th>
+              <th>Plan</th><th>Plan price</th><th>Tokens/plan</th>
+              <th>Revenue/render</th><th>Voice</th><th>Visuals</th>
+              <th>AI gen</th><th>Compute</th><th>Storage</th>
+              <th>Total cost</th><th>Margin $</th><th>Margin %</th><th>Renders</th>
             </tr></thead>
             <tbody id="cost-breakdown-tbody">
-              <tr><td colspan="10"><div class="loading"></div></td></tr>
+              <tr><td colspan="13"><div class="loading"></div></td></tr>
             </tbody>
           </table>
         </div>
       </div>
 
-      <!-- Assumptions card -->
+      <!-- Recent renders + Assumptions side by side -->
+      <div class="two-col" style="margin-bottom:18px">
+        <!-- Recent renders with full breakdown -->
+        <div class="card" style="grid-column:span 2">
+          <div class="card-hdr">
+            <span class="card-title">Recent render cost log</span>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <select id="cost-filter-plan" onchange="filterCostLog()"
+                style="background:var(--ink2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:11.5px;padding:5px 10px;outline:none">
+                <option value="">All plans</option>
+                <option value="free">Free</option>
+                <option value="starter">Starter</option>
+                <option value="pro">Pro</option>
+                <option value="studio">Studio</option>
+                <option value="agency">Agency</option>
+              </select>
+              <select id="cost-filter-margin" onchange="filterCostLog()"
+                style="background:var(--ink2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:11.5px;padding:5px 10px;outline:none">
+                <option value="">All margins</option>
+                <option value="high">High (&gt;50%)</option>
+                <option value="mid">Mid (20–50%)</option>
+                <option value="low">Low (&lt;20%)</option>
+                <option value="neg">Negative</option>
+              </select>
+              <select id="cost-filter-voice" onchange="filterCostLog()"
+                style="background:var(--ink2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:11.5px;padding:5px 10px;outline:none">
+                <option value="">All voice</option>
+                <option value="edge_tts">Edge TTS</option>
+                <option value="elevenlabs">ElevenLabs</option>
+              </select>
+              <button class="btn btn-ghost btn-sm" onclick="exportRenderLogCSV()">⬇ Export</button>
+              <span id="cost-log-count" style="font-size:11px;color:var(--text3)"></span>
+            </div>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr>
+                <th>Time</th><th>Job ID</th><th>User</th><th>Plan</th>
+                <th>Scenes</th><th>Voice</th><th>AI</th><th>Render time</th>
+                <th>Voice $</th><th>Visual $</th><th>AI $</th><th>Compute $</th><th>Storage $</th>
+                <th>Total cost</th><th>Revenue</th><th>Margin $</th><th>Margin %</th>
+              </tr></thead>
+              <tbody id="cost-recent-tbody">
+                <tr><td colspan="17"><div class="loading"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cost assumptions + totals -->
       <div class="two-col">
         <div class="card">
-          <div class="card-hdr"><span class="card-title">Cost assumptions</span></div>
+          <div class="card-hdr"><span class="card-title">Cost assumptions (current rates)</span></div>
           <div style="padding:14px 18px;display:flex;flex-direction:column;gap:8px">
             <div style="display:flex;justify-content:space-between;font-size:12.5px">
-              <span style="color:var(--text2)">Voice (Edge TTS / Microsoft)</span>
-              <span style="color:var(--teal);font-family:DM Mono,monospace">Free — always</span>
+              <span style="color:var(--text2)">Voice — Edge TTS (all plans)</span>
+              <span style="color:var(--teal);font-family:DM Mono,monospace">Free</span>
             </div>
             <div style="display:flex;justify-content:space-between;font-size:12.5px">
-              <span style="color:var(--text2)">Voice (ElevenLabs — Studio plan only)</span>
+              <span style="color:var(--text2)">Voice — ElevenLabs (Studio only)</span>
               <span style="color:var(--gold);font-family:DM Mono,monospace">$0.30 / 1k chars</span>
             </div>
             <div style="display:flex;justify-content:space-between;font-size:12.5px">
-              <span style="color:var(--text2)">Visuals (Pexels)</span>
-              <span style="color:var(--teal);font-family:DM Mono,monospace">$0.00 / render</span>
+              <span style="color:var(--text2)">Visuals — Pexels</span>
+              <span style="color:var(--teal);font-family:DM Mono,monospace">Free</span>
             </div>
             <div style="display:flex;justify-content:space-between;font-size:12.5px">
-              <span style="color:var(--text2)">Visuals (DALL-E 3)</span>
+              <span style="color:var(--text2)">Visuals — DALL-E 3</span>
               <span style="color:var(--gold);font-family:DM Mono,monospace">$0.04 / image</span>
             </div>
             <div style="display:flex;justify-content:space-between;font-size:12.5px">
-              <span style="color:var(--text2)">AI generation (Groq)</span>
+              <span style="color:var(--text2)">AI generation — Groq (Free/Starter)</span>
               <span style="color:var(--teal);font-family:DM Mono,monospace">Free tier</span>
             </div>
             <div style="display:flex;justify-content:space-between;font-size:12.5px">
-              <span style="color:var(--text2)">AI generation (OpenAI)</span>
-              <span style="color:var(--gold);font-family:DM Mono,monospace">$0.00015 / 1k tok</span>
+              <span style="color:var(--text2)">AI generation — OpenAI GPT-4o-mini (Pro+)</span>
+              <span style="color:var(--gold);font-family:DM Mono,monospace">$0.15/$0.60 per 1M tok</span>
             </div>
             <div style="display:flex;justify-content:space-between;font-size:12.5px">
-              <span style="color:var(--text2)">Compute (Railway)</span>
+              <span style="color:var(--text2)">Compute — Railway shared 0.5 vCPU</span>
               <span style="color:var(--text2);font-family:DM Mono,monospace">$0.000008 / sec</span>
             </div>
             <div style="display:flex;justify-content:space-between;font-size:12.5px">
-              <span style="color:var(--text2)">Storage (R2)</span>
+              <span style="color:var(--text2)">Storage — Cloudflare R2 (avg 50 MB/video)</span>
               <span style="color:var(--text2);font-family:DM Mono,monospace">$0.000025 / render</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px;border-top:1px solid var(--border);padding-top:8px;margin-top:4px">
+              <span style="color:var(--text2)">Exchange rate (USD → NGN)</span>
+              <span id="cost-rate-display" style="color:var(--violet);font-family:DM Mono,monospace">loading…</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px">
+              <span style="color:var(--text2)">Revenue formula</span>
+              <span style="color:var(--text3);font-size:11px">plan_price ÷ (plan_tokens ÷ 100)</span>
             </div>
           </div>
         </div>
         <div class="card">
-          <div class="card-hdr"><span class="card-title">Recent render costs</span></div>
+          <div class="card-hdr"><span class="card-title">Lifetime totals by plan</span></div>
           <div class="tbl-wrap">
             <table>
               <thead><tr>
-                <th>Job</th><th>Plan</th><th>Cost</th><th>Margin</th><th>Time</th>
+                <th>Plan</th><th>Renders</th><th>Total revenue</th><th>Total cost</th><th>Total margin</th>
               </tr></thead>
-              <tbody id="cost-recent-tbody">
+              <tbody id="cost-totals-tbody">
                 <tr><td colspan="5"><div class="loading"></div></td></tr>
               </tbody>
             </table>
@@ -3170,76 +3237,268 @@ async function fetchCsrfToken() {
 
 var COST_DATA = {};
 
+var COST_LOG_ALL = [];
+
+function mCol(pct) {
+  return pct >= 50 ? 'var(--teal)' : pct >= 20 ? 'var(--gold)' : 'var(--rose)';
+}
+function mBg(pct) {
+  return pct >= 50 ? 'rgba(45,212,191,0.07)' : pct >= 20 ? 'rgba(201,168,76,0.07)' : 'rgba(248,113,113,0.07)';
+}
+function usd(v,d){ return '$' + (v||0).toFixed(d||5); }
+
+function filterCostLog() {
+  var planF   = (document.getElementById('cost-filter-plan')   || {}).value || '';
+  var marginF = (document.getElementById('cost-filter-margin') || {}).value || '';
+  var voiceF  = (document.getElementById('cost-filter-voice')  || {}).value || '';
+  var filtered = COST_LOG_ALL.filter(function(r) {
+    if (planF   && r.plan !== planF) return false;
+    if (voiceF  && r.voice_provider !== voiceF) return false;
+    if (marginF === 'high' && r.margin_pct < 50)  return false;
+    if (marginF === 'mid'  && (r.margin_pct < 20 || r.margin_pct >= 50)) return false;
+    if (marginF === 'low'  && (r.margin_pct < 0  || r.margin_pct >= 20)) return false;
+    if (marginF === 'neg'  && r.margin_pct >= 0)  return false;
+    return true;
+  });
+  renderCostLog(filtered);
+}
+
+function renderCostLog(records) {
+  var tbody = document.getElementById('cost-recent-tbody');
+  var count = document.getElementById('cost-log-count');
+  if (count) count.textContent = records.length + ' records';
+  if (!tbody) return;
+  if (!records.length) {
+    tbody.innerHTML = '<tr><td colspan="17" style="text-align:center;color:var(--text3);padding:20px">No records match filters</td></tr>';
+    return;
+  }
+  tbody.innerHTML = records.map(function(r) {
+    var mc = mCol(r.margin_pct);
+    var voiceBadge = r.voice_provider === 'elevenlabs'
+      ? '<span style="background:rgba(245,158,11,.15);color:#fbbf24;border-radius:3px;padding:1px 5px;font-size:10px">EL</span>'
+      : '<span style="background:rgba(45,212,191,.1);color:#2dd4bf;border-radius:3px;padding:1px 5px;font-size:10px">edge</span>';
+    var aiBadge = r.ai_provider === 'openai'
+      ? '<span style="background:rgba(124,58,237,.15);color:#a78bfa;border-radius:3px;padding:1px 5px;font-size:10px">GPT</span>'
+      : '<span style="background:rgba(45,212,191,.1);color:#2dd4bf;border-radius:3px;padding:1px 5px;font-size:10px">Groq</span>';
+    return '<tr style="cursor:pointer" onclick="showJobCostDetail('+JSON.stringify(r)+')">'
+      + '<td style="color:var(--text3);font-size:11px;white-space:nowrap">' + ago(r.ts) + '</td>'
+      + '<td style="font-family:DM Mono,monospace;font-size:10px;color:var(--text3)">' + (r.job_id||'').slice(0,8) + '…</td>'
+      + '<td style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(r.user_id||'—').slice(0,16) + '</td>'
+      + '<td>' + planTag(r.plan || 'free') + '</td>'
+      + '<td style="text-align:center;color:var(--text2)">' + (r.scenes||0) + '</td>'
+      + '<td>' + voiceBadge + '</td>'
+      + '<td>' + aiBadge + '</td>'
+      + '<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text3)">' + (r.render_seconds||0).toFixed(1) + 's</td>'
+      + '<td style="font-family:DM Mono,monospace;font-size:11px">' + usd(r.cost_voice_usd,5) + '</td>'
+      + '<td style="font-family:DM Mono,monospace;font-size:11px">' + usd(r.cost_visual_usd,5) + '</td>'
+      + '<td style="font-family:DM Mono,monospace;font-size:11px">' + usd(r.cost_ai_usd,5) + '</td>'
+      + '<td style="font-family:DM Mono,monospace;font-size:11px">' + usd(r.cost_compute_usd,5) + '</td>'
+      + '<td style="font-family:DM Mono,monospace;font-size:11px">' + usd(r.cost_storage_usd,5) + '</td>'
+      + '<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--rose)">' + usd(r.total_cost_usd,5) + '</td>'
+      + '<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--teal)">' + usd(r.revenue_per_render,5) + '</td>'
+      + '<td style="font-family:DM Mono,monospace;font-size:11px;color:' + mc + '">' + usd(r.margin_usd,5) + '</td>'
+      + '<td><span style="font-weight:700;color:' + mc + '">' + (r.margin_pct||0).toFixed(1) + '%</span></td>'
+      + '</tr>';
+  }).join('');
+}
+
+function showJobCostDetail(r) {
+  var mc = mCol(r.margin_pct);
+  var html = '<div style="padding:4px 0">'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'
+    + kv('Job ID', '<span style="font-family:DM Mono,monospace;font-size:11px">' + (r.job_id||'') + '</span>')
+    + kv('Time', ago(r.ts))
+    + kv('Plan', planTag(r.plan||'free'))
+    + kv('Scenes', r.scenes||0)
+    + kv('Voice', r.voice_provider||'—')
+    + kv('AI provider', r.ai_provider||'—')
+    + kv('Render time', (r.render_seconds||0).toFixed(2) + 's')
+    + kv('Total chars', fmt(r.total_chars||0))
+    + kv('AI input tokens', fmt(r.ai_input_tokens||0))
+    + kv('AI output tokens', fmt(r.ai_output_tokens||0))
+    + '</div>'
+    + '<div style="background:var(--ink2);border-radius:8px;padding:14px;margin-bottom:12px">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">Cost breakdown</div>'
+    + costBar('Voice',   r.cost_voice_usd,  r.total_cost_usd, 'var(--violet)')
+    + costBar('Visual',  r.cost_visual_usd, r.total_cost_usd, 'var(--teal)')
+    + costBar('AI gen',  r.cost_ai_usd,     r.total_cost_usd, 'var(--gold)')
+    + costBar('Compute', r.cost_compute_usd,r.total_cost_usd, 'var(--rose)')
+    + costBar('Storage', r.cost_storage_usd,r.total_cost_usd, '#64748b')
+    + '</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">'
+    + metricBox('Total cost', usd(r.total_cost_usd,5), 'var(--rose)')
+    + metricBox('Revenue/render', usd(r.revenue_per_render,5), 'var(--teal)')
+    + metricBox('Margin', usd(r.margin_usd,5) + ' (' + (r.margin_pct||0).toFixed(1) + '%)', mc)
+    + '</div>'
+    + '<div style="margin-top:12px;font-size:11px;color:var(--text3)">Plan: ₦' + fmt(r.plan_price_ngn||0) + ' · ' + fmt(r.plan_tokens||100) + ' tokens · ' + (r.renders_per_plan||1).toFixed(0) + ' renders/plan · Rate: ₦' + fmt(r.exchange_rate||1600) + '/$</div>'
+    + '</div>';
+  showModal('<b>Render cost detail</b>', html);
+}
+
+function kv(label, val) {
+  return '<div style="background:var(--ink2);border-radius:6px;padding:8px 12px">'
+    + '<div style="font-size:10px;color:var(--text3);margin-bottom:3px">' + label + '</div>'
+    + '<div style="font-size:12.5px;color:var(--text)">' + val + '</div></div>';
+}
+function costBar(label, cost, total, color) {
+  var pct = total > 0 ? (cost||0) / total * 100 : 0;
+  return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+    + '<span style="width:60px;font-size:11px;color:var(--text3)">' + label + '</span>'
+    + '<div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden">'
+    + '<div style="height:100%;width:' + pct.toFixed(1) + '%;background:' + color + ';border-radius:3px"></div></div>'
+    + '<span style="width:70px;text-align:right;font-family:DM Mono,monospace;font-size:11px;color:var(--text2)">' + usd(cost,5) + '</span>'
+    + '<span style="width:36px;text-align:right;font-size:10px;color:var(--text3)">' + pct.toFixed(0) + '%</span>'
+    + '</div>';
+}
+function metricBox(label, val, color) {
+  return '<div style="background:var(--ink2);border-radius:8px;padding:12px;text-align:center">'
+    + '<div style="font-size:10px;color:var(--text3);margin-bottom:4px">' + label + '</div>'
+    + '<div style="font-size:14px;font-weight:700;color:' + color + ';font-family:DM Mono,monospace">' + val + '</div></div>';
+}
+
+function exportCostCSV() {
+  var rows = [['Plan','Price NGN','Price USD','Plan tokens','Revenue/render','Avg cost','Margin $','Margin %','Renders','Voice','Visual','AI','Compute','Storage']];
+  Object.entries(COST_DATA||{}).forEach(function(e) {
+    var k=e[0], p=e[1], bd=p.cost_breakdown||{};
+    rows.push([k, p.price_ngn||0, (p.price_usd||0).toFixed(4), p.plan_tokens||100,
+      (p.revenue_per_render||0).toFixed(6), (p.avg_cost_usd||0).toFixed(6),
+      (p.margin_usd||0).toFixed(4), (p.margin_pct||0).toFixed(1), p.renders||0,
+      (bd.voice||0).toFixed(6), (bd.visual||0).toFixed(6), (bd.ai||0).toFixed(6),
+      (bd.compute||0).toFixed(6), (bd.storage||0).toFixed(6)]);
+  });
+  downloadCSV('sceneforge_cost_summary.csv', rows);
+}
+
+function exportRenderLogCSV() {
+  var rows = [['time','job_id','user_id','plan','scenes','voice','ai','render_s',
+    'cost_voice','cost_visual','cost_ai','cost_compute','cost_storage',
+    'total_cost','revenue','margin','margin_pct']];
+  COST_LOG_ALL.forEach(function(r) {
+    rows.push([r.ts, r.job_id, r.user_id, r.plan, r.scenes||0,
+      r.voice_provider, r.ai_provider, (r.render_seconds||0).toFixed(2),
+      (r.cost_voice_usd||0).toFixed(6), (r.cost_visual_usd||0).toFixed(6),
+      (r.cost_ai_usd||0).toFixed(6), (r.cost_compute_usd||0).toFixed(6),
+      (r.cost_storage_usd||0).toFixed(6), (r.total_cost_usd||0).toFixed(6),
+      (r.revenue_per_render||0).toFixed(6), (r.margin_usd||0).toFixed(6),
+      (r.margin_pct||0).toFixed(1)]);
+  });
+  downloadCSV('sceneforge_render_log.csv', rows);
+}
+
+function downloadCSV(name, rows) {
+  var csv = rows.map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
+  var a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = name; a.click();
+}
+
 async function loadCosts() {
   try {
     var d = await apiFetch('/costs/summary');
     COST_DATA = d.plans || {};
     var rate = d.exchange_rate || 1600;
 
-    // ── Plan margin cards ──────────────────────────────────────────────────
+    // ── Exchange rate display
+    var rateEl = document.getElementById('cost-rate-display');
+    var rateLbl = document.getElementById('cost-rate-label');
+    if (rateEl) rateEl.textContent = '₦' + fmt(Math.round(rate)) + ' / $1';
+    if (rateLbl) rateLbl.textContent = 'Rate: ₦' + fmt(Math.round(rate)) + '/$';
+
+    // ── KPI bar ───────────────────────────────────────────────────────────
+    var totalRevenue=0, totalCost=0, totalMargin=0, totalRenders=0;
+    Object.values(COST_DATA).forEach(function(p) {
+      totalRevenue  += p.total_revenue_usd || 0;
+      totalCost     += p.total_cost_usd    || 0;
+      totalMargin   += p.total_margin_usd  || 0;
+      totalRenders  += p.renders           || 0;
+    });
+    var avgMarginPct = totalRevenue > 0 ? totalMargin / totalRevenue * 100 : 0;
+    var kpiBar = document.getElementById('cost-kpi-bar');
+    if (kpiBar) {
+      kpiBar.innerHTML = [
+        ['Total revenue tracked', '$' + totalRevenue.toFixed(2), 'teal'],
+        ['Total API/infra cost',  '$' + totalCost.toFixed(4),    'rose'],
+        ['Total gross margin',    '$' + totalMargin.toFixed(2),  avgMarginPct>=50?'teal':avgMarginPct>=20?'gold':'rose'],
+        ['Avg margin %',          avgMarginPct.toFixed(1)+'%',   avgMarginPct>=50?'teal':avgMarginPct>=20?'gold':'rose'],
+        ['Renders tracked',       fmt(totalRenders),             'violet'],
+      ].map(function(s) {
+        return '<div class="stat '+s[2]+'">'
+          + '<div class="stat-label">'+s[0]+'</div>'
+          + '<div class="stat-val" style="font-size:20px">'+s[1]+'</div></div>';
+      }).join('');
+    }
+
+    // ── Plan margin cards ─────────────────────────────────────────────────
     var colors = {starter:'violet', pro:'gold', studio:'teal', agency:'amber', free:'rose'};
     var grid = document.getElementById('cost-plan-grid');
     if (grid) {
       grid.innerHTML = Object.entries(COST_DATA).map(function(e) {
         var k = e[0], p = e[1];
         var cls = colors[k] || 'gold';
-        var marginColor = p.margin_pct >= 50 ? 'var(--teal)' : p.margin_pct >= 20 ? 'var(--gold)' : 'var(--rose)';
+        var mc = mCol(p.margin_pct||0);
         return '<div class="stat ' + cls + '">'
           + '<div class="stat-label">' + (p.plan_label || k) + '</div>'
-          + '<div class="stat-val" style="font-size:22px;color:' + marginColor + '">' + p.margin_pct.toFixed(1) + '%</div>'
+          + '<div class="stat-val" style="font-size:22px;color:' + mc + '">' + (p.margin_pct||0).toFixed(1) + '%</div>'
           + '<div class="stat-meta" style="display:flex;flex-direction:column;gap:3px;margin-top:6px">'
-          + '<span>Revenue: $' + (p.price_usd || 0).toFixed(4) + ' <span style="color:var(--text3);font-size:10px">(₦' + fmt(p.price_ngn || 0) + ')</span></span>'
-          + '<span>Avg cost: $' + (p.avg_cost_usd || 0).toFixed(4) + '</span>'
-          + '<span>Margin: $' + (p.margin_usd || 0).toFixed(4) + '</span>'
-          + '<span style="color:var(--text3);font-size:11px">' + fmt(p.renders || 0) + ' renders tracked</span>'
+          + '<span>₦' + fmt(p.price_ngn||0) + ' &nbsp;→&nbsp; $' + (p.revenue_per_render||0).toFixed(4) + '/render</span>'
+          + '<span style="color:var(--text3)">Avg cost: $' + (p.avg_cost_usd||0).toFixed(5) + '</span>'
+          + '<span>Margin: $' + (p.margin_usd||0).toFixed(4) + '</span>'
+          + '<span style="color:var(--text3);font-size:11px">' + fmt(p.plan_tokens||100) + ' tokens → ' + (p.renders_per_plan||1).toFixed(0) + ' renders</span>'
+          + '<span style="color:var(--text3);font-size:11px">' + fmt(p.renders||0) + ' renders tracked</span>'
           + '</div></div>';
-      }).join('') || '<div class="loading">No cost data yet — costs are recorded after each render</div>';
+      }).join('') || '<div style="padding:16px;color:var(--text3)">No cost data yet — costs are recorded after each render</div>';
     }
 
-    // ── Breakdown table ────────────────────────────────────────────────────
+    // ── Breakdown table ───────────────────────────────────────────────────
     var tbody = document.getElementById('cost-breakdown-tbody');
     if (tbody) {
       tbody.innerHTML = Object.entries(COST_DATA).map(function(e) {
-        var k = e[0], p = e[1];
-        var bd = p.cost_breakdown || {};
-        var marginColor = p.margin_pct >= 50 ? 'var(--teal)' : p.margin_pct >= 20 ? 'var(--gold)' : 'var(--rose)';
-        var marginBg = p.margin_pct >= 50 ? 'rgba(45,212,191,0.08)' : p.margin_pct >= 20 ? 'rgba(201,168,76,0.08)' : 'rgba(248,113,113,0.08)';
-        return '<tr style="background:' + marginBg + '">'
-          + '<td><span class="tag tag-' + (k === 'pro' ? 'pro' : k === 'studio' ? 'studio' : k === 'starter' ? 'starter' : k === 'agency' ? 'agency' : 'free') + '">' + (p.plan_label || k) + '</span></td>'
-          + '<td style="font-family:DM Mono,monospace;color:var(--teal)">$' + (p.price_usd || 0).toFixed(4) + '</td>'
-          + '<td style="font-family:DM Mono,monospace;font-size:11px">$' + (bd.voice || 0).toFixed(5) + '</td>'
-          + '<td style="font-family:DM Mono,monospace;font-size:11px">$' + (bd.visual || 0).toFixed(5) + '</td>'
-          + '<td style="font-family:DM Mono,monospace;font-size:11px">$' + (bd.ai || 0).toFixed(5) + '</td>'
-          + '<td style="font-family:DM Mono,monospace;font-size:11px">$' + (bd.compute || 0).toFixed(5) + '</td>'
-          + '<td style="font-family:DM Mono,monospace;font-size:11px">$' + (bd.storage || 0).toFixed(5) + '</td>'
-          + '<td style="font-family:DM Mono,monospace;color:var(--rose)">$' + (p.avg_cost_usd || 0).toFixed(5) + '</td>'
-          + '<td style="font-family:DM Mono,monospace;color:' + marginColor + '">$' + (p.margin_usd || 0).toFixed(4) + '</td>'
-          + '<td><span style="font-weight:700;color:' + marginColor + '">' + (p.margin_pct || 0).toFixed(1) + '%</span></td>'
+        var k = e[0], p = e[1]; var bd = p.cost_breakdown || {};
+        var mc = mCol(p.margin_pct||0);
+        return '<tr style="background:' + mBg(p.margin_pct||0) + '">'
+          + '<td>' + planTag(k) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:12px">₦' + fmt(p.price_ngn||0) + ' ($' + (p.price_usd||0).toFixed(3) + ')</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:12px;text-align:center">' + fmt(p.plan_tokens||100) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:12px;color:var(--teal)">' + usd(p.revenue_per_render,5) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:11px">' + usd(bd.voice,5) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:11px">' + usd(bd.visual,5) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:11px">' + usd(bd.ai,5) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:11px">' + usd(bd.compute,5) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:11px">' + usd(bd.storage,5) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:12px;color:var(--rose);font-weight:600">' + usd(p.avg_cost_usd,5) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:12px;color:' + mc + '">' + usd(p.margin_usd,4) + '</td>'
+          + '<td><span style="font-weight:700;font-size:13px;color:' + mc + '">' + (p.margin_pct||0).toFixed(1) + '%</span></td>'
+          + '<td style="color:var(--text3);text-align:center">' + fmt(p.renders||0) + '</td>'
           + '</tr>';
-      }).join('') || '<tr><td colspan="10" class="loading">No data yet</td></tr>';
+      }).join('') || '<tr><td colspan="13" style="padding:16px;color:var(--text3);text-align:center">No data yet</td></tr>';
     }
 
-    // ── Recent costs ───────────────────────────────────────────────────────
-    var recent = await apiFetch('/costs/recent');
-    var records = recent.records || [];
-    var rtbody = document.getElementById('cost-recent-tbody');
-    if (rtbody) {
-      rtbody.innerHTML = records.length ? records.map(function(r) {
-        var mc = r.margin_pct >= 50 ? 'var(--teal)' : r.margin_pct >= 20 ? 'var(--gold)' : 'var(--rose)';
+    // ── Lifetime totals ───────────────────────────────────────────────────
+    var ttbody = document.getElementById('cost-totals-tbody');
+    if (ttbody) {
+      ttbody.innerHTML = Object.entries(COST_DATA).map(function(e) {
+        var k=e[0], p=e[1];
+        var tm = (p.total_margin_usd||0);
+        var mc = mCol(p.margin_pct||0);
         return '<tr>'
-          + '<td style="font-family:DM Mono,monospace;font-size:11px;color:var(--text3)">' + r.job_id.slice(0,8) + '…</td>'
-          + '<td>' + planTag(r.plan || 'free') + '</td>'
-          + '<td style="font-family:DM Mono,monospace;font-size:12px;color:var(--rose)">$' + (r.total_cost_usd || 0).toFixed(5) + '</td>'
-          + '<td style="font-family:DM Mono,monospace;font-size:12px;color:' + mc + '">' + (r.margin_pct || 0).toFixed(1) + '%</td>'
-          + '<td style="color:var(--text3);font-size:11px">' + ago(r.ts) + '</td>'
+          + '<td>' + planTag(k) + '</td>'
+          + '<td style="text-align:center">' + fmt(p.renders||0) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;color:var(--teal)">' + usd(p.total_revenue_usd,2) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;color:var(--rose)">' + usd(p.total_cost_usd,4) + '</td>'
+          + '<td style="font-family:DM Mono,monospace;font-weight:700;color:' + mc + '">' + usd(tm,4) + '</td>'
           + '</tr>';
-      }).join('') : '<tr><td colspan="5" class="loading">No renders tracked yet</td></tr>';
+      }).join('') || '<tr><td colspan="5" style="padding:16px;color:var(--text3);text-align:center">No data yet</td></tr>';
     }
+
+    // ── Recent render log ─────────────────────────────────────────────────
+    var recent = await apiFetch('/costs/recent');
+    COST_LOG_ALL = (recent.records || []);
+    filterCostLog();
 
   } catch(e) {
     console.error('loadCosts error:', e);
     var g = document.getElementById('cost-plan-grid');
-    if (g) g.innerHTML = '<div class="loading">Failed to load cost data</div>';
+    if (g) g.innerHTML = '<div style="padding:16px;color:var(--rose)">Failed to load cost data: ' + e.message + '</div>';
   }
 }
 
