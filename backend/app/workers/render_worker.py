@@ -11,7 +11,7 @@ import redis.asyncio as aioredis
 from app.config import get_settings
 from app.models.schemas import RenderRequest
 from app.services.ffmpeg import render_full_pipeline
-from app.services.voice import synthesize_all_scenes, split_audio_by_scenes
+from app.services.voice import synthesize_all_scenes_with_timing, split_audio_by_scenes
 from app.services.visuals import get_visual_for_scene
 from app.services.storage import upload_job_files, r2_enabled
 from app.services.capcut import build_capcut_draft, write_manifest
@@ -61,6 +61,10 @@ async def render_video(ctx, job_id: str, payload: dict):
         async def voice_progress(done, total):
             pct = 5 + int((done / total) * 35)
             await _set_progress(redis, job_id, f"Voice {done}/{total}...", pct)
+
+        # Word timings from Edge TTS — list[list[dict]], one per scene
+        # Used to sync subtitle cards to the actual spoken words
+        scene_timings: list[list[dict]] = [[] for _ in req.scenes]
 
         # Check if any scene has a custom voice clip
         has_per_scene_voice = any(
@@ -116,7 +120,7 @@ async def render_video(ctx, job_id: str, payload: dict):
             # Synthesise TTS for scenes without custom voice
             if scenes_needing_tts:
                 tts_scenes = [s for _, s in scenes_needing_tts]
-                tts_paths = await synthesize_all_scenes(
+                tts_paths, tts_timings = await synthesize_all_scenes_with_timing(
                     scenes=tts_scenes,
                     voice_name=req.voice_name,
                     output_dir=str(output_dir),
@@ -126,8 +130,9 @@ async def render_video(ctx, job_id: str, payload: dict):
                 )
                 for idx, (i, _) in enumerate(scenes_needing_tts):
                     audio_files[i] = tts_paths[idx]
+                    scene_timings[i] = tts_timings[idx]
         else:
-            audio_files = await synthesize_all_scenes(
+            audio_files, scene_timings = await synthesize_all_scenes_with_timing(
                 scenes=req.scenes,
                 voice_name=req.voice_name,
                 output_dir=str(output_dir),
@@ -204,6 +209,7 @@ async def render_video(ctx, job_id: str, payload: dict):
             on_progress=ffmpeg_progress,
             platform=req.platform,
             max_resolution=_max_resolution,
+            scene_timings=scene_timings,
         )
         _render_seconds = __import__('time').time() - _render_start
 
