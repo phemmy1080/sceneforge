@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import subprocess
+import tempfile
+import os
 from pathlib import Path
-
-import edge_tts
+from typing import Optional
 
 from app.config import get_settings
 from app.models.schemas import Scene
@@ -12,38 +14,17 @@ from app.models.schemas import Scene
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
-# Maps SceneForge voice names → Edge TTS voice IDs
-# All free — no API key, no account required
+# Maps SceneForge voice names → Edge TTS neural voice IDs
 VOICE_MAP: dict[str, str] = {
-    # Free tier
-    "Marcus":   "en-US-GuyNeural",
-    "Sophie":   "en-US-JennyNeural",
-    "Alex":     "en-US-ChristopherNeural",
-    "Jordan":   "en-GB-RyanNeural",
-    "Luna":     "en-US-AriaNeural",
-    "Kai":      "en-AU-WilliamNeural",
-    # Paid tier
-    "Andrew":   "en-US-AndrewNeural",
-    "Brian":    "en-US-BrianNeural",
-    "Emma":     "en-US-EmmaNeural",
-    "Ava":      "en-US-AvaNeural",
-    "Steffan":  "en-US-SteffanNeural",
-    "Michelle": "en-US-MichelleNeural",
-    "Libby":    "en-GB-LibbyNeural",
-    "Maisie":   "en-GB-MaisieNeural",
-    "Sonia":    "en-GB-SoniaNeural",
-    "Natasha":  "en-AU-NatashaNeural",
-    "Clara":    "en-CA-ClaraNeural",
-    "Liam":     "en-CA-LiamNeural",
-    "Connor":   "en-IE-ConnorNeural",
-    "Emily":    "en-IE-EmilyNeural",
-    "Neerja":   "en-IN-NeerjaNeural",
-    "Prabhat":  "en-IN-PrabhatNeural",
-    "Mitchell": "en-NZ-MitchellNeural",
-    "Leah":     "en-ZA-LeahNeural",
+    "Marcus": "en-US-GuyNeural",           # Deep, authoritative
+    "Sophie": "en-US-JennyNeural",         # Warm, friendly
+    "Alex":   "en-US-ChristopherNeural",   # Energetic
+    "Jordan": "en-GB-RyanNeural",          # Professional, British
+    "Luna":   "en-US-AriaNeural",          # Calm, storytelling
+    "Kai":    "en-AU-WilliamNeural",       # Casual, Australian
 }
 
-# Speed is expressed as a rate string e.g. "+10%" or "-5%"
+
 def _rate_string(speed: float) -> str:
     pct = round((speed - 1.0) * 100)
     if pct == 0:
@@ -51,35 +32,104 @@ def _rate_string(speed: float) -> str:
     return f"+{pct}%" if pct > 0 else f"{pct}%"
 
 
+# ── Word timing type ──────────────────────────────────────────────────────────
+# List of {"word": str, "start": float, "end": float} in seconds
+WordTimings = list[dict]
+
+
+async def _synthesize_edge_with_timing(
+    text: str,
+    voice_id: str,
+    rate: str,
+    out_path: str,
+) -> WordTimings:
+    """
+    Synthesise via Edge TTS using stream() to capture both audio and
+    word boundary events. Returns word timings list.
+
+    Edge TTS offset/duration units: 100-nanosecond ticks.
+    Divide by 10_000_000 to get seconds.
+    """
+    import edge_tts
+
+    audio_chunks: list[bytes] = []
+    timings: WordTimings = []
+
+    communicate = edge_tts.Communicate(text=text, voice=voice_id, rate=rate)
+    async for chunk in communicate.stream():
+        if chunk["type"] == "audio":
+            audio_chunks.append(chunk["data"])
+        elif chunk["type"] == "WordBoundary":
+            start_s = chunk["offset"] / 10_000_000
+            dur_s   = chunk["duration"] / 10_000_000
+            timings.append({
+                "word":  chunk["text"],
+                "start": round(start_s, 4),
+                "end":   round(start_s + dur_s, 4),
+            })
+
+    # Write the raw MP3 audio chunks
+    with open(out_path, "wb") as f:
+        f.write(b"".join(audio_chunks))
+
+    return timings
+
+
 async def synthesize_scene(
     scene: Scene,
     voice_name: str,
     output_dir: str,
     speed: float = 1.0,
-    stability: str = "medium",   # kept for API compatibility, not used by Edge TTS
+    stability: str = "medium",  # kept for API compatibility
 ) -> str:
+    """Synthesise TTS for a single scene. Returns audio path."""
+    path, _ = await _synthesize_scene_with_timing(scene, voice_name, output_dir, speed)
+    return path
+
+
+async def _synthesize_scene_with_timing(
+    scene: Scene,
+    voice_name: str,
+    output_dir: str,
+    speed: float = 1.0,
+) -> tuple[str, WordTimings]:
     """
-    Generate TTS audio for a single scene using Microsoft Edge TTS.
-    Returns the path to the saved MP3 file.
-    Free — no API key required.
+    Synthesise TTS and capture per-word timing from Edge TTS.
+    Falls back to save() (no timing) if stream() fails.
+    Returns (audio_path, word_timings).
     """
+    import edge_tts
+
     voice_id = VOICE_MAP.get(voice_name, VOICE_MAP["Marcus"])
-    rate = _rate_string(speed)
+    rate     = _rate_string(speed)
     out_path = str(Path(output_dir) / f"scene_{scene.id:02d}_audio.mp3")
 
-    communicate = edge_tts.Communicate(
-        text=scene.text,
-        voice=voice_id,
-        rate=rate,
-    )
-    await communicate.save(out_path)
+    # Primary: stream() captures audio + word boundaries simultaneously
+    try:
+        timings = await asyncio.wait_for(
+            _synthesize_edge_with_timing(scene.text, voice_id, rate, out_path),
+            timeout=30.0,
+        )
+        size = Path(out_path).stat().st_size
+        logger.info(
+            "Edge TTS ✓ scene %s | %s | %d words timed | %d bytes",
+            scene.id, voice_id, len(timings), size,
+        )
+        return out_path, timings
 
-    size = Path(out_path).stat().st_size
-    logger.info(
-        "Synthesised scene %s with %s → %s (%d bytes)",
-        scene.id, voice_id, Path(out_path).name, size,
-    )
-    return out_path
+    except asyncio.TimeoutError:
+        logger.warning("Edge TTS stream timed out (scene %s) — trying save()", scene.id)
+    except Exception as e:
+        logger.warning("Edge TTS stream failed (scene %s): %s — trying save()", scene.id, e)
+
+    # Fallback: save() without timing data
+    try:
+        communicate = edge_tts.Communicate(text=scene.text, voice=voice_id, rate=rate)
+        await asyncio.wait_for(communicate.save(out_path), timeout=25.0)
+        logger.info("Edge TTS save() fallback ✓ scene %s (no word timing)", scene.id)
+        return out_path, []
+    except Exception as e2:
+        raise RuntimeError(f"Scene {scene.id}: Edge TTS failed entirely — {e2}") from e2
 
 
 async def synthesize_all_scenes(
@@ -90,29 +140,48 @@ async def synthesize_all_scenes(
     stability: str = "medium",
     on_progress=None,
 ) -> list[str]:
-    """Synthesise all scenes concurrently (max 3 at a time)."""
-    total = len(scenes)
+    """Synthesise all scenes. Returns audio paths only (backward compatible)."""
+    paths, _ = await synthesize_all_scenes_with_timing(
+        scenes, voice_name, output_dir, speed, stability, on_progress
+    )
+    return paths
+
+
+async def synthesize_all_scenes_with_timing(
+    scenes: list[Scene],
+    voice_name: str,
+    output_dir: str,
+    speed: float = 1.0,
+    stability: str = "medium",
+    on_progress=None,
+) -> tuple[list[str], list[WordTimings]]:
+    """
+    Synthesise all scenes concurrently (max 3 at a time).
+    Returns (audio_paths, word_timings_per_scene).
+    """
+    total     = len(scenes)
     completed = 0
-    results: list[str | None] = [None] * total
+    paths:   list[Optional[str]]       = [None] * total
+    timings: list[Optional[WordTimings]] = [None] * total
     semaphore = asyncio.Semaphore(3)
 
-    async def _synth(i: int, scene: Scene):
+    async def _synth(i: int, scene: Scene) -> None:
         nonlocal completed
         async with semaphore:
-            path = await synthesize_scene(
-                scene, voice_name, output_dir, speed, stability
+            p, t = await _synthesize_scene_with_timing(
+                scene, voice_name, output_dir, speed
             )
-            results[i] = path
+            paths[i]   = p
+            timings[i] = t
             completed += 1
             if on_progress:
                 await on_progress(completed, total)
 
     await asyncio.gather(*[_synth(i, s) for i, s in enumerate(scenes)])
-    return results  # type: ignore[return-value]
+    return paths, [t or [] for t in timings]  # type: ignore[return-value]
 
 
 async def get_available_voices() -> list[dict]:
-    """Return the list of available voices."""
     return [
         {"id": vid, "name": name, "category": "free"}
         for name, vid in VOICE_MAP.items()
@@ -124,52 +193,25 @@ async def split_audio_by_scenes(
     scenes: list[Scene],
     output_dir: str,
 ) -> list[str]:
-    """
-    Split a single uploaded voiceover file into per-scene audio clips
-    based on cumulative scene durations. Uses FFmpeg for accurate splitting.
-    """
-    import subprocess
-    from pathlib import Path
-
+    """Split a single uploaded voiceover into per-scene clips by duration."""
     output_files = []
     cursor = 0.0
-
-    for i, scene in enumerate(scenes):
+    for scene in scenes:
         out_path = str(Path(output_dir) / f"scene_{scene.id:02d}_audio.mp3")
-        duration = float(scene.duration)
-
-        cmd = [
-            "ffmpeg", "-y",
-            "-i", audio_path,
-            "-ss", str(cursor),
-            "-t", str(duration),
-            "-c:a", "libmp3lame",
-            "-q:a", "4",
+        result = subprocess.run([
+            "ffmpeg", "-y", "-i", audio_path,
+            "-ss", str(cursor), "-t", str(float(scene.duration)),
+            "-ar", "44100", "-ac", "2", "-q:a", "4",
             out_path,
-        ]
-
-        result = subprocess.run(cmd, capture_output=True)
+        ], capture_output=True)
         if result.returncode != 0:
-            logger.warning(
-                "Could not split scene %s audio at %.1fs — using full audio: %s",
-                scene.id, cursor, result.stderr.decode()[:100]
-            )
-            # Fallback: copy the whole file for this scene
-            cmd_fallback = [
-                "ffmpeg", "-y",
-                "-i", audio_path,
+            subprocess.run([
+                "ffmpeg", "-y", "-i", audio_path,
                 "-ss", str(cursor),
-                "-c:a", "libmp3lame",
-                "-q:a", "4",
+                "-ar", "44100", "-ac", "2", "-q:a", "4",
                 out_path,
-            ]
-            subprocess.run(cmd_fallback, capture_output=True)
-
+            ], capture_output=True)
         output_files.append(out_path)
-        logger.info(
-            "Split scene %s: %.1fs → %.1fs → %s",
-            scene.id, cursor, cursor + duration, Path(out_path).name,
-        )
-        cursor += duration
-
+        logger.info("Split scene %s: %.1f–%.1fs", scene.id, cursor, cursor + scene.duration)
+        cursor += float(scene.duration)
     return output_files
