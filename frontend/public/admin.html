@@ -3378,7 +3378,7 @@ function renderCostLog(records) {
     tbody.innerHTML = '<tr><td colspan="17" style="text-align:center;color:var(--text3);padding:20px">No records match filters</td></tr>';
     return;
   }
-  tbody.innerHTML = records.map(function(r) {
+  tbody.innerHTML = records.map(function(r, i) {
     var mc = mCol(r.margin_pct);
     var voiceBadge = r.voice_provider === 'elevenlabs'
       ? '<span style="background:rgba(245,158,11,.15);color:#fbbf24;border-radius:3px;padding:1px 5px;font-size:10px">EL</span>'
@@ -4138,7 +4138,7 @@ async function unblockIp(ip) {
     <div style="flex:1;overflow:auto;background:#080810;display:flex;justify-content:center;padding:16px 0" id="email-preview-scroll">
       <iframe id="email-preview-frame"
         style="width:540px;min-height:600px;border:none;border-radius:8px;background:#080810;display:block;transition:width .2s"
-        sandbox="allow-same-origin">
+        sandbox="allow-same-origin allow-scripts">
       </iframe>
     </div>
   </div>
