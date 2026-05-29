@@ -483,6 +483,7 @@ async def render_video(ctx, job_id: str, payload: dict):
         try:
             _user_plan = "free"
             _plan_price_ngn = 0.0
+            _plan_tokens = 100        # tokens bundled in this plan purchase
             _exchange_rate = 1600.0
             if user_id:
                 _raw_user = await redis.get(f"user:{user_id}")
@@ -490,12 +491,13 @@ async def render_video(ctx, job_id: str, payload: dict):
                     _ud = json.loads(_raw_user)
                     _user_plan = _ud.get("plan", "free")
 
-            # Get plan price from Redis pricing
+            # Get plan price and token bundle size from Redis pricing
             try:
                 from app.services.pricing import get_plans
                 plans = await get_plans(redis)
                 _plan_data = plans.get(_user_plan, {})
                 _plan_price_ngn = float(_plan_data.get("amount", 0))
+                _plan_tokens    = int(_plan_data.get("tokens", 100))
                 # Get cached exchange rate
                 _rate_raw = await redis.get("sceneforge:exchange:usd_ngn")
                 if _rate_raw:
@@ -506,8 +508,8 @@ async def render_video(ctx, job_id: str, payload: dict):
             # Count total chars across all scenes for voice cost
             _total_chars = sum(len(s.text) for s in req.scenes)
             _dalle_images = len([v for v in visual_files if hasattr(v, 'source') and v.source == 'dalle'])
-            # Voice provider: ElevenLabs only for studio plan when key is set
-            # and voice is in the EL voice ID map (Marcus, Sophie, Alex, Jordan, Luna, Kai)
+
+            # Voice provider — ElevenLabs only for studio plan when key is set
             _el_voices = {"Marcus", "Sophie", "Alex", "Jordan", "Luna", "Kai"}
             _voice_provider = (
                 "elevenlabs"
@@ -517,6 +519,22 @@ async def render_video(ctx, job_id: str, payload: dict):
                 else "edge_tts"
             )
 
+            # AI provider — Pro/Studio/Agency use OpenAI when key is set; others use Groq
+            _PREMIUM_PLANS = {"pro", "studio", "agency"}
+            _ai_provider = (
+                "openai"
+                if _user_plan in _PREMIUM_PLANS and getattr(settings, "openai_api_key", "")
+                else "groq"
+            )
+
+            # Actual render wall-clock time (measured in render_full_pipeline result)
+            _render_secs = float(result.get("render_seconds", 0) if isinstance(result, dict) else 0) or 30.0
+
+            # AI token estimates from result metadata if available, else use
+            # per-plan estimates: premium models ~1200 input / 600 output; free ~800/400
+            _ai_in  = int(result.get("ai_input_tokens",  1200 if _ai_provider == "openai" else 800))                        if isinstance(result, dict) else (1200 if _ai_provider == "openai" else 800)
+            _ai_out = int(result.get("ai_output_tokens",  600 if _ai_provider == "openai" else 400))                        if isinstance(result, dict) else (600 if _ai_provider == "openai" else 400)
+
             _cost_rec = build_cost_record(
                 job_id=job_id,
                 user_id=user_id or "",
@@ -525,12 +543,13 @@ async def render_video(ctx, job_id: str, payload: dict):
                 visual_source=getattr(req, 'visual_source', 'pexels_video') or 'pexels_video',
                 voice_provider=_voice_provider,
                 total_chars=_total_chars,
-                ai_provider="groq" if settings.groq_api_key else "openai",
-                ai_input_tokens=800,   # avg tokens per render (script+ideas gen)
-                ai_output_tokens=400,
-                render_seconds=getattr(locals(), '_render_seconds', 30.0),
+                ai_provider=_ai_provider,
+                ai_input_tokens=_ai_in,
+                ai_output_tokens=_ai_out,
+                render_seconds=_render_secs,
                 dalle_images=_dalle_images,
                 plan_price_ngn=_plan_price_ngn,
+                plan_tokens=_plan_tokens,
                 exchange_rate=_exchange_rate,
             )
             await store_cost_record(redis, _cost_rec)
