@@ -201,10 +201,21 @@ async def start_render(
                 pass
     if prev_job_id:
         await redis.set(f"job:{job_id}:prev_job_id", prev_job_id, ex=86400)
-    # Store niche for analytics
+    # Store render metadata for analytics and cost log enrichment
     niche = getattr(req, "niche", None) or ""
     if niche:
         await redis.set(f"job:{job_id}:niche", niche, ex=86400)
+    platform_meta = getattr(req, "platform", None) or ""
+    if platform_meta:
+        await redis.set(f"job:{job_id}:platform", platform_meta, ex=86400)
+    proj_title_meta = getattr(req, "project_title", None) or ""
+    if proj_title_meta:
+        await redis.set(f"job:{job_id}:project_title", proj_title_meta, ex=86400)
+    # Track last render timestamp for inactive-user engagement
+    if user_id:
+        import datetime as _rdt
+        await redis.set(f"user:{user_id}:last_render_at",
+                        _rdt.datetime.utcnow().isoformat(), ex=60 * 60 * 24 * 90)
 
     pool = await arq.create_pool(
         arq.connections.RedisSettings.from_dsn(settings.redis_url)
