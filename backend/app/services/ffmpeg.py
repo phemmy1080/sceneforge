@@ -87,8 +87,26 @@ def _find_font() -> str | None:
 
 
 _FONT_PATH = _find_font()
-_HAS_DRAWTEXT = False  # Disabled — subtitle rendering disabled
-logger.info("FFmpeg drawtext available: %s (font: %s)", _HAS_DRAWTEXT, _FONT_PATH)
+_SUBTITLES_ENABLED = True
+
+def _font_name() -> str:
+    """Return the font family name for ASS styles based on what's installed."""
+    if not _FONT_PATH:
+        return "Arial"
+    p = _FONT_PATH.lower()
+    if "liberation" in p:
+        return "Liberation Sans"
+    if "ubuntu" in p:
+        return "Ubuntu"
+    if "freesans" in p or "freefont" in p:
+        return "FreeSans"
+    if "dejavu" in p:
+        return "DejaVu Sans"
+    return "Arial"
+
+_ASS_FONT = _font_name()
+logger.info("ASS subtitle font: %s", _ASS_FONT)  # ASS subtitle format — no filter-graph escaping issues
+logger.info("Subtitles enabled (ASS format) | font: %s", _FONT_PATH)
 
 
 # ── Runner ────────────────────────────────────────────────────────────────────
@@ -127,7 +145,7 @@ async def normalize_scene(
         "ffmpeg", "-y",
         "-i", input_path,
         "-vf", vf,
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "26", "-threads", "2",
+        "-c:v", "libx264", "-preset", "fast", "-crf", "23", "-threads", "2",
         "-r", "30",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
@@ -138,6 +156,159 @@ async def normalize_scene(
         output_path,
     ])
     return output_path
+
+
+
+# ── ASS subtitle generator ────────────────────────────────────────────────────
+# Uses Advanced SubStation Alpha (.ass) format instead of drawtext.
+# Text content lives in a file — no filter-graph escaping issues whatsoever.
+# Apostrophes, commas, quotes, Unicode all work perfectly.
+
+def _make_ass_file(
+    text: str,
+    duration: float,
+    style: str,
+    w: int,
+    h: int,
+    ass_path: str,
+) -> bool:
+    """Generate an ASS subtitle file for a single scene.
+    Returns True on success, False if there is nothing to render.
+    """
+    # ASS colour format: &HAABBGGRR (alpha, blue, green, red — all hex)
+    STYLES: dict[str, dict] = {
+        "viral": {
+            "font":       _ASS_FONT,
+            "size":       max(44, min(62, int(w * 0.056))),
+            "primary":    "&H00FFFFFF",   # white
+            "outline_c":  "&H00000000",   # black outline
+            "shadow_c":   "&HB0000000",   # heavy shadow
+            "bold":       -1,
+            "outline":    4,
+            "shadow":     2,
+            "margin_v":   int(h * 0.14),  # distance from bottom
+            "alignment":  2,              # bottom-centre
+        },
+        "minimal": {
+            "font":       _ASS_FONT,
+            "size":       max(34, min(46, int(w * 0.040))),
+            "primary":    "&H00FFFFFF",
+            "outline_c":  "&H00000000",
+            "shadow_c":   "&H00000000",
+            "bold":       0,
+            "outline":    1,
+            "shadow":     0,
+            "margin_v":   int(h * 0.10),
+            "alignment":  2,
+        },
+        "karaoke": {
+            "font":       _ASS_FONT,
+            "size":       max(40, min(56, int(w * 0.050))),
+            "primary":    "&H0000FFFF",   # yellow (BGR reversed: FFFF00 → &H0000FFFF)
+            "outline_c":  "&H00000000",
+            "shadow_c":   "&HA0000000",
+            "bold":       -1,
+            "outline":    3,
+            "shadow":     2,
+            "margin_v":   int(h * 0.12),
+            "alignment":  2,
+        },
+    }
+
+    s = STYLES.get(style, STYLES["viral"])
+
+    # ── Word chunking: 3–4 words per caption card ─────────────────────────────
+    # Max chars per line based on font size and frame width (Arial ~0.55× fontsize per char)
+    max_chars = max(10, int(w * 0.75 / (s["size"] * 0.55)))
+    words = text.replace("\n", " ").split()
+    if not words:
+        return False
+
+    chunks: list[str] = []
+    cur: list[str] = []
+    cur_len = 0
+    for word in words:
+        wl = len(word) + 1
+        if cur and (cur_len + wl > max_chars or len(cur) >= 4):
+            chunks.append(" ".join(cur))
+            cur, cur_len = [], 0
+        cur.append(word)
+        cur_len += wl
+    if cur:
+        chunks.append(" ".join(cur))
+
+    if not chunks:
+        return False
+
+    # ── Timing: divide duration evenly, 50ms gap between cards ──────────────
+    n    = len(chunks)
+    gap  = 0.05
+    slot = max(0.3, (duration - gap * (n - 1)) / n)
+
+    def _ts(t: float) -> str:
+        """Format seconds → ASS timestamp H:MM:SS.cs"""
+        t = max(0.0, t)
+        hh = int(t // 3600)
+        mm = int((t % 3600) // 60)
+        ss = t % 60
+        return f"{hh}:{mm:02d}:{ss:05.2f}"
+
+    # ── ASS header ────────────────────────────────────────────────────────────
+    ass = (
+        f"[Script Info]\n"
+        f"ScriptType: v4.00+\n"
+        f"Collisions: Normal\n"
+        f"PlayResX: {w}\n"
+        f"PlayResY: {h}\n"
+        f"Timer: 100.0000\n"
+        f"WrapStyle: 1\n"
+        f"\n"
+        f"[V4+ Styles]\n"
+        f"Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, "
+        f"OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
+        f"ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
+        f"Alignment, MarginL, MarginR, MarginV, Encoding\n"
+        f"Style: Default,"
+        f"{s['font']},"
+        f"{s['size']},"
+        f"{s['primary']},"
+        f"&H000000FF,"
+        f"{s['outline_c']},"
+        f"{s['shadow_c']},"
+        f"{s['bold']},"
+        f"0,0,0,100,100,0,0,1,"
+        f"{s['outline']},"
+        f"{s['shadow']},"
+        f"{s['alignment']},"
+        f"10,10,{s['margin_v']},1\n"
+        f"\n"
+        f"[Events]\n"
+        f"Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+    )
+
+    for i, chunk in enumerate(chunks):
+        t_start = i * (slot + gap)
+        t_end   = min(t_start + slot, duration - 0.05)
+        # ASS is safe with apostrophes/commas/quotes — only strip braces (ASS tags)
+        safe = (
+            chunk
+            .replace("{", "")
+            .replace("}", "")
+            .replace("**", "").replace("__", "").replace("*", "").replace("#", "")
+            .replace("\n", " ")
+            .strip()
+        )
+        if not safe:
+            continue
+        ass += f"Dialogue: 0,{_ts(t_start)},{_ts(t_end)},Default,,0,0,0,,{safe}\n"
+
+    try:
+        with open(ass_path, "w", encoding="utf-8") as f:
+            f.write(ass)
+        return True
+    except Exception as _e:
+        logger.warning("Failed to write ASS subtitle file: %s", _e)
+        return False
 
 
 # ── Scene renderer ────────────────────────────────────────────────────────────
@@ -234,166 +405,56 @@ async def render_scene(
     else:
         motion_vf = f"scale=w={w}:h={h}:force_original_aspect_ratio=increase,crop={w}:{h},setsar=1"
 
-    # ── Kinetic word-by-word subtitles ──────────────────────────────────────────
-    # Shows 3-4 words at a time, centred, timed across the scene duration.
-    # Each chunk has its own drawtext with enable='between(t,start,end)'.
-    # This prevents overflow completely and looks like CapCut/Reels style.
-    if subtitle_style != "none" and _HAS_DRAWTEXT and _FONT_PATH:
-        # Font size scales by frame width
-        _fs = {
-            "viral":   max(24, min(52, int(w * 0.048))),
-            "minimal": max(20, min(40, int(w * 0.036))),
-            "karaoke": max(22, min(48, int(w * 0.043))),
-        }.get(subtitle_style, max(24, min(52, int(w * 0.048))))
+    # ── ASS word-by-word subtitles ──────────────────────────────────────────────
+    # Generates a .ass subtitle file for this scene and appends the `ass` filter
+    # to the motion filter chain.  ASS format keeps text in a file, so there are
+    # NO filter-graph escaping issues — apostrophes, commas, quotes, Unicode all
+    # work perfectly.  One flat -vf chain, no filter_complex needed.
+    ass_filter = ""
+    if subtitle_style != "none" and _SUBTITLES_ENABLED:
+        _ass_path = output_path.replace(".mp4", "_subs.ass")
+        _ok = _make_ass_file(
+            text=scene.text,
+            duration=duration,
+            style=subtitle_style,
+            w=w, h=h,
+            ass_path=_ass_path,
+        )
+        if _ok:
+            # Escape colons in path for FFmpeg filter syntax (Linux paths rarely
+            # need this but handle it defensively)
+            _safe_ass = _ass_path.replace("\\", "/").replace(":", "\\:")
+            ass_filter = f",ass='{_safe_ass}'"
+            logger.info("ASS subtitles: style=%s | path=%s", subtitle_style, _ass_path)
 
-        # Y position as integer pixels
-        _y = {
-            "viral":   int(h * 0.80),
-            "minimal": int(h * 0.85),
-            "karaoke": int(h * 0.82),
-        }.get(subtitle_style, int(h * 0.80))
+    fc = motion_vf + ass_filter
 
-        # Style string (no y= here — added per drawtext call)
-        _x = "(w-text_w)/2"
-        _styles = {
-            "viral":   f"fontsize={_fs}:fontcolor=white:borderw=3:bordercolor=black:shadowx=2:shadowy=2:shadowcolor=black@0.6:x={_x}:y={_y}",
-            "minimal": f"fontsize={_fs}:fontcolor=white:borderw=1:bordercolor=black@0.4:x={_x}:y={_y}",
-            "karaoke": f"fontsize={_fs}:fontcolor=yellow:borderw=2:bordercolor=black:shadowx=2:shadowy=2:shadowcolor=black@0.8:x={_x}:y={_y}",
-        }
-        _base_style = _styles.get(subtitle_style, _styles["viral"])
-
-        def _sanitise(t: str) -> str:
-            return (
-                t
-                .replace("**", "")       # strip markdown bold
-                .replace("__", "")       # strip markdown underline
-                .replace("*",  "")       # strip markdown italic
-                .replace("#",  "")       # strip markdown headers
-                .replace("'",  "")         # remove apostrophes — breaks text= delimiter
-                .replace("\"",  "\u201C")
-                .replace(":",   "\\:")
-                .replace("%",   "\\%")
-                .replace("[",   "\\[")
-                .replace("]",   "\\]")
-                .replace("{",   "")
-                .replace("}",   "")
-                .replace("\n", " ")
-                .replace("\\", "")
-            )
-
-        # ── Split text into chunks of 3-4 words ───────────────────────────────
-        # Aim for chunks whose rendered width fits ~80% of frame
-        # Average char width ≈ font_size * 0.55 for LiberationSans Bold
-        _max_chars = max(12, int(w * 0.78 / (_fs * 0.55)))
-        words = scene.text.replace("\n", " ").split()
-        chunks: list[str] = []
-        cur: list[str] = []
-        cur_len = 0
-        for word in words:
-            wl = len(word) + 1
-            if cur and (cur_len + wl > _max_chars or len(cur) >= 4):
-                chunks.append(" ".join(cur))
-                cur, cur_len = [], 0
-            cur.append(word)
-            cur_len += wl
-        if cur:
-            chunks.append(" ".join(cur))
-
-        if not chunks:
-            use_filter_complex = False
-            fc = motion_vf
-        else:
-            # ── Assign time windows ───────────────────────────────────────────
-            n = len(chunks)
-            gap = 0.05
-            slot = max(0.3, (duration - gap * (n - 1)) / n)
-
-            drawtext_filters: list[str] = []
-            for i, chunk in enumerate(chunks):
-                t_start = round(i * (slot + gap), 3)
-                t_end   = round(t_start + slot, 3)
-                safe    = _sanitise(chunk)
-                if not safe:
-                    continue
-                # No quotes. Spaces → \ , colons → \: , enable commas → \,
-                safe_text = safe.replace(",", "\\,").replace(" ", "\\ ").replace(":", "\\:")
-                _comma = "\\,"
-                dt = (
-                    f"drawtext=fontfile={_FONT_PATH}"
-                    f":text={safe_text}"
-                    f":{_base_style}"
-                    f":enable=between(t{_comma}{t_start}{_comma}{t_end})"
-                )
-                drawtext_filters.append(dt)
-
-            if drawtext_filters:
-                # ── Semicolon-separated filter graph ──────────────────────────
-                # zoompan cannot be chained directly with drawtext in one filtergraph.
-                # Solution: zoompan outputs to [zoomed], drawtext reads from [zoomed].
-                # Format: [0:v]motion_vf[zoomed];[zoomed]drawtext,...[out]
-                motion_part = f"[0:v]{motion_vf}[zoomed]"
-                subtitle_part = f"[zoomed]{','.join(drawtext_filters)}[out]"
-                fc = motion_part + ";" + subtitle_part
-                use_filter_complex = True
-            else:
-                use_filter_complex = False
-                fc = motion_vf
-    else:
-        use_filter_complex = False
-        fc = motion_vf
-
-    if use_filter_complex:
-        cmd = [
-            "ffmpeg", "-y",
-            *(["-loop", "1", "-t", str(duration)] if is_image else []),
-            "-i", visual_path,
-            "-t", str(duration),
-            "-i", audio_path,
-            "-filter_complex", fc,
-            "-map", "[out]",
-            "-map", "1:a:0",
-            "-c:v", "libx264",
-            "-preset", "ultrafast",
-            "-crf", "26",
-            "-threads", "2",
-            "-r", "30",
-            "-c:a", "aac",
-            "-ar", "44100",
-            "-ac", "2",
-            "-b:a", "128k",
-            "-pix_fmt", "yuv420p",
-            "-avoid_negative_ts", "make_zero",
-            "-async", "1",
-            "-vsync", "cfr",
-            "-shortest",
-            output_path,
-        ]
-    else:
-        cmd = [
-            "ffmpeg", "-y",
-            *(["-loop", "1", "-t", str(duration)] if is_image else []),
-            "-i", visual_path,
-            "-t", str(duration),
-            "-i", audio_path,
-            "-map", "0:v:0",
-            "-map", "1:a:0",
-            "-vf", fc,
-            "-c:v", "libx264",
-            "-preset", "ultrafast",
-            "-crf", "26",
-            "-threads", "2",
-            "-r", "30",
-            "-c:a", "aac",
-            "-ar", "44100",
-            "-ac", "2",
-            "-b:a", "128k",
-            "-pix_fmt", "yuv420p",
-            "-avoid_negative_ts", "make_zero",
-            "-async", "1",
-            "-vsync", "cfr",
-            "-shortest",
-            output_path,
-        ]
+    # Single -vf command — ASS filter appended to motion_vf when subtitles enabled
+    cmd = [
+        "ffmpeg", "-y",
+        *(["-loop", "1", "-t", str(duration)] if is_image else []),
+        "-i", visual_path,
+        "-t", str(duration),
+        "-i", audio_path,
+        "-map", "0:v:0",
+        "-map", "1:a:0",
+        "-vf", fc,
+        "-c:v", "libx264",
+        "-preset", "medium",
+        "-crf", "22",
+        "-threads", "2",
+        "-r", "30",
+        "-c:a", "aac",
+        "-ar", "44100",
+        "-ac", "2",
+        "-b:a", "128k",
+        "-pix_fmt", "yuv420p",
+        "-avoid_negative_ts", "make_zero",
+        "-async", "1",
+        "-vsync", "cfr",
+        "-shortest",
+        output_path,
+    ]
 
     logger.info("Scene %s | motion=%s | platform=%s | %dx%d | %.1fs",
                 scene.id, motion, platform, w, h, duration)
@@ -520,7 +581,7 @@ async def concat_scenes(
             "-filter_complex", filter_str,
             "-map", "[vout]",
             "-map", "[aout]",
-            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "26",
+            "-c:v", "libx264", "-preset", "medium", "-crf", "22",
             "-r", "30", "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
             "-movflags", "+faststart",
@@ -623,38 +684,51 @@ async def _resolve_music(music_path: str, output_dir: str):
     if os.path.exists(local_path):
         return local_path
 
-    logger.info("Generating ambient music track for: %s", track_name)
+    logger.info("Generating music track for: %s", track_name)
     try:
-        # Generate 3 minutes of ambient sine tones that loop well
-        freqs = {
-            "upbeat":    [440, 550, 660],
-            "cinematic": [220, 277, 330],
-            "lofi":      [196, 246, 293],
-            "corporate": [330, 415, 494],
-            "energetic": [528, 660, 792],
-            "inspiring": [264, 330, 396],
-        }.get(track_name, [330, 440, 550])
+        # Harmonic chord profiles — root, third, fifth with tremolo and stereo width
+        profiles = {
+            "upbeat":    {"freqs": [261.63, 329.63, 392.00], "tr": 4.0, "td": 0.06, "vol": 0.26},
+            "cinematic": {"freqs": [110.00, 138.59, 164.81], "tr": 0.8, "td": 0.12, "vol": 0.20},
+            "lofi":      {"freqs": [196.00, 246.94, 293.66], "tr": 2.5, "td": 0.08, "vol": 0.18},
+            "corporate": {"freqs": [220.00, 277.18, 329.63], "tr": 3.0, "td": 0.04, "vol": 0.20},
+            "energetic": {"freqs": [329.63, 415.30, 493.88], "tr": 6.0, "td": 0.08, "vol": 0.24},
+            "inspiring": {"freqs": [261.63, 392.00, 523.25], "tr": 1.5, "td": 0.10, "vol": 0.22},
+        }
+        p = profiles.get(track_name, profiles["corporate"])
+        f1, f2, f3 = p["freqs"]
+        tr, td, vol = p["tr"], p["td"], p["vol"]
 
-        # Build a rich but subtle ambient sound from layered sines
-        expr = "+".join(
-            f"sin(2*PI*{f}*t)*{0.15 / len(freqs)}" for f in freqs
+        def osc(f, detune=0.0):
+            fd = f * (1 + detune)
+            return f"sin(2*PI*{fd:.4f}*t)*exp(-t*0.003)"
+
+        L = f"{osc(f1)}+{osc(f2, -0.002)}+{osc(f3, -0.003)}"
+        R = f"{osc(f1)}+{osc(f2,  0.002)}+{osc(f3,  0.003)}"
+        tremolo = f"(1-{td}*sin(2*PI*{tr}*t))"
+        expr_L = f"({L})*{tremolo}*{vol:.3f}"
+        expr_R = f"({R})*{tremolo}*{vol:.3f}"
+
+        filter_chain = (
+            f"aevalsrc=exprs='{expr_L}|{expr_R}':s=44100"
+            f",afade=t=in:st=0:d=2"
+            f",afade=t=out:st=178:d=2"
         )
-        filter_str = f"aevalsrc='{expr}':s=44100:c=stereo,volume=0.4"
 
         loop = asyncio.get_event_loop()
         def _gen():
             import subprocess
             result = subprocess.run([
                 "ffmpeg", "-y",
-                "-f", "lavfi", "-i", filter_str,
-                "-t", "180",  # 3 minutes
-                "-c:a", "mp3", "-b:a", "128k",
+                "-f", "lavfi", "-i", filter_chain,
+                "-t", "180",
+                "-c:a", "libmp3lame", "-b:a", "192k", "-q:a", "2",
                 local_path,
             ], capture_output=True)
             return result.returncode
         rc = await loop.run_in_executor(None, _gen)
         if rc == 0:
-            logger.info("Generated music track: %s", local_path)
+            logger.info("Generated music track '%s': %s", track_name, local_path)
             return local_path
         else:
             logger.warning("FFmpeg music generation failed — skipping music")
@@ -662,7 +736,6 @@ async def _resolve_music(music_path: str, output_dir: str):
     except Exception as e:
         logger.warning("Music generation failed: %s — skipping", e)
         return None
-
 # ── Full pipeline ─────────────────────────────────────────────────────────────
 async def render_full_pipeline(
     scenes: list[Scene],
