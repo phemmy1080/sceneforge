@@ -1073,12 +1073,57 @@ async def get_cost_summary(
 
 @router.get("/costs/recent")
 async def get_recent_costs(
+    limit: int = 100,
     redis=Depends(get_redis),
     admin: dict = Depends(_require_admin),
 ):
-    """Last 50 individual render cost records."""
+    """Last N individual render cost records enriched with username + render metadata."""
     from app.services.cost_tracker import get_recent_cost_records
-    records = await get_recent_cost_records(redis, limit=50)
+    records = await get_recent_cost_records(redis, limit=min(limit, 500))
+
+    # Enrich with username and render metadata
+    user_name_cache: dict = {}
+    for rec in records:
+        uid = rec.get("user_id", "")
+        if uid:
+            if uid not in user_name_cache:
+                try:
+                    raw = await redis.get(f"user:{uid}")
+                    if raw:
+                        ud = json.loads(raw)
+                        user_name_cache[uid] = {
+                            "full_name": ud.get("full_name", ""),
+                            "email":     ud.get("email", ""),
+                        }
+                    else:
+                        user_name_cache[uid] = {"full_name": "", "email": ""}
+                except Exception:
+                    user_name_cache[uid] = {"full_name": "", "email": ""}
+            rec["full_name"] = user_name_cache[uid]["full_name"]
+            rec["email"]     = user_name_cache[uid]["email"]
+
+        # Pull extra render metadata from job Redis keys
+        job_id = rec.get("job_id", "")
+        if job_id:
+            try:
+                niche_r    = await redis.get(f"job:{job_id}:niche")
+                platform_r = await redis.get(f"job:{job_id}:platform")
+                title_r    = await redis.get(f"job:{job_id}:project_title")
+                scenes_r   = await redis.get(f"job:{job_id}:scenes")
+                rec["niche"]         = niche_r.decode() if isinstance(niche_r, bytes) else (niche_r or "")
+                rec["platform"]      = platform_r.decode() if isinstance(platform_r, bytes) else (platform_r or "")
+                rec["project_title"] = title_r.decode() if isinstance(title_r, bytes) else (title_r or "")
+                if scenes_r:
+                    import json as _j
+                    sc = _j.loads(scenes_r if isinstance(scenes_r, str) else scenes_r.decode())
+                    rec["scenes_detail"] = [{"id": s.get("id"), "text": s.get("text","")[:80]} for s in sc[:5]]
+            except Exception:
+                pass
+
+        # Tokens consumed = render cost derived from scene count
+        from app.services.auth_service import calculate_render_cost
+        rec["tokens_consumed"] = calculate_render_cost(rec.get("scenes", 0))
+
     return {"records": records, "total": len(records)}
 
 
@@ -1384,3 +1429,110 @@ async def backfill_scene_stats(redis=Depends(get_redis), admin: dict = Depends(_
             except Exception:
                 pass
     return {"filled_users": filled, "user_scene_counts": user_scene_counts}
+
+
+# ─── Engagement campaign endpoints ───────────────────────────────────────────
+
+@router.get("/campaigns/status")
+async def get_campaign_status(redis=Depends(get_redis), admin: dict = Depends(_require_admin)):
+    """How many users are in each campaign bucket."""
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    counts = {"scanned": 0, "zero_render": 0, "inactive_5d": 0,
+              "inactive_14d": 0, "inactive_30d": 0, "healthy": 0,
+              "unverified": 0, "flag_zero_render": 0, "flag_5d": 0,
+              "flag_14d": 0, "flag_30d": 0}
+    cursor = 0
+    while True:
+        cursor, keys = await redis.scan(cursor, match="user:*", count=200)
+        for key in keys:
+            if isinstance(key, bytes): key = key.decode()
+            if key.count(":") != 1:
+                continue
+            raw = await redis.get(key)
+            if not raw:
+                continue
+            try:
+                ud = json.loads(raw)
+                uid = ud.get("id", "")
+                if not uid: continue
+                counts["scanned"] += 1
+                if not ud.get("email_verified"):
+                    counts["unverified"] += 1
+                    continue
+                videos = ud.get("videos_created", 0)
+                created_str = ud.get("created_at", "")
+                try:
+                    created_at = datetime.fromisoformat(created_str.replace("Z","")).replace(tzinfo=timezone.utc)
+                except Exception:
+                    created_at = now - timedelta(days=1)
+                age_days = (now - created_at).total_seconds() / 86400
+                lr_raw = await redis.get(f"user:{uid}:last_render_at")
+                lr_str = (lr_raw.decode() if isinstance(lr_raw, bytes) else lr_raw) or ""
+                try:
+                    last_render = datetime.fromisoformat(lr_str.replace("Z","")).replace(tzinfo=timezone.utc) if lr_str else None
+                except Exception:
+                    last_render = None
+                days_inactive = (now - last_render).total_seconds() / 86400 if last_render else age_days
+                if videos == 0 and age_days >= 1.0: counts["zero_render"] += 1
+                elif days_inactive >= 30: counts["inactive_30d"] += 1
+                elif days_inactive >= 14: counts["inactive_14d"] += 1
+                elif days_inactive >= 5:  counts["inactive_5d"] += 1
+                else: counts["healthy"] += 1
+                # Check if flags already set
+                if await redis.exists(f"campaign:zero_render:{uid}"): counts["flag_zero_render"] += 1
+                if await redis.exists(f"campaign:inactive_5d:{uid}"): counts["flag_5d"] += 1
+                if await redis.exists(f"campaign:inactive_14d:{uid}"): counts["flag_14d"] += 1
+                if await redis.exists(f"campaign:inactive_30d:{uid}"): counts["flag_30d"] += 1
+            except Exception:
+                pass
+        if cursor == 0:
+            break
+    return counts
+
+
+@router.post("/campaigns/run")
+async def run_engagement_campaign(
+    background_tasks: BackgroundTasks,
+    redis=Depends(get_redis),
+    admin: dict = Depends(_require_admin),
+):
+    """Trigger the engagement campaign. Runs in the background."""
+    from app.services.email_campaigns import run_engagement_campaign as _run
+    import asyncio
+    async def _bg():
+        result = await _run(redis)
+        logger.info("Campaign run complete: %s", result)
+        # Store last run result
+        await redis.set("campaign:last_run",
+                        json.dumps({**result, "ts": __import__("datetime").datetime.utcnow().isoformat()}),
+                        ex=60*60*24*7)
+    background_tasks.add_task(asyncio.create_task, _bg())
+    return {"status": "started", "message": "Campaign running in background — check /campaigns/last-run for results"}
+
+
+@router.get("/campaigns/last-run")
+async def get_last_campaign_run(redis=Depends(get_redis), admin: dict = Depends(_require_admin)):
+    """Result of the most recent campaign run."""
+    raw = await redis.get("campaign:last_run")
+    if not raw:
+        return {"status": "never_run", "message": "No campaign has been run yet"}
+    return json.loads(raw)
+
+
+@router.post("/campaigns/send-welcome/{user_id}")
+async def send_welcome_to_user(
+    user_id: str,
+    redis=Depends(get_redis),
+    admin: dict = Depends(_require_admin),
+):
+    """Manually send the welcome email to a specific user."""
+    raw = await redis.get(f"user:{user_id}")
+    if not raw:
+        raise HTTPException(status_code=404, detail="User not found")
+    ud = json.loads(raw)
+    from app.services.email_campaigns import send_welcome_email
+    import asyncio
+    asyncio.create_task(send_welcome_email(ud["email"], ud.get("full_name", "")))
+    await _log_admin_action(redis, admin["email"], "campaign_welcome", user_id, {"email": ud["email"]})
+    return {"status": "queued", "email": ud["email"]}
