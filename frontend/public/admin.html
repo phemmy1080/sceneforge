@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SceneForge — Command Center</title>
+<title>SceneForge - Command Center</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js" onerror="window.ExcelJS=null"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{
@@ -806,76 +806,76 @@ tr:hover td{background:rgba(255,255,255,0.018)}
                         <button class="ep-tab" onclick="switchEpTab('emphasis',this)">⚡ Emphasis</button>
                       </div>
                       <div id="ep-attention" class="ep-panel" style="display:grid;grid-template-columns:repeat(8,1fr);gap:4px">
-                        <button class="ep-btn" onclick="insertSymbol('🚨')" title="Alert">🚨</button>
-                        <button class="ep-btn" onclick="insertSymbol('⚠️')" title="Warning">⚠️</button>
-                        <button class="ep-btn" onclick="insertSymbol('📢')" title="Announce">📢</button>
-                        <button class="ep-btn" onclick="insertSymbol('🔔')" title="Bell">🔔</button>
-                        <button class="ep-btn" onclick="insertSymbol('👀')" title="Eyes">👀</button>
-                        <button class="ep-btn" onclick="insertSymbol('👇')" title="Point down">👇</button>
-                        <button class="ep-btn" onclick="insertSymbol('👆')" title="Point up">👆</button>
-                        <button class="ep-btn" onclick="insertSymbol('➡️')" title="Right">➡️</button>
-                        <button class="ep-btn" onclick="insertSymbol('‼️')" title="Important">‼️</button>
-                        <button class="ep-btn" onclick="insertSymbol('❗')" title="Exclaim">❗</button>
-                        <button class="ep-btn" onclick="insertSymbol('🔴')" title="Red dot">🔴</button>
-                        <button class="ep-btn" onclick="insertSymbol('🟡')" title="Yellow dot">🟡</button>
-                        <button class="ep-btn" onclick="insertSymbol('🟢')" title="Green dot">🟢</button>
-                        <button class="ep-btn" onclick="insertSymbol('📌')" title="Pin">📌</button>
-                        <button class="ep-btn" onclick="insertSymbol('🎯')" title="Target">🎯</button>
-                        <button class="ep-btn" onclick="insertSymbol('🔑')" title="Key">🔑</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128680;')" title="Alert">🚨</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#9888;&#65039;')" title="Warning">⚠️</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128226;')" title="Announce">📢</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128276;')" title="Bell">🔔</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128064;')" title="Eyes">👀</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128071;')" title="Point down">👇</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128070;')" title="Point up">👆</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#10145;&#65039;')" title="Right">➡️</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#8252;&#65039;')" title="Important">‼️</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#10071;')" title="Exclaim">❗</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128308;')" title="Red dot">🔴</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128993;')" title="Yellow dot">🟡</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128994;')" title="Green dot">🟢</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128204;')" title="Pin">📌</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#127919;')" title="Target">🎯</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128273;')" title="Key">🔑</button>
                       </div>
                       <div id="ep-visual" class="ep-panel" style="display:none;grid-template-columns:repeat(8,1fr);gap:4px">
-                        <button class="ep-btn" onclick="insertSymbol('✅')" title="Check">✅</button>
-                        <button class="ep-btn" onclick="insertSymbol('❌')" title="Cross">❌</button>
-                        <button class="ep-btn" onclick="insertSymbol('🎬')" title="Video">🎬</button>
-                        <button class="ep-btn" onclick="insertSymbol('🎥')" title="Camera">🎥</button>
-                        <button class="ep-btn" onclick="insertSymbol('🚀')" title="Launch">🚀</button>
-                        <button class="ep-btn" onclick="insertSymbol('💡')" title="Idea">💡</button>
-                        <button class="ep-btn" onclick="insertSymbol('🏆')" title="Trophy">🏆</button>
-                        <button class="ep-btn" onclick="insertSymbol('💰')" title="Money">💰</button>
-                        <button class="ep-btn" onclick="insertSymbol('🎁')" title="Gift">🎁</button>
-                        <button class="ep-btn" onclick="insertSymbol('📈')" title="Growth">📈</button>
-                        <button class="ep-btn" onclick="insertSymbol('⏰')" title="Time">⏰</button>
-                        <button class="ep-btn" onclick="insertSymbol('🔥')" title="Hot">🔥</button>
-                        <button class="ep-btn" onclick="insertSymbol('💎')" title="Premium">💎</button>
-                        <button class="ep-btn" onclick="insertSymbol('🌟')" title="Star">🌟</button>
-                        <button class="ep-btn" onclick="insertSymbol('💪')" title="Strong">💪</button>
-                        <button class="ep-btn" onclick="insertSymbol('🎉')" title="Celebrate">🎉</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#9989;')" title="Check">✅</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#10060;')" title="Cross">❌</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#127916;')" title="Video">🎬</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#127909;')" title="Camera">🎥</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128640;')" title="Launch">🚀</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128161;')" title="Idea">💡</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#127942;')" title="Trophy">🏆</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128176;')" title="Money">💰</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#127873;')" title="Gift">🎁</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128200;')" title="Growth">📈</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#9200;')" title="Time">⏰</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128293;')" title="Hot">🔥</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128142;')" title="Premium">💎</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#127775;')" title="Star">🌟</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128170;')" title="Strong">💪</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#127881;')" title="Celebrate">🎉</button>
                       </div>
                       <div id="ep-decorative" class="ep-panel" style="display:none;grid-template-columns:repeat(8,1fr);gap:4px">
-                        <button class="ep-btn" onclick="insertSymbol('✨')" title="Sparkles">✨</button>
-                        <button class="ep-btn" onclick="insertSymbol('⭐')" title="Star">⭐</button>
-                        <button class="ep-btn" onclick="insertSymbol('🌈')" title="Rainbow">🌈</button>
-                        <button class="ep-btn" onclick="insertSymbol('💫')" title="Dizzy">💫</button>
-                        <button class="ep-btn" onclick="insertSymbol('🌸')" title="Blossom">🌸</button>
-                        <button class="ep-btn" onclick="insertSymbol('🦋')" title="Butterfly">🦋</button>
-                        <button class="ep-btn" onclick="insertSymbol('💜')" title="Heart">💜</button>
-                        <button class="ep-btn" onclick="insertSymbol('🧡')" title="Heart">🧡</button>
-                        <button class="ep-btn" onclick="insertSymbol('•')" title="Bullet">•</button>
-                        <button class="ep-btn" onclick="insertSymbol('◆')" title="Diamond">◆</button>
-                        <button class="ep-btn" onclick="insertSymbol('▸')" title="Arrow">▸</button>
-                        <button class="ep-btn" onclick="insertSymbol('»')" title="Angle">»</button>
-                        <button class="ep-btn" onclick="insertSymbol('✦')" title="4-point star">✦</button>
-                        <button class="ep-btn" onclick="insertSymbol('★')" title="Star">★</button>
-                        <button class="ep-btn" onclick="insertSymbol('☑️')" title="Check box">☑️</button>
-                        <button class="ep-btn" onclick="insertSymbol('🎀')" title="Ribbon">🎀</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#10024;')" title="Sparkles">✨</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#11088;')" title="Star">⭐</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#127752;')" title="Rainbow">🌈</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128171;')" title="Dizzy">💫</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#127800;')" title="Blossom">🌸</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#129419;')" title="Butterfly">🦋</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128156;')" title="Heart">💜</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#129505;')" title="Heart">🧡</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#8226;')" title="Bullet">•</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#9670;')" title="Diamond">◆</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#9656;')" title="Arrow">▸</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#187;')" title="Angle">»</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#10022;')" title="4-point star">✦</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#9733;')" title="Star">★</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#9745;&#65039;')" title="Check box">☑️</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#127872;')" title="Ribbon">🎀</button>
                       </div>
                       <div id="ep-emphasis" class="ep-panel" style="display:none;grid-template-columns:repeat(8,1fr);gap:4px">
-                        <button class="ep-btn" onclick="insertSymbol('⚡')" title="Lightning">⚡</button>
-                        <button class="ep-btn" onclick="insertSymbol('💥')" title="Boom">💥</button>
-                        <button class="ep-btn" onclick="insertSymbol('‼️')" title="Double !">‼️</button>
-                        <button class="ep-btn" onclick="insertSymbol('⁉️')" title="!?">⁉️</button>
-                        <button class="ep-btn" onclick="insertSymbol('🆕')" title="New">🆕</button>
-                        <button class="ep-btn" onclick="insertSymbol('🆓')" title="Free">🆓</button>
-                        <button class="ep-btn" onclick="insertSymbol('🔝')" title="Top">🔝</button>
-                        <button class="ep-btn" onclick="insertSymbol('💯')" title="100%">💯</button>
-                        <button class="ep-btn" onclick="insertSymbol('🏅')" title="Medal">🏅</button>
-                        <button class="ep-btn" onclick="insertSymbol('📣')" title="Megaphone">📣</button>
-                        <button class="ep-btn" onclick="insertSymbol('🔮')" title="Crystal">🔮</button>
-                        <button class="ep-btn" onclick="insertSymbol('🧲')" title="Magnet">🧲</button>
-                        <button class="ep-btn" onclick="insertSymbol('🎪')" title="Event">🎪</button>
-                        <button class="ep-btn" onclick="insertSymbol('🏋️')" title="Lift">🏋️</button>
-                        <button class="ep-btn" onclick="insertSymbol('🎙️')" title="Mic">🎙️</button>
-                        <button class="ep-btn" onclick="insertSymbol('📡')" title="Broadcast">📡</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#9889;')" title="Lightning">⚡</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128165;')" title="Boom">💥</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#8252;&#65039;')" title="Double !">‼️</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#8265;&#65039;')" title="!?">⁉️</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#127381;')" title="New">🆕</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#127379;')" title="Free">🆓</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128285;')" title="Top">🔝</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128175;')" title="100%">💯</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#127941;')" title="Medal">🏅</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128227;')" title="Megaphone">📣</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128302;')" title="Crystal">🔮</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#129522;')" title="Magnet">🧲</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#127914;')" title="Event">🎪</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#127947;&#65039;')" title="Lift">🏋️</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#127897;&#65039;')" title="Mic">🎙️</button>
+                        <button class="ep-btn" onclick="insertSymbol('&#128225;')" title="Broadcast">📡</button>
                       </div>
                       <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
                         <input id="ep-search" type="text" placeholder="Search symbols..." oninput="searchSymbols(this.value)"
@@ -2066,7 +2066,7 @@ async function loadDash(){
     // Show breakdown of personal vs workspace pool tokens
     var tokenMeta = document.getElementById('stat-tokens-meta');
     if(tokenMeta && s.user_tokens_total !== undefined){
-      tokenMeta.textContent = fmt(s.user_tokens_total)+' personal · '+fmt(s.workspace_pool_total)+' agency pools';
+      tokenMeta.textContent = fmt(s.user_tokens_total)+' personal \u00B7 '+fmt(s.workspace_pool_total)+' agency pools';
     }
     // Render workspace pools table if pools exist
     if(s.workspace_pools && s.workspace_pools.length > 0){
@@ -2283,7 +2283,7 @@ function bcParseEmails(text){
   var unique=[...new Set(emails)];
   BC_UPLOADED_EMAILS=unique;
   var el=document.getElementById('bc-upload-status');
-  if(el){el.style.display='block';el.textContent='✓ '+unique.length+' valid email'+(unique.length===1?'':'s')+' loaded';}
+  if(el){el.style.display='block';el.textContent='\u2713 '+unique.length+' valid email'+(unique.length===1?'':'s')+' loaded';}
   var list=document.getElementById('bc-email-list');
   if(list) list.value=unique.join('\n');
 }
@@ -2342,14 +2342,14 @@ async function generateSubjectSuggestions(){
       return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--ink3);border:1px solid var(--border2);border-radius:8px;cursor:pointer" onclick="useSubjectSuggestion(\''+s.subject.replace(/'/g,'\\\'')+'\')">'
         +'<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:100px;background:'+colors[s.type]+';color:'+textColors[s.type]+';flex-shrink:0;text-transform:capitalize">'+s.type+'</span>'
         +'<span style="font-size:12px;color:var(--text);flex:1">'+s.subject+'</span>'
-        +'<span style="font-size:11px;color:var(--teal);flex-shrink:0">Use →</span>'
+        +'<span style="font-size:11px;color:var(--teal);flex-shrink:0">Use \u2192</span>'
         +'</div>';
     }).join('');
   }catch(e){
     var msg = (e && e.detail) ? e.detail : 'Failed. Check Railway logs.';
     container.innerHTML='<div style="font-size:12px;color:var(--rose)">' + msg + '</div>';
   }
-  if(btn) btn.textContent='↻ Regenerate';
+  if(btn) btn.textContent='\u21BB Regenerate';
 }
 function useSubjectSuggestion(subject){
   document.getElementById('bc-subject').value=subject;
@@ -2380,7 +2380,7 @@ async function generateCampaign(){
     var msg = (e && e.detail) ? e.detail : (e && e.message) ? e.message : 'Failed to generate campaign. Check Railway logs for details.';
     showAlert('broadcast', msg, 'error');
   }
-  btn.textContent='↻ Regenerate';btn.disabled=false;
+  btn.textContent='\u21BB Regenerate';btn.disabled=false;
 }
 function useCampaign(){
   if(!window._campResult)return;
@@ -2460,17 +2460,17 @@ async function doBroadcast(){
   if(!confirm('Send "'+subj+'" to '+label+'?\n\nThis cannot be undone.'))return;
   try{
     var r=await apiFetch('/broadcast',{method:'POST',body:JSON.stringify(body)});
-    showAlert('broadcast','✅ Sent: '+r.sent+' | Failed: '+r.failed+' | Skipped: '+r.skipped,'success');
+    showAlert('broadcast','\u2705 Sent: '+r.sent+' | Failed: '+r.failed+' | Skipped: '+r.skipped,'success');
     bcClear();loadBroadcasts();
   }catch(e){showAlert('broadcast',e.detail||'Broadcast failed','error');}
 }
 
 // ── Broadcast history (accordion) ─────────────────────────────────────────────
 function bcTargetLabel(b){
-  if(b.target==='plan')return '📋 Plan: '+b.plan;
-  if(b.target==='user')return '👤 User';
-  if(b.target==='upload')return '📩 '+(b.recipients||0)+' emails';
-  return '🌐 All users';
+  if(b.target==='plan')return '\uD83D\uDCCB Plan: '+b.plan;
+  if(b.target==='user')return '\uD83D\uDC64 User';
+  if(b.target==='upload')return '\uD83D\uDCE9 '+(b.recipients||0)+' emails';
+  return '\uD83C\uDF10 All users';
 }
 async function loadBroadcasts(){
   try{
@@ -2485,7 +2485,7 @@ async function loadBroadcasts(){
         +'<div style="width:6px;height:6px;border-radius:50%;background:'+accent+';flex-shrink:0"></div>'
         +'<div style="flex:1;min-width:0">'
         +'<div style="font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+b.subject+'</div>'
-        +'<div style="font-size:11px;color:var(--text3);margin-top:1px">'+bcTargetLabel(b)+' · <span style="color:var(--teal)">'+b.sent+' sent</span>'+(b.failed>0?' · <span style="color:var(--rose)">'+b.failed+' failed</span>':'')+'</div>'
+        +'<div style="font-size:11px;color:var(--text3);margin-top:1px">'+bcTargetLabel(b)+' \u00B7 <span style="color:var(--teal)">'+b.sent+' sent</span>'+(b.failed>0?' \u00B7 <span style="color:var(--rose)">'+b.failed+' failed</span>':'')+'</div>'
         +'</div>'
         +'<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">'
         +'<span style="font-size:10px;color:var(--text3)">'+ago(b.ts)+'</span>'
@@ -2494,7 +2494,7 @@ async function loadBroadcasts(){
         +'<div id="bcbody-'+idx+'" style="display:none;padding:0 14px 12px;border-top:1px solid var(--border)">'
         +'<div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin:10px 0 6px">Message</div>'
         +'<div style="font-size:12.5px;color:var(--text2);line-height:1.65;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:10px 12px;max-height:160px;overflow-y:auto;white-space:pre-wrap">'+(b.message||'(no body stored)')+'</div>'
-        +'<button class="btn btn-teal btn-sm" style="width:100%;justify-content:center;margin-top:10px" onclick="bcReuseIdx('+idx+')">↵ Reuse as template</button>'
+        +'<button class="btn btn-teal btn-sm" style="width:100%;justify-content:center;margin-top:10px" onclick="bcReuseIdx('+idx+')">\u21B5 Reuse as template</button>'
         +'</div></div>';
     }).join('');
   }catch(e){document.getElementById('broadcast-history').innerHTML='<div class="loading">Failed to load</div>';}
@@ -2542,12 +2542,12 @@ async function loadRevenue(){
     var totalUsd=(total/rate);
     var avgNgn=txCount>0?Math.round(total/txCount):0;
     function _set(id,val){var el=document.getElementById(id);if(el)el.textContent=val;}
-    _set('rev-ngn','₦'+fmt(Math.round(total)));
+    _set('rev-ngn','\u20A6'+fmt(Math.round(total)));
     _set('rev-usd','$'+totalUsd.toFixed(2));
-    _set('rev-usd-sub','≈ $'+totalUsd.toFixed(2)+' USD');
-    _set('rev-rate-sub','Rate: ₦'+Math.round(rate)+'/$1');
+    _set('rev-usd-sub','\u2248 $'+totalUsd.toFixed(2)+' USD');
+    _set('rev-rate-sub','Rate: \u20A6'+Math.round(rate)+'/$1');
     _set('rev-count',fmt(txCount));
-    _set('rev-avg','₦'+fmt(avgNgn));
+    _set('rev-avg','\u20A6'+fmt(avgNgn));
     REV_CHART_DATA=chart; REV_TOTAL=total; REV_TX=txCount; REV_RATE=rate;
     var ctx=document.getElementById('revenue-chart').getContext('2d');
     if(revChart)revChart.destroy();
@@ -2679,13 +2679,13 @@ function renderNiches(niches) {
         + '<div style="font-family:DM Mono,monospace;font-size:10px;color:var(--text3)">' + n.key + '</div>'
         + '</div>'
         + '<div style="display:flex;gap:4px;flex-shrink:0">'
-        + '<button onclick="openNicheEdit(\''+n.key+'\')" title="Edit" class="niche-edit-btn">✎</button>'
-        + '<button onclick="deleteNiche(\''+n.key+'\')" title="Delete" class="niche-del-btn">×</button>'
+        + '<button onclick="openNicheEdit(\''+n.key+'\')" title="Edit" class="niche-edit-btn">\u270E</button>'
+        + '<button onclick="deleteNiche(\''+n.key+'\')" title="Delete" class="niche-del-btn">\u00D7</button>'
         + '</div></div>'
         + (suggs.length
           ? '<div style="display:flex;flex-direction:column;gap:3px">'
             + suggs.slice(0,3).map(function(s){
-                return '<div style="font-size:11px;color:var(--text2);background:rgba(255,255,255,0.04);border-radius:5px;padding:3px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">· '+s+'</div>';
+                return '<div style="font-size:11px;color:var(--text2);background:rgba(255,255,255,0.04);border-radius:5px;padding:3px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">\u00B7 '+s+'</div>';
               }).join('')
             + (suggs.length > 3 ? '<div style="font-size:10px;color:var(--text3);padding:2px 7px">+' + (suggs.length-3) + ' more</div>' : '')
             + '</div>'
@@ -2781,18 +2781,18 @@ var LOG_FILTER = 'all';
 var LOG_SEARCH = '';
 
 var LOG_ICONS = {
-  top_up:         {i:'↑', bg:'rgba(45,212,191,0.12)',  c:'var(--teal)',   label:'Token top-up'},
-  set_tokens:     {i:'✏', bg:'rgba(167,139,250,0.12)', c:'var(--violet)', label:'Set tokens'},
-  set_plan:       {i:'◈', bg:'rgba(167,139,250,0.12)', c:'var(--violet)', label:'Plan change'},
-  pricing_update: {i:'₦', bg:'rgba(201,168,76,0.12)',  c:'var(--gold)',   label:'Pricing update'},
+  top_up:         {i:'\u2191', bg:'rgba(45,212,191,0.12)',  c:'var(--teal)',   label:'Token top-up'},
+  set_tokens:     {i:'\u270F', bg:'rgba(167,139,250,0.12)', c:'var(--violet)', label:'Set tokens'},
+  set_plan:       {i:'\u25C8', bg:'rgba(167,139,250,0.12)', c:'var(--violet)', label:'Plan change'},
+  pricing_update: {i:'\u20A6', bg:'rgba(201,168,76,0.12)',  c:'var(--gold)',   label:'Pricing update'},
   plan_added:     {i:'+', bg:'rgba(45,212,191,0.12)',   c:'var(--teal)',   label:'Plan added'},
-  suspend:        {i:'⊘', bg:'rgba(248,113,113,0.12)', c:'var(--rose)',   label:'Suspended'},
-  unsuspend:      {i:'✓', bg:'rgba(45,212,191,0.12)',  c:'var(--teal)',   label:'Unsuspended'},
-  broadcast:      {i:'✉', bg:'rgba(96,165,250,0.12)',  c:'#60a5fa',       label:'Broadcast'},
-  delete_user:    {i:'✗', bg:'rgba(248,113,113,0.12)', c:'var(--rose)',   label:'User deleted'},
-  coupon_created: {i:'◆', bg:'rgba(45,212,191,0.12)',  c:'var(--teal)',   label:'Coupon created'},
-  coupon_deleted: {i:'◇', bg:'rgba(248,113,113,0.12)', c:'var(--rose)',   label:'Coupon deleted'},
-  unblock_ip:     {i:'✓', bg:'rgba(45,212,191,0.12)',  c:'var(--teal)',   label:'IP unblocked'},
+  suspend:        {i:'\u2298', bg:'rgba(248,113,113,0.12)', c:'var(--rose)',   label:'Suspended'},
+  unsuspend:      {i:'\u2713', bg:'rgba(45,212,191,0.12)',  c:'var(--teal)',   label:'Unsuspended'},
+  broadcast:      {i:'\u2709', bg:'rgba(96,165,250,0.12)',  c:'#60a5fa',       label:'Broadcast'},
+  delete_user:    {i:'\u2717', bg:'rgba(248,113,113,0.12)', c:'var(--rose)',   label:'User deleted'},
+  coupon_created: {i:'\u25C6', bg:'rgba(45,212,191,0.12)',  c:'var(--teal)',   label:'Coupon created'},
+  coupon_deleted: {i:'\u25C7', bg:'rgba(248,113,113,0.12)', c:'var(--rose)',   label:'Coupon deleted'},
+  unblock_ip:     {i:'\u2713', bg:'rgba(45,212,191,0.12)',  c:'var(--teal)',   label:'IP unblocked'},
 };
 
 function updateLogStats(logs) {
@@ -2806,15 +2806,15 @@ function updateLogStats(logs) {
 function logDetails(l) {
   var parts = [];
   if(l.tokens !== undefined) parts.push(fmt(l.tokens) + ' tokens');
-  if(l.plan)    parts.push('→ ' + l.plan);
+  if(l.plan)    parts.push('\u2192 ' + l.plan);
   if(l.reason)  parts.push(l.reason.slice(0,60));
   if(l.subject) parts.push('"' + l.subject.slice(0,40) + '"');
   if(l.sent)    parts.push(fmt(l.sent) + ' sent');
   if(l.ip)      parts.push(l.ip);
-  if(l.amount)  parts.push('₦' + fmt(l.amount));
+  if(l.amount)  parts.push('\u20A6' + fmt(l.amount));
   if(l.email)   parts.push(l.email);
   if(l.user_id) parts.push('uid:' + l.user_id.slice(0,8));
-  return parts.join(' · ') || '--';
+  return parts.join(' \u00B7 ') || '--';
 }
 
 function renderLogs(logs) {
@@ -2854,7 +2854,7 @@ function renderLogs(logs) {
        + '</div>';
 
     groups[date].forEach(function(l, idx) {
-      var s = LOG_ICONS[l.action] || {i:'○', bg:'rgba(255,255,255,0.06)', c:'var(--text3)', label:l.action};
+      var s = LOG_ICONS[l.action] || {i:'\u25CB', bg:'rgba(255,255,255,0.06)', c:'var(--text3)', label:l.action};
       var actionLabel = s.label || l.action.replace(/_/g,' ');
       var time = l.ts ? new Date(l.ts).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '';
       var details = logDetails(l);
@@ -2871,11 +2871,11 @@ function renderLogs(logs) {
         + '<div style="padding:14px 16px ' + (isLast?'14px':'12px') + ' 12px;min-width:0">'
         + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:3px">'
         + '<span style="font-size:13px;font-weight:600;color:var(--text)">' + actionLabel + '</span>'
-        + (details ? '<span style="font-size:11.5px;color:var(--text2)">·</span><span style="font-size:11.5px;color:var(--text2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:320px">' + details + '</span>' : '')
+        + (details ? '<span style="font-size:11.5px;color:var(--text2)">\u00B7</span><span style="font-size:11.5px;color:var(--text2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:320px">' + details + '</span>' : '')
         + '</div>'
         + '<div style="display:flex;align-items:center;gap:10px">'
         + (perfBy ? '<span style="font-size:11px;color:var(--text3);display:flex;align-items:center;gap:4px"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".6"><circle cx="8" cy="6" r="3"/><path d="M2 14c0-3.3 2.7-5 6-5s6 1.7 6 5"/></svg>' + perfBy + '</span>' : '')
-        + (l.target_user ? '<span style="font-size:11px;color:var(--text3)">→ ' + l.target_user + '</span>' : '')
+        + (l.target_user ? '<span style="font-size:11px;color:var(--text3)">\u2192 ' + l.target_user + '</span>' : '')
         + '</div>'
         + '</div>'
         // Time column
@@ -2968,7 +2968,7 @@ function _xlsxHeader(ws, cols){
 
 async function exportRevenueExcel(){
   if(!REV_CHART_DATA.length){await loadRevenue();}
-  var wb=new ExcelJS.Workbook();
+  if(typeof ExcelJS==='undefined'){showToast('Excel export unavailable in this environment','err');return;}var wb=new ExcelJS.Workbook();
   wb.creator='SceneForge Admin';wb.created=new Date();
 
   // Sheet 1 — Daily revenue
@@ -2991,11 +2991,11 @@ async function exportRevenueExcel(){
   var today=new Date().toISOString().slice(0,10);
   [
     ['Report date', today],
-    ['Total revenue (NGN)', '₦'+fmt(Math.round(REV_TOTAL))],
+    ['Total revenue (NGN)', '\u20A6'+fmt(Math.round(REV_TOTAL))],
     ['Total revenue (USD)', '$'+(REV_TOTAL/rate).toFixed(2)],
     ['Total transactions', REV_TX],
-    ['Avg per transaction (NGN)', REV_TX>0?'₦'+fmt(Math.round(REV_TOTAL/REV_TX)):'--'],
-    ['Exchange rate used', '₦'+Math.round(rate)+'/$1'],
+    ['Avg per transaction (NGN)', REV_TX>0?'\u20A6'+fmt(Math.round(REV_TOTAL/REV_TX)):'--'],
+    ['Exchange rate used', '\u20A6'+Math.round(rate)+'/$1'],
   ].forEach(function(r){ws2.addRow(r);});
 
   await _xlsxDownload(wb,'sceneforge_revenue_'+today+'.xlsx');
@@ -3003,7 +3003,7 @@ async function exportRevenueExcel(){
 
 async function exportTxExcel(){
   if(!TX_DATA.length){await loadTx();await new Promise(function(r){setTimeout(r,500);});}
-  var wb=new ExcelJS.Workbook();
+  if(typeof ExcelJS==='undefined'){showToast('Excel export unavailable in this environment','err');return;}var wb=new ExcelJS.Workbook();
   wb.creator='SceneForge Admin';wb.created=new Date();
   var ws=wb.addWorksheet('Transactions');
   _xlsxHeader(ws,[
@@ -3058,7 +3058,7 @@ async function loadFeedback(){
     var dist={1:0,2:0,3:0,4:0,5:0};
     items.forEach(function(i){dist[i.rating]=(dist[i.rating]||0)+1;});
     var maxD=Math.max.apply(null,Object.values(dist).concat([1]));
-    var EMOJIS={1:'😞',2:'😕',3:'😐',4:'😊',5:'🤩'};
+    var EMOJIS={1:'\uD83D\uDE1E',2:'\uD83D\uDE15',3:'\uD83D\uDE10',4:'\uD83D\uDE0A',5:'\uD83E\uDD29'};
     document.getElementById('fb-distribution').innerHTML=[5,4,3,2,1].map(function(r){
       var count=dist[r]||0;
       var pct=Math.round(count/Math.max(total,1)*100);
@@ -3095,9 +3095,9 @@ function renderFeedback(){
     if(filter==='1')return i.rating<=2;
     return true;
   });
-  var STARS={1:'★☆☆☆☆',2:'★★☆☆☆',3:'★★★☆☆',4:'★★★★☆',5:'★★★★★'};
+  var STARS={1:'\u2605\u2606\u2606\u2606\u2606',2:'\u2605\u2605\u2606\u2606\u2606',3:'\u2605\u2605\u2605\u2606\u2606',4:'\u2605\u2605\u2605\u2605\u2606',5:'\u2605\u2605\u2605\u2605\u2605'};
   var COLS={1:'#f87171',2:'#fb923c',3:'#fbbf24',4:'#34d399',5:'#2dd4bf'};
-  var EMOJIS={1:'😞',2:'😕',3:'😐',4:'😊',5:'🤩'};
+  var EMOJIS={1:'\uD83D\uDE1E',2:'\uD83D\uDE15',3:'\uD83D\uDE10',4:'\uD83D\uDE0A',5:'\uD83E\uDD29'};
   document.getElementById('fb-list').innerHTML=items.length
     ?items.map(function(i){
       var tags=(i.tags||[]).map(function(t){
@@ -3121,7 +3121,7 @@ function renderFeedback(){
 
 async function exportFeedbackExcel(){
   if(!FB_DATA.length){await loadFeedback();await new Promise(function(r){setTimeout(r,500);});}
-  var wb=new ExcelJS.Workbook();wb.creator='SceneForge Admin';wb.created=new Date();
+  if(typeof ExcelJS==='undefined'){showToast('Excel export unavailable in this environment','err');return;}var wb=new ExcelJS.Workbook();wb.creator='SceneForge Admin';wb.created=new Date();
   var today=new Date().toISOString().slice(0,10);
 
   var ws=wb.addWorksheet('Feedback');
@@ -3130,7 +3130,7 @@ async function exportFeedbackExcel(){
     {header:'Tags',width:36},{header:'Comment',width:48},
     {header:'User name',width:22},{header:'Email',width:28},{header:'Date',width:20}
   ]);
-  var STARS={1:'★☆☆☆☆',2:'★★☆☆☆',3:'★★★☆☆',4:'★★★★☆',5:'★★★★★'};
+  var STARS={1:'\u2605\u2606\u2606\u2606\u2606',2:'\u2605\u2605\u2606\u2606\u2606',3:'\u2605\u2605\u2605\u2606\u2606',4:'\u2605\u2605\u2605\u2605\u2606',5:'\u2605\u2605\u2605\u2605\u2605'};
   FB_DATA.forEach(function(i){
     var u=USER_CACHE[i.user_id]||{};
     ws.addRow([i.rating,STARS[i.rating]||'',i.trigger||'',(i.tags||[]).join(', '),i.comment||'',
@@ -3158,7 +3158,7 @@ async function exportFeedbackPdf(){
   var avg=FB_DATA.length?FB_DATA.reduce(function(s,i){return s+i.rating;},0)/FB_DATA.length:0;
   var dist={1:0,2:0,3:0,4:0,5:0};
   FB_DATA.forEach(function(i){dist[i.rating]=(dist[i.rating]||0)+1;});
-  var STARS={1:'★☆☆☆☆',2:'★★☆☆☆',3:'★★★☆☆',4:'★★★★☆',5:'★★★★★'};
+  var STARS={1:'\u2605\u2606\u2606\u2606\u2606',2:'\u2605\u2605\u2606\u2606\u2606',3:'\u2605\u2605\u2605\u2606\u2606',4:'\u2605\u2605\u2605\u2605\u2606',5:'\u2605\u2605\u2605\u2605\u2605'};
 
   var html='<!DOCTYPE html><html><head><meta charset="utf-8">'
     +'<style>body{font-family:Arial,sans-serif;color:#111;padding:32px;max-width:800px;margin:0 auto}'
@@ -3248,7 +3248,7 @@ async function exportFeedbackPdf(){
 
 async function exportAnalyticsExcel(){
   if(!ANA_DATA.total_users){await loadAnalytics();await new Promise(function(r){setTimeout(r,500);});}
-  var wb=new ExcelJS.Workbook();
+  if(typeof ExcelJS==='undefined'){showToast('Excel export unavailable in this environment','err');return;}var wb=new ExcelJS.Workbook();
   wb.creator='SceneForge Admin';wb.created=new Date();
   var today=new Date().toISOString().slice(0,10);
 
@@ -3289,26 +3289,26 @@ async function exportAnalyticsExcel(){
 // ── Emoji / symbol picker ─────────────────────────────────────────────────
 
 var EP_SYMBOLS = [
-  {name:'alert',sym:'🚨'},{name:'warning',sym:'⚠️'},{name:'announce announce',sym:'📢'},
-  {name:'bell notification',sym:'🔔'},{name:'eyes look',sym:'👀'},{name:'point down',sym:'👇'},
-  {name:'point up',sym:'👆'},{name:'right arrow',sym:'➡️'},{name:'important',sym:'‼️'},
-  {name:'exclaim',sym:'❗'},{name:'red dot',sym:'🔴'},{name:'yellow dot',sym:'🟡'},
-  {name:'green dot',sym:'🟢'},{name:'pin',sym:'📌'},{name:'target bullseye',sym:'🎯'},
-  {name:'key point',sym:'🔑'},{name:'check tick',sym:'✅'},{name:'cross x no',sym:'❌'},
-  {name:'video film',sym:'🎬'},{name:'camera',sym:'🎥'},{name:'rocket launch',sym:'🚀'},
-  {name:'idea lightbulb',sym:'💡'},{name:'trophy win',sym:'🏆'},{name:'money cash',sym:'💰'},
-  {name:'gift present',sym:'🎁'},{name:'growth chart',sym:'📈'},{name:'clock time',sym:'⏰'},
-  {name:'fire hot',sym:'🔥'},{name:'diamond premium',sym:'💎'},{name:'star shine',sym:'🌟'},
-  {name:'strong muscle',sym:'💪'},{name:'celebrate party',sym:'🎉'},{name:'sparkles shine',sym:'✨'},
-  {name:'star gold',sym:'⭐'},{name:'rainbow colour',sym:'🌈'},{name:'flash lightning',sym:'💫'},
-  {name:'blossom flower',sym:'🌸'},{name:'butterfly',sym:'🦋'},{name:'heart purple',sym:'💜'},
-  {name:'heart orange',sym:'🧡'},{name:'bullet point',sym:'•'},{name:'diamond shape',sym:'◆'},
-  {name:'arrow right',sym:'▸'},{name:'angle double',sym:'»'},{name:'four point star',sym:'✦'},
-  {name:'black star',sym:'★'},{name:'checkbox tick',sym:'☑️'},{name:'ribbon bow',sym:'🎀'},
-  {name:'lightning bolt',sym:'⚡'},{name:'explosion boom',sym:'💥'},{name:'double exclaim',sym:'‼️'},
-  {name:'exclaim question',sym:'⁉️'},{name:'new',sym:'🆕'},{name:'free',sym:'🆓'},
-  {name:'top',sym:'🔝'},{name:'hundred percent',sym:'💯'},{name:'medal award',sym:'🏅'},
-  {name:'megaphone loud',sym:'📣'},{name:'broadcast megaphone',sym:'📡'},
+  {name:'alert',sym:'\uD83D\uDEA8'},{name:'warning',sym:'\u26A0\uFE0F'},{name:'announce announce',sym:'\uD83D\uDCE2'},
+  {name:'bell notification',sym:'\uD83D\uDD14'},{name:'eyes look',sym:'\uD83D\uDC40'},{name:'point down',sym:'\uD83D\uDC47'},
+  {name:'point up',sym:'\uD83D\uDC46'},{name:'right arrow',sym:'\u27A1\uFE0F'},{name:'important',sym:'\u203C\uFE0F'},
+  {name:'exclaim',sym:'\u2757'},{name:'red dot',sym:'\uD83D\uDD34'},{name:'yellow dot',sym:'\uD83D\uDFE1'},
+  {name:'green dot',sym:'\uD83D\uDFE2'},{name:'pin',sym:'\uD83D\uDCCC'},{name:'target bullseye',sym:'\uD83C\uDFAF'},
+  {name:'key point',sym:'\uD83D\uDD11'},{name:'check tick',sym:'\u2705'},{name:'cross x no',sym:'\u274C'},
+  {name:'video film',sym:'\uD83C\uDFAC'},{name:'camera',sym:'\uD83C\uDFA5'},{name:'rocket launch',sym:'\uD83D\uDE80'},
+  {name:'idea lightbulb',sym:'\uD83D\uDCA1'},{name:'trophy win',sym:'\uD83C\uDFC6'},{name:'money cash',sym:'\uD83D\uDCB0'},
+  {name:'gift present',sym:'\uD83C\uDF81'},{name:'growth chart',sym:'\uD83D\uDCC8'},{name:'clock time',sym:'\u23F0'},
+  {name:'fire hot',sym:'\uD83D\uDD25'},{name:'diamond premium',sym:'\uD83D\uDC8E'},{name:'star shine',sym:'\uD83C\uDF1F'},
+  {name:'strong muscle',sym:'\uD83D\uDCAA'},{name:'celebrate party',sym:'\uD83C\uDF89'},{name:'sparkles shine',sym:'\u2728'},
+  {name:'star gold',sym:'\u2B50'},{name:'rainbow colour',sym:'\uD83C\uDF08'},{name:'flash lightning',sym:'\uD83D\uDCAB'},
+  {name:'blossom flower',sym:'\uD83C\uDF38'},{name:'butterfly',sym:'\uD83E\uDD8B'},{name:'heart purple',sym:'\uD83D\uDC9C'},
+  {name:'heart orange',sym:'\uD83E\uDDE1'},{name:'bullet point',sym:'\u2022'},{name:'diamond shape',sym:'\u25C6'},
+  {name:'arrow right',sym:'\u25B8'},{name:'angle double',sym:'\u00BB'},{name:'four point star',sym:'\u2726'},
+  {name:'black star',sym:'\u2605'},{name:'checkbox tick',sym:'\u2611\uFE0F'},{name:'ribbon bow',sym:'\uD83C\uDF80'},
+  {name:'lightning bolt',sym:'\u26A1'},{name:'explosion boom',sym:'\uD83D\uDCA5'},{name:'double exclaim',sym:'\u203C\uFE0F'},
+  {name:'exclaim question',sym:'\u2049\uFE0F'},{name:'new',sym:'\uD83C\uDD95'},{name:'free',sym:'\uD83C\uDD93'},
+  {name:'top',sym:'\uD83D\uDD1D'},{name:'hundred percent',sym:'\uD83D\uDCAF'},{name:'medal award',sym:'\uD83C\uDFC5'},
+  {name:'megaphone loud',sym:'\uD83D\uDCE3'},{name:'broadcast megaphone',sym:'\uD83D\uDCE1'},
 ];
 
 function toggleEmojiPicker(e){
@@ -3434,7 +3434,7 @@ function renderCostLog(records) {
     COST_LOG_INDEX[i] = r;
     return '<tr style="cursor:pointer" onclick="showJobCostDetail('+i+')">'
       + '<td style="color:var(--text3);font-size:11px;white-space:nowrap">' + ago(r.ts) + '</td>'
-      + '<td style="font-family:DM Mono,monospace;font-size:10px;color:var(--text3)">' + (r.job_id||'').slice(0,8) + '…</td>'
+      + '<td style="font-family:DM Mono,monospace;font-size:10px;color:var(--text3)">' + (r.job_id||'').slice(0,8) + '\u2026</td>'
       + '<td style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="font-weight:600;color:var(--text)">' + escHtml(r.full_name||r.user_id||'--') + '</span><br><span style="color:var(--text3);font-size:10px">' + escHtml(r.email||'') + '</span></td>'
       + '<td>' + planTag(r.plan || 'free') + '</td>'
       + '<td style="text-align:center;color:var(--text2)">' + (r.scenes||0) + '</td>'
@@ -3513,10 +3513,10 @@ function showJobCostDetail(idx) {
     + '</div>';
 
   html += '<div style="font-size:11px;color:var(--text3);padding:8px 0">'
-    + 'Plan: ₦'+fmt(r.plan_price_ngn||0)+' &nbsp;·&nbsp; '
-    + fmt(r.plan_tokens||100)+' tokens/plan &nbsp;·&nbsp; '
-    + (r.renders_per_plan||1).toFixed(0)+' renders/plan &nbsp;·&nbsp; '
-    + 'Rate: ₦'+fmt(r.exchange_rate||1600)+'/$'
+    + 'Plan: \u20A6'+fmt(r.plan_price_ngn||0)+' &nbsp;\u00B7&nbsp; '
+    + fmt(r.plan_tokens||100)+' tokens/plan &nbsp;\u00B7&nbsp; '
+    + (r.renders_per_plan||1).toFixed(0)+' renders/plan &nbsp;\u00B7&nbsp; '
+    + 'Rate: \u20A6'+fmt(r.exchange_rate||1600)+'/$'
     + '</div>';
 
   document.getElementById('cost-detail-body').innerHTML = html;
@@ -3593,8 +3593,8 @@ async function loadCosts() {
     // ── Exchange rate display
     var rateEl = document.getElementById('cost-rate-display');
     var rateLbl = document.getElementById('cost-rate-label');
-    if (rateEl) rateEl.textContent = '₦' + fmt(Math.round(rate)) + ' / $1';
-    if (rateLbl) rateLbl.textContent = 'Rate: ₦' + fmt(Math.round(rate)) + '/$';
+    if (rateEl) rateEl.textContent = '\u20A6' + fmt(Math.round(rate)) + ' / $1';
+    if (rateLbl) rateLbl.textContent = 'Rate: \u20A6' + fmt(Math.round(rate)) + '/$';
 
     // ── KPI bar ───────────────────────────────────────────────────────────
     var totalRevenue=0, totalCost=0, totalMargin=0, totalRenders=0;
@@ -3632,10 +3632,10 @@ async function loadCosts() {
           + '<div class="stat-label">' + (p.plan_label || k) + '</div>'
           + '<div class="stat-val" style="font-size:22px;color:' + mc + '">' + (p.margin_pct||0).toFixed(1) + '%</div>'
           + '<div class="stat-meta" style="display:flex;flex-direction:column;gap:3px;margin-top:6px">'
-          + '<span>₦' + fmt(p.price_ngn||0) + ' &nbsp;→&nbsp; $' + (p.revenue_per_render||0).toFixed(4) + '/render</span>'
+          + '<span>\u20A6' + fmt(p.price_ngn||0) + ' &nbsp;\u2192&nbsp; $' + (p.revenue_per_render||0).toFixed(4) + '/render</span>'
           + '<span style="color:var(--text3)">Avg cost: $' + (p.avg_cost_usd||0).toFixed(5) + '</span>'
           + '<span>Margin: $' + (p.margin_usd||0).toFixed(4) + '</span>'
-          + '<span style="color:var(--text3);font-size:11px">' + fmt(p.plan_tokens||100) + ' tokens → ' + (p.renders_per_plan||1).toFixed(0) + ' renders</span>'
+          + '<span style="color:var(--text3);font-size:11px">' + fmt(p.plan_tokens||100) + ' tokens \u2192 ' + (p.renders_per_plan||1).toFixed(0) + ' renders</span>'
           + '<span style="color:var(--text3);font-size:11px">' + fmt(p.renders||0) + ' renders tracked</span>'
           + '</div></div>';
       }).join('') || '<div style="padding:16px;color:var(--text3)">No cost data yet -- costs are recorded after each render</div>';
@@ -3649,7 +3649,7 @@ async function loadCosts() {
         var mc = mCol(p.margin_pct||0);
         return '<tr style="background:' + mBg(p.margin_pct||0) + '">'
           + '<td>' + planTag(k) + '</td>'
-          + '<td style="font-family:DM Mono,monospace;font-size:12px">₦' + fmt(p.price_ngn||0) + ' ($' + (p.price_usd||0).toFixed(3) + ')</td>'
+          + '<td style="font-family:DM Mono,monospace;font-size:12px">\u20A6' + fmt(p.price_ngn||0) + ' ($' + (p.price_usd||0).toFixed(3) + ')</td>'
           + '<td style="font-family:DM Mono,monospace;font-size:12px;text-align:center">' + fmt(p.plan_tokens||100) + '</td>'
           + '<td style="font-family:DM Mono,monospace;font-size:12px;color:var(--teal)">' + usd(p.revenue_per_render,5) + '</td>'
           + '<td style="font-family:DM Mono,monospace;font-size:11px">' + usd(bd.voice,5) + '</td>'
@@ -3779,13 +3779,13 @@ async function loadCampaigns() {
     var status = await apiFetch('/campaigns/status');
     var colors = {zero_render:'violet', inactive_5d:'gold', inactive_14d:'gold', inactive_30d:'rose', healthy:'teal', unverified:'text3'};
     var labels = {
-      scanned: ['👥', 'Total users scanned', ''],
-      unverified: ['📧', 'Unverified email', 'Excluded from campaigns'],
-      zero_render: ['⏳', 'Never rendered', '24h+ since signup'],
-      inactive_5d: ['🔔', '5-day inactive', '5-14 days since last render'],
-      inactive_14d: ['💤', '14-day inactive', '14-30 days since last render'],
-      inactive_30d: ['🌟', '30-day inactive', '30+ days since last render'],
-      healthy: ['✅', 'Active users', 'Rendered in last 5 days'],
+      scanned: ['\uD83D\uDC65', 'Total users scanned', ''],
+      unverified: ['\uD83D\uDCE7', 'Unverified email', 'Excluded from campaigns'],
+      zero_render: ['\u23F3', 'Never rendered', '24h+ since signup'],
+      inactive_5d: ['\uD83D\uDD14', '5-day inactive', '5-14 days since last render'],
+      inactive_14d: ['\uD83D\uDCA4', '14-day inactive', '14-30 days since last render'],
+      inactive_30d: ['\uD83C\uDF1F', '30-day inactive', '30+ days since last render'],
+      healthy: ['\u2705', 'Active users', 'Rendered in last 5 days'],
     };
     var grid = document.getElementById('campaign-bucket-grid');
     if (grid) {
@@ -3834,7 +3834,7 @@ async function loadCampaigns() {
 
 async function runCampaign() {
   var btn = document.getElementById('run-campaign-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Running…'; }
+  if (btn) { btn.disabled = true; btn.textContent = '\u23F3 Running\u2026'; }
   try {
     var r = await apiFetch('/campaigns/run', {method:'POST'});
     showToast('Campaign started -- '+r.message, 'success');
@@ -3842,7 +3842,7 @@ async function runCampaign() {
   } catch(e) {
     showToast('Campaign failed: '+e.message, 'error');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '▶ Run Campaign Now'; }
+    if (btn) { btn.disabled = false; btn.textContent = '\u25B6 Run Campaign Now'; }
   }
 }
 
@@ -3851,32 +3851,32 @@ async function runCampaign() {
 var AUDIT_ENTRIES = [];
 
 var AUDIT_ACTION_ICONS = {
-  top_up:         {i:'↑', c:'var(--teal)',   bg:'rgba(45,212,191,0.12)'},
-  set_tokens:     {i:'✏', c:'var(--violet)', bg:'rgba(167,139,250,0.12)'},
-  set_plan:       {i:'◈', c:'var(--violet)', bg:'rgba(167,139,250,0.12)'},
-  pricing_update: {i:'₦', c:'var(--gold)',   bg:'rgba(201,168,76,0.12)'},
+  top_up:         {i:'\u2191', c:'var(--teal)',   bg:'rgba(45,212,191,0.12)'},
+  set_tokens:     {i:'\u270F', c:'var(--violet)', bg:'rgba(167,139,250,0.12)'},
+  set_plan:       {i:'\u25C8', c:'var(--violet)', bg:'rgba(167,139,250,0.12)'},
+  pricing_update: {i:'\u20A6', c:'var(--gold)',   bg:'rgba(201,168,76,0.12)'},
   plan_added:     {i:'+', c:'var(--teal)',   bg:'rgba(45,212,191,0.12)'},
-  suspend:        {i:'⊘', c:'var(--rose)',   bg:'rgba(248,113,113,0.12)'},
-  unsuspend:      {i:'✓', c:'var(--teal)',   bg:'rgba(45,212,191,0.12)'},
-  broadcast:      {i:'✉', c:'#60a5fa',       bg:'rgba(96,165,250,0.12)'},
-  delete_user:    {i:'✗', c:'var(--rose)',   bg:'rgba(248,113,113,0.12)'},
-  coupon_created: {i:'◆', c:'var(--teal)',   bg:'rgba(45,212,191,0.12)'},
-  coupon_deleted: {i:'◇', c:'var(--rose)',   bg:'rgba(248,113,113,0.12)'},
+  suspend:        {i:'\u2298', c:'var(--rose)',   bg:'rgba(248,113,113,0.12)'},
+  unsuspend:      {i:'\u2713', c:'var(--teal)',   bg:'rgba(45,212,191,0.12)'},
+  broadcast:      {i:'\u2709', c:'#60a5fa',       bg:'rgba(96,165,250,0.12)'},
+  delete_user:    {i:'\u2717', c:'var(--rose)',   bg:'rgba(248,113,113,0.12)'},
+  coupon_created: {i:'\u25C6', c:'var(--teal)',   bg:'rgba(45,212,191,0.12)'},
+  coupon_deleted: {i:'\u25C7', c:'var(--rose)',   bg:'rgba(248,113,113,0.12)'},
 };
 
 function auditDetails(e) {
   var parts = [];
-  if (e.user_id)    parts.push('User: ' + e.user_id.slice(0,8) + '…');
+  if (e.user_id)    parts.push('User: ' + e.user_id.slice(0,8) + '\u2026');
   if (e.tokens)     parts.push(fmt(e.tokens) + ' tokens');
   if (e.plan)       parts.push('Plan: ' + e.plan);
   if (e.plan_key)   parts.push('Plan key: ' + e.plan_key);
-  if (e.amount)     parts.push('₦' + fmt(e.amount));
+  if (e.amount)     parts.push('\u20A6' + fmt(e.amount));
   if (e.subject)    parts.push('"' + e.subject.slice(0,40) + '"');
   if (e.sent)       parts.push(fmt(e.sent) + ' sent');
   if (e.reason)     parts.push(e.reason.slice(0,50));
   if (e.email)      parts.push(e.email);
-  if (e.old !== undefined) parts.push(fmt(e.old) + ' → ' + fmt(e.tokens));
-  return parts.join(' · ') || '--';
+  if (e.old !== undefined) parts.push(fmt(e.old) + ' \u2192 ' + fmt(e.tokens));
+  return parts.join(' \u00B7 ') || '--';
 }
 
 function renderAuditTable(entries) {
@@ -3887,7 +3887,7 @@ function renderAuditTable(entries) {
     return;
   }
   tbody.innerHTML = entries.map(function(e) {
-    var ic = AUDIT_ACTION_ICONS[e.action] || {i:'•', c:'var(--text3)', bg:'rgba(255,255,255,0.06)'};
+    var ic = AUDIT_ACTION_ICONS[e.action] || {i:'\u2022', c:'var(--text3)', bg:'rgba(255,255,255,0.06)'};
     var roleColor = {superadmin:'var(--rose)', admin:'var(--violet)', analytics:'var(--teal)', support:'var(--gold)'}[e.performed_by_role] || 'var(--text3)';
     return '<tr>'
       + '<td style="font-size:11px;color:var(--text3);white-space:nowrap">' + ago(e.ts) + '<div style="font-size:10px;color:var(--text3);margin-top:1px">' + (e.ts || '').slice(11,19) + ' UTC</div></td>'
@@ -4041,7 +4041,7 @@ async function loadUserRenderCosts(uid) {
         ? '<span style="color:var(--violet);font-size:10.5px">ElevenLabs</span>'
         : '<span style="color:var(--teal);font-size:10.5px">Edge TTS</span>';
       var visualLabel = r.visual_source === 'dalle'
-        ? '<span style="color:var(--gold);font-size:10.5px">DALL·E</span>'
+        ? '<span style="color:var(--gold);font-size:10.5px">DALL\u00B7E</span>'
         : '<span style="color:var(--text3);font-size:10.5px">Pexels</span>';
       return '<tr>'
         + '<td style="font-size:11px;color:var(--text3);white-space:nowrap">' + ago(r.ts) + '</td>'
@@ -4083,7 +4083,7 @@ async function loadSecurity() {
       susList.innerHTML = users.length ? users.map(function(u) {
         return '<div style="padding:12px 20px;border-bottom:1px solid var(--border)">'
           + '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">'
-          + '<div style="font-family:DM Mono,monospace;font-size:11.5px;color:var(--text)">' + u.user_id.slice(0,16) + '…</div>'
+          + '<div style="font-family:DM Mono,monospace;font-size:11.5px;color:var(--text)">' + u.user_id.slice(0,16) + '\u2026</div>'
           + '<span style="font-size:10px;color:var(--text3)">' + ago(u.ts) + '</span>'
           + '</div>'
           + '<div style="display:flex;flex-wrap:wrap;gap:5px">'
@@ -4092,7 +4092,7 @@ async function loadSecurity() {
           }).join('')
           + '</div>'
           + '<div style="font-size:11px;color:var(--text3);margin-top:4px">'
-          + fmt(u.renders||0) + ' renders · ' + fmt(u.tokens||0) + ' tokens · ' + fmt(u.failures||0) + ' failures'
+          + fmt(u.renders||0) + ' renders \u00B7 ' + fmt(u.tokens||0) + ' tokens \u00B7 ' + fmt(u.failures||0) + ' failures'
           + '</div></div>';
       }).join('') : '<div class="loading">No suspicious activity detected</div>';
     }
@@ -4117,7 +4117,7 @@ async function loadSecurity() {
         ? '<div style="padding:16px 20px;display:flex;flex-direction:column;gap:8px">'
           + users2.map(function(u) {
             return '<div style="display:flex;align-items:center;justify-content:space-between">'
-              + '<span style="font-family:DM Mono,monospace;font-size:12px;color:var(--text2)">' + u.user_id.slice(0,16) + '…</span>'
+              + '<span style="font-family:DM Mono,monospace;font-size:12px;color:var(--text2)">' + u.user_id.slice(0,16) + '\u2026</span>'
               + '<div style="display:flex;align-items:center;gap:8px">'
               + '<div style="width:80px;height:4px;background:rgba(255,255,255,0.07);border-radius:2px;overflow:hidden">'
               + '<div style="height:100%;width:' + Math.min(u.active_jobs/2*100,100) + '%;background:var(--teal);border-radius:2px"></div>'
