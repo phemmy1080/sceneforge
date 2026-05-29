@@ -1626,6 +1626,7 @@ tr:hover td{background:rgba(255,255,255,0.018)}
       </div>
 
       <!-- KPI buckets -->
+      <div id="alert-campaigns" class="alert" style="display:none;margin-bottom:12px"></div>
       <div id="campaign-bucket-grid" class="stat-row" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:20px">
         <div class="loading"></div>
       </div>
@@ -2968,7 +2969,7 @@ function _xlsxHeader(ws, cols){
 
 async function exportRevenueExcel(){
   if(!REV_CHART_DATA.length){await loadRevenue();}
-  if(typeof ExcelJS==='undefined'){showToast('Excel export unavailable in this environment','err');return;}var wb=new ExcelJS.Workbook();
+  if(typeof ExcelJS==='undefined'){showAlert('costs','Excel export unavailable in this environment','err');return;}var wb=new ExcelJS.Workbook();
   wb.creator='SceneForge Admin';wb.created=new Date();
 
   // Sheet 1 — Daily revenue
@@ -3003,7 +3004,7 @@ async function exportRevenueExcel(){
 
 async function exportTxExcel(){
   if(!TX_DATA.length){await loadTx();await new Promise(function(r){setTimeout(r,500);});}
-  if(typeof ExcelJS==='undefined'){showToast('Excel export unavailable in this environment','err');return;}var wb=new ExcelJS.Workbook();
+  if(typeof ExcelJS==='undefined'){showAlert('costs','Excel export unavailable in this environment','err');return;}var wb=new ExcelJS.Workbook();
   wb.creator='SceneForge Admin';wb.created=new Date();
   var ws=wb.addWorksheet('Transactions');
   _xlsxHeader(ws,[
@@ -3121,7 +3122,7 @@ function renderFeedback(){
 
 async function exportFeedbackExcel(){
   if(!FB_DATA.length){await loadFeedback();await new Promise(function(r){setTimeout(r,500);});}
-  if(typeof ExcelJS==='undefined'){showToast('Excel export unavailable in this environment','err');return;}var wb=new ExcelJS.Workbook();wb.creator='SceneForge Admin';wb.created=new Date();
+  if(typeof ExcelJS==='undefined'){showAlert('costs','Excel export unavailable in this environment','err');return;}var wb=new ExcelJS.Workbook();wb.creator='SceneForge Admin';wb.created=new Date();
   var today=new Date().toISOString().slice(0,10);
 
   var ws=wb.addWorksheet('Feedback');
@@ -3203,7 +3204,7 @@ async function exportFeedbackPdf(){
 
 async function exportAnalyticsExcel(){
   if(!ANA_DATA.total_users){await loadAnalytics();await new Promise(function(r){setTimeout(r,500);});}
-  if(typeof ExcelJS==='undefined'){showToast('Excel export unavailable in this environment','err');return;}var wb=new ExcelJS.Workbook();
+  if(typeof ExcelJS==='undefined'){showAlert('costs','Excel export unavailable in this environment','err');return;}var wb=new ExcelJS.Workbook();
   wb.creator='SceneForge Admin';wb.created=new Date();
   var today=new Date().toISOString().slice(0,10);
 
@@ -3697,10 +3698,14 @@ async function previewEmail(type) {
   document.getElementById('email-preview-modal').classList.add('on');
 
   try {
-    var resp = await fetch('/api/admin' + url, {
-      headers: {'Authorization': 'Bearer ' + KEY, 'x-admin-key': KEY}
+    var resp = await fetch(API + url, {
+      headers: {
+        'Authorization': 'Bearer ' + KEY,
+        'x-admin-key': KEY,
+        'x-csrf-token': CSRF_TOKEN || ''
+      }
     });
-    if (!resp.ok) throw new Error('Preview failed: ' + resp.status);
+    if (!resp.ok) throw new Error('Preview failed ' + resp.status + ': ' + await resp.text());
     var html = await resp.text();
     frame.srcdoc = html;
   } catch(e) {
@@ -3724,7 +3729,7 @@ function openEmailInTab() {
   if (!CURRENT_PREVIEW_URL) return;
   var token = KEY;
   var sep = CURRENT_PREVIEW_URL.includes('?') ? '&' : '?';
-  window.open('/api/admin' + CURRENT_PREVIEW_URL + sep + 'token=' + encodeURIComponent(token), '_blank');
+  window.open(API + CURRENT_PREVIEW_URL + sep + 'token=' + encodeURIComponent(token), '_blank');
 }
 
 // ── Campaigns ─────────────────────────────────────────────────────────────────
@@ -3792,10 +3797,10 @@ async function runCampaign() {
   if (btn) { btn.disabled = true; btn.textContent = '\u23F3 Running\u2026'; }
   try {
     var r = await apiFetch('/campaigns/run', {method:'POST'});
-    showToast('Campaign started -- '+r.message, 'success');
+    showAlert('campaigns','Campaign started: '+r.message,'success');
     setTimeout(loadCampaigns, 3000);
   } catch(e) {
-    showToast('Campaign failed: '+e.message, 'error');
+    showAlert('campaigns','Campaign failed: '+e.message,'err');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '\u25B6 Run Campaign Now'; }
   }
