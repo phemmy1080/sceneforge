@@ -3698,7 +3698,7 @@ async function previewEmail(type) {
 
   try {
     var resp = await fetch('/api/admin' + url, {
-      headers: {'Authorization': 'Bearer ' + (localStorage.getItem('admin_token') || '')}
+      headers: {'Authorization': 'Bearer ' + KEY, 'x-admin-key': KEY}
     });
     if (!resp.ok) throw new Error('Preview failed: ' + resp.status);
     var html = await resp.text();
@@ -3722,7 +3722,7 @@ function setPreviewWidth(w) {
 
 function openEmailInTab() {
   if (!CURRENT_PREVIEW_URL) return;
-  var token = localStorage.getItem('admin_token') || '';
+  var token = KEY;
   var sep = CURRENT_PREVIEW_URL.includes('?') ? '&' : '?';
   window.open('/api/admin' + CURRENT_PREVIEW_URL + sep + 'token=' + encodeURIComponent(token), '_blank');
 }
