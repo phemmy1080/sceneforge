@@ -171,8 +171,14 @@ def _make_ass_file(
     w: int,
     h: int,
     ass_path: str,
+    word_timings: list | None = None,
 ) -> bool:
     """Generate an ASS subtitle file for a single scene.
+
+    word_timings: list of {word, start, end} in seconds from Edge TTS.
+    When provided, caption cards are timed to actual speech — perfectly in sync.
+    When None or empty, timing falls back to equal-duration division.
+
     Returns True on success, False if there is nothing to render.
     """
     # ASS colour format: &HAABBGGRR (alpha, blue, green, red — all hex)
@@ -221,37 +227,10 @@ def _make_ass_file(
     # 8% of width on each side so subtitles never touch the edges on any platform
     side_margin = max(40, int(w * 0.08))
 
-    # ── Word chunking: max 3 words OR ~55% of usable line width ──────────────
-    # usable width = frame - 2×side_margin; avg char ≈ fontsize × 0.58
-    usable_px  = w - 2 * side_margin
-    max_chars  = max(8, int(usable_px / (s["size"] * 0.58)))
-    # Hard cap: never more than 3 words per card for punchy, readable captions
-    max_words  = 3
-
-    words = text.replace("\n", " ").split()
-    if not words:
-        return False
-
-    chunks: list[str] = []
-    cur: list[str] = []
-    cur_len = 0
-    for word in words:
-        wl = len(word) + 1
-        if cur and (cur_len + wl > max_chars or len(cur) >= max_words):
-            chunks.append(" ".join(cur))
-            cur, cur_len = [], 0
-        cur.append(word)
-        cur_len += wl
-    if cur:
-        chunks.append(" ".join(cur))
-
-    if not chunks:
-        return False
-
-    # ── Timing: divide duration evenly, 50ms gap between cards ───────────────
-    n    = len(chunks)
-    gap  = 0.05
-    slot = max(0.3, (duration - gap * (n - 1)) / n)
+    # ── Word chunking: max 3 words OR ~55% of usable line width ─────────────
+    usable_px = w - 2 * side_margin
+    max_chars = max(8, int(usable_px / (s["size"] * 0.58)))
+    max_words = 3  # never more than 3 words per card
 
     def _ts(t: float) -> str:
         """Format seconds → ASS timestamp H:MM:SS.cs"""
@@ -260,6 +239,69 @@ def _make_ass_file(
         mm = int((t % 3600) // 60)
         ss = t % 60
         return f"{hh}:{mm:02d}:{ss:05.2f}"
+
+    # ── Build timed caption cards ─────────────────────────────────────────────
+    # Structure: list of {"text": str, "start": float, "end": float}
+    cards: list[dict] = []
+
+    if word_timings:
+        # ── Path A: Edge TTS word boundaries — perfect sync ───────────────────
+        # Group words into max_words-sized cards, timing from actual speech data.
+        cur_words: list[dict] = []
+
+        def _flush(words_list: list[dict]) -> None:
+            if not words_list:
+                return
+            txt = " ".join(w["word"] for w in words_list)
+            # Card stays on screen from first word start → just before next card
+            cards.append({
+                "text":  txt,
+                "start": words_list[0]["start"],
+                "end":   words_list[-1]["end"] + 0.08,  # tiny tail after last word
+            })
+
+        for wt in word_timings:
+            cur_words.append(wt)
+            # Check char budget too — long words may need early flush
+            cur_text = " ".join(w["word"] for w in cur_words)
+            if len(cur_words) >= max_words or len(cur_text) > max_chars:
+                _flush(cur_words)
+                cur_words = []
+        _flush(cur_words)
+
+        # Extend each card's end to the start of the next card (no gap between cards)
+        for i in range(len(cards) - 1):
+            cards[i]["end"] = cards[i + 1]["start"] - 0.01
+
+    else:
+        # ── Path B: No timing data — equal-duration fallback ─────────────────
+        words = text.replace("\n", " ").split()
+        if not words:
+            return False
+
+        text_chunks: list[str] = []
+        cur: list[str] = []
+        cur_len = 0
+        for word in words:
+            wl = len(word) + 1
+            if cur and (cur_len + wl > max_chars or len(cur) >= max_words):
+                text_chunks.append(" ".join(cur))
+                cur, cur_len = [], 0
+            cur.append(word)
+            cur_len += wl
+        if cur:
+            text_chunks.append(" ".join(cur))
+
+        n   = len(text_chunks)
+        gap = 0.05
+        slot = max(0.3, (duration - gap * (n - 1)) / n)
+        for i, chunk in enumerate(text_chunks):
+            t_start = i * (slot + gap)
+            t_end   = min(t_start + slot, duration - 0.05)
+            cards.append({"text": chunk, "start": t_start, "end": t_end})
+
+    if not cards:
+        return False
 
     # ── ASS header ────────────────────────────────────────────────────────────
     # WrapStyle 0 = smart word-wrap (fallback if a single word is still too wide)
@@ -295,12 +337,11 @@ def _make_ass_file(
         f"Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
     )
 
-    for i, chunk in enumerate(chunks):
-        t_start = i * (slot + gap)
-        t_end   = min(t_start + slot, duration - 0.05)
-        # ASS handles apostrophes/commas/quotes natively — only strip ASS tag braces
+    for card in cards:
+        t_start = card["start"]
+        t_end   = card["end"]
         safe = (
-            chunk
+            card["text"]
             .replace("{", "")
             .replace("}", "")
             .replace("**", "").replace("__", "").replace("*", "").replace("#", "")
@@ -391,7 +432,8 @@ async def render_scene(
     platform: str | None = None,
     motion: str = "auto",   # "auto" | "kenburns_in" | "kenburns_out" | "pan_left" | "pan_right" | "none"
     scene_index: int = 0,
-    is_custom_image: bool = False,  # True = letterbox (preserve proportions), False = scale-fill+crop
+    is_custom_image: bool = False,  # True = letterbox, False = scale-fill+crop
+    word_timings: list | None = None,  # per-word timing from Edge TTS for subtitle sync
 ) -> str:
     w, h   = _dims(platform)
     duration = max(float(scene.duration or 10), 3.0)
@@ -428,6 +470,7 @@ async def render_scene(
             style=subtitle_style,
             w=w, h=h,
             ass_path=_ass_path,
+            word_timings=word_timings or [],
         )
         if _ok:
             # Escape colons in path for FFmpeg filter syntax (Linux paths rarely
@@ -758,7 +801,8 @@ async def render_full_pipeline(
     motion: str = "auto",
     transition: str = "fade",
     transition_duration: float = 0.4,
-    max_resolution: str | None = None,   # e.g. "720p" for free plan
+    max_resolution: str | None = None,
+    scene_timings: list | None = None,   # per-scene word timings from Edge TTS
 ) -> dict:
     # Resolve music track name → local file path
     resolved_music = await _resolve_music(music_path, output_dir)
@@ -794,6 +838,7 @@ async def render_full_pipeline(
         is_image = getattr(visual, "media_type", "video") == "image"
 
         _is_custom = bool(getattr(scene, "custom_image_url", None))
+        _timings = (scene_timings[i] if scene_timings and i < len(scene_timings) else None)
         await render_scene(
             scene=scene,
             visual_path=visual.path,
@@ -805,6 +850,7 @@ async def render_full_pipeline(
             motion=motion,
             scene_index=i,
             is_custom_image=_is_custom,
+            word_timings=_timings,
         )
         scene_outputs.append(scene_out)
 
