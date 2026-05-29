@@ -1028,30 +1028,45 @@ async def get_cost_summary(
 
     result = {}
     for plan_key, plan_data in plans.items():
-        price_ngn = float(plan_data.get("amount", 0))
-        price_usd = price_ngn / rate
+        price_ngn    = float(plan_data.get("amount", 0))
+        plan_tokens  = int(plan_data.get("tokens", 100))
+        price_usd    = price_ngn / rate
+        # Revenue per render = price / (plan_tokens / tokens_per_render)
+        from app.services.cost_tracker import TOKENS_PER_VIDEO
+        renders_per_plan     = max(plan_tokens / TOKENS_PER_VIDEO, 1)
+        revenue_per_render   = price_usd / renders_per_plan
+
         cost_data = summary.get(plan_key, {})
+        n         = max(cost_data.get("renders", 1), 1)
         avg_cost  = cost_data.get("avg_cost_usd", 0)
-        margin    = price_usd - avg_cost
-        margin_pct = (margin / price_usd * 100) if price_usd > 0 else 0
+        margin    = revenue_per_render - avg_cost
+        margin_pct = (margin / revenue_per_render * 100) if revenue_per_render > 0 else 0
+
         result[plan_key] = {
             **cost_data,
-            "plan_label":      plan_data.get("label", plan_key),
-            "price_ngn":       price_ngn,
-            "price_usd":       round(price_usd, 4),
-            "avg_cost_usd":    round(avg_cost, 6),
-            "margin_usd":      round(margin, 4),
-            "margin_pct":      round(margin_pct, 1),
-            "exchange_rate":   rate,
-            "renders":         cost_data.get("renders", 0),
-            # Itemised cost breakdown
+            "plan_label":          plan_data.get("label", plan_key),
+            "price_ngn":           price_ngn,
+            "price_usd":           round(price_usd, 4),
+            "plan_tokens":         plan_tokens,
+            "renders_per_plan":    round(renders_per_plan, 1),
+            "revenue_per_render":  round(revenue_per_render, 6),
+            "avg_cost_usd":        round(avg_cost, 6),
+            "margin_usd":          round(margin, 4),
+            "margin_pct":          round(margin_pct, 1),
+            "exchange_rate":       rate,
+            "renders":             cost_data.get("renders", 0),
+            # Per-render average itemised costs
             "cost_breakdown": {
-                "voice":   round(cost_data.get("cost_voice", 0) / max(cost_data.get("renders", 1), 1), 6),
-                "visual":  round(cost_data.get("cost_visual", 0) / max(cost_data.get("renders", 1), 1), 6),
-                "ai":      round(cost_data.get("cost_ai", 0) / max(cost_data.get("renders", 1), 1), 6),
-                "compute": round(cost_data.get("cost_compute", 0) / max(cost_data.get("renders", 1), 1), 6),
-                "storage": round(cost_data.get("cost_storage", 0) / max(cost_data.get("renders", 1), 1), 6),
+                "voice":   round(cost_data.get("cost_voice", 0)   / n, 6),
+                "visual":  round(cost_data.get("cost_visual", 0)  / n, 6),
+                "ai":      round(cost_data.get("cost_ai", 0)      / n, 6),
+                "compute": round(cost_data.get("cost_compute", 0) / n, 6),
+                "storage": round(cost_data.get("cost_storage", 0) / n, 6),
             },
+            # Totals across all renders for this plan
+            "total_revenue_usd":   round(cost_data.get("total_revenue_usd", 0), 4),
+            "total_cost_usd":      round(cost_data.get("total_cost_usd", 0), 4),
+            "total_margin_usd":    round(cost_data.get("total_margin_usd", 0), 4),
         }
     return {"plans": result, "exchange_rate": rate}
 
