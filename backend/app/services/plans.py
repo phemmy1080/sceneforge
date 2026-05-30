@@ -6,7 +6,7 @@ All limits are checked here so changing them is one place.
 
 PLAN_LIMITS = {
     "free": {
-        "max_scenes": 8,
+        "max_scenes": -1,   # unlimited — let users feel the full product
         "max_renders_per_day": 3,
         "max_resolution": "720p",
         "ai_voices": False,
