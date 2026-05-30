@@ -147,7 +147,7 @@ function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => v
   // Non-owners (editor/admin/client) are always in agency mode.
   // Personal steps: when the owner navigates to projects/setup/script/voice/export
   //   they are explicitly in personal mode, regardless of workspace membership.
-  const PERSONAL_STEPS = new Set(['projects','my-videos','setup','script','voice','export','upgrade','plans'])
+  const PERSONAL_STEPS = new Set(['projects','my-videos','setup','script','voice','export','upgrade','plans','profile'])
   const onPersonalStep = PERSONAL_STEPS.has(currentStepRaw)
   const inAgencyMode  = !!agencyProjectId ||
                         (currentStepRaw.startsWith('agency') || currentStepRaw === 'agency-workflow') ||
