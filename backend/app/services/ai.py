@@ -16,6 +16,31 @@ from app.models.schemas import (
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
+# ── AI token usage tracking ───────────────────────────────────────────────────
+# Stores actual LLM token usage from the most recent generate_scenes call.
+# Keyed by user_id; render.py reads and clears on job creation.
+_pending_ai_usage: dict[str, dict] = {}
+
+def get_and_clear_ai_usage(user_id: str) -> dict:
+    """Return accumulated AI token usage for user and clear it."""
+    return _pending_ai_usage.pop(user_id, {"ai_input_tokens": 0, "ai_output_tokens": 0})
+
+def _record_usage(user_id: str | None, response) -> None:
+    """Accumulate token usage from a Groq/OpenAI response object."""
+    if not user_id:
+        return
+    try:
+        u = response.usage
+        if u:
+            prev = _pending_ai_usage.get(user_id, {"ai_input_tokens": 0, "ai_output_tokens": 0})
+            _pending_ai_usage[user_id] = {
+                "ai_input_tokens":  prev["ai_input_tokens"]  + (u.prompt_tokens     or 0),
+                "ai_output_tokens": prev["ai_output_tokens"] + (u.completion_tokens or 0),
+            }
+    except Exception:
+        pass
+
+
 
 # ── Cached clients ────────────────────────────────────────────────────────────
 _groq_client:   Optional[AsyncOpenAI] = None
@@ -109,7 +134,7 @@ def _clean_json(raw: str) -> str:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-async def generate_ideas(req: GenerateIdeasRequest, plan: str = "free") -> list[IdeaItem]:
+async def generate_ideas(req: GenerateIdeasRequest, plan: str = "free", user_id: str | None = None) -> list[IdeaItem]:
     client, model = _client_and_model(plan)
 
     # Build enriched context section
@@ -161,6 +186,7 @@ Return ONLY a valid JSON array of 6 objects — no explanation, no markdown:
         ],
     )
 
+    _record_usage(user_id, response)
     raw = response.choices[0].message.content or ""
     logger.debug("Ideas raw: %s", raw[:300])
 
@@ -173,7 +199,7 @@ Return ONLY a valid JSON array of 6 objects — no explanation, no markdown:
     return [IdeaItem(**item) for item in data]
 
 
-async def generate_script(req: GenerateScriptRequest, plan: str = "free") -> str:
+async def generate_script(req: GenerateScriptRequest, plan: str = "free", user_id: str | None = None) -> str:
     client, model = _client_and_model(plan)
     is_long  = "YouTube" in req.platform and "Shorts" not in req.platform
     duration = "3-5 minutes (450-700 words)" if is_long else "45-60 seconds (120-160 words)"
@@ -201,6 +227,7 @@ Short punchy sentences for voiceover. No markdown.{brand_ctx}"""
             {"role": "user",   "content": prompt},
         ],
     )
+    _record_usage(user_id, response)
     return response.choices[0].message.content or ""
 
 
@@ -236,7 +263,7 @@ Add [SHOW: ...] visual cues. Short punchy sentences.{brand_ctx}"""
             yield delta
 
 
-async def generate_scenes(req: GenerateScenesRequest, plan: str = "free") -> list[Scene]:
+async def generate_scenes(req: GenerateScenesRequest, plan: str = "free", user_id: str | None = None) -> list[Scene]:
     client, model = _client_and_model(plan)
     brand_ctx = _brand_context(req)
 
@@ -282,6 +309,7 @@ Rules:
         ],
     )
 
+    _record_usage(user_id, response)
     raw = response.choices[0].message.content or ""
     logger.debug("Scenes raw: %s", raw[:300])
 
