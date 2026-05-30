@@ -235,7 +235,7 @@ export default function MyVideos() {
 
   return (
     <div>
-      <PageHeader title="My Videos" subtitle={`${renders.length} video${renders.length !== 1 ? 's' : ''} saved${locked > 0 ? \` · ${locked} hidden (free plan)\` : ''}`} />
+      <PageHeader title="My Videos" subtitle={renders.length + ' video' + (renders.length !== 1 ? 's' : '') + ' saved' + (locked > 0 ? ' · ' + locked + ' hidden (free plan)' : '')} />
 
       {/* Search + filter bar */}
       {renders.length > 0 && (
