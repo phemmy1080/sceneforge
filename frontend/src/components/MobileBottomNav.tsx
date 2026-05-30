@@ -65,10 +65,11 @@ export default function MobileBottomNav() {
   }
 
   const items = isAgencyStep ? [
-    { id: 'agency-projects', label: 'Projects', active: isAgencyStep && currentStep.startsWith('agency-project'), icon: <ProjectsIcon /> },
-    { id: 'agency-new',      label: 'New',      active: currentStep === 'agency-new',     icon: <CreateIcon /> },
-    { id: 'agency-team',     label: 'Team',     active: currentStep === 'agency-team',    icon: <ProfileIcon /> },
-    { id: 'agency-kits',     label: 'Brand',    active: currentStep === 'agency-kits',    icon: <VideosIcon /> },
+    { id: 'agency-projects', label: 'Projects', active: currentStep === 'agency-projects' || currentStep === 'agency-detail', icon: <ProjectsIcon /> },
+    { id: 'agency-new',      label: 'New',      active: currentStep === 'agency-new',      icon: <CreateIcon /> },
+    { id: 'agency-team',     label: 'Team',     active: currentStep === 'agency-team',     icon: <ProjectsIcon /> },
+    { id: 'agency-kits',     label: 'Brand',    active: currentStep === 'agency-kits',     icon: <VideosIcon /> },
+    { id: 'profile',         label: 'Account',  active: currentStep === 'profile',         icon: <ProfileIcon /> },
   ] : [
     { id: 'setup',     label: 'Create',   active: isCreate,   icon: <CreateIcon /> },
     { id: 'export',    label: 'Export',   active: isExport,   icon: <ExportIcon /> },
