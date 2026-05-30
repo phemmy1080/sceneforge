@@ -246,61 +246,55 @@ async def start_render(
 async def get_render_history(
     authorization: Optional[str] = Header(None),
     limit: int = 50,
-    redis=Depends(_get_redis),
 ):
     """Return the user's render history — job metadata + video URLs."""
     user_id = _extract_user_id(authorization)
     if not user_id:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    # Get all job_ids this user has been charged for
-    job_ids_raw = await redis.smembers(f"user:{user_id}:charged_jobs")
-    if not job_ids_raw:
-        return {"renders": [], "total": 0}
+    redis = await _get_redis()
+    try:
+        job_ids_raw = await redis.smembers(f"user:{user_id}:charged_jobs")
+        if not job_ids_raw:
+            return {"renders": [], "total": 0}
 
-    job_ids = [j.decode() if isinstance(j, bytes) else j for j in job_ids_raw]
+        job_ids = [j.decode() if isinstance(j, bytes) else j for j in job_ids_raw]
+        renders = []
 
-    renders = []
-    for job_id in job_ids:
-        try:
-            # Primary: job progress record (has status, video_url, timestamps)
-            raw = await redis.get(f"job:{job_id}:progress")
-            if not raw:
+        for job_id in job_ids:
+            try:
+                raw = await redis.get(f"job:{job_id}:progress")
+                if not raw:
+                    continue
+                data = json.loads(raw)
+                if data.get("status") not in ("complete", "exported"):
+                    continue
+                video_url = data.get("video_url") or data.get("url", "")
+                if not video_url:
+                    continue
+
+                niche_r    = await redis.get(f"job:{job_id}:niche")
+                title_r    = await redis.get(f"job:{job_id}:project_title")
+                platform_r = await redis.get(f"job:{job_id}:platform")
+
+                renders.append({
+                    "job_id":      job_id,
+                    "title":       (title_r.decode() if isinstance(title_r, bytes) else title_r) or "Untitled",
+                    "niche":       (niche_r.decode() if isinstance(niche_r, bytes) else niche_r) or "",
+                    "platform":    (platform_r.decode() if isinstance(platform_r, bytes) else platform_r) or "",
+                    "video_url":   video_url,
+                    "scene_count": data.get("scene_count", 0),
+                    "duration":    data.get("duration", 0),
+                    "ts":          data.get("ts", data.get("completed_at", "")),
+                    "status":      "complete",
+                })
+            except Exception:
                 continue
-            data = json.loads(raw)
-            if data.get("status") not in ("complete", "exported"):
-                continue
 
-            video_url = data.get("video_url") or data.get("url", "")
-            if not video_url:
-                continue
-
-            # Enrich with metadata stored at render time
-            niche_r    = await redis.get(f"job:{job_id}:niche")
-            title_r    = await redis.get(f"job:{job_id}:project_title")
-            platform_r = await redis.get(f"job:{job_id}:platform")
-
-            niche    = (niche_r.decode()    if isinstance(niche_r,    bytes) else niche_r)    or ""
-            title    = (title_r.decode()    if isinstance(title_r,    bytes) else title_r)    or "Untitled"
-            platform = (platform_r.decode() if isinstance(platform_r, bytes) else platform_r) or ""
-
-            renders.append({
-                "job_id":    job_id,
-                "title":     title,
-                "niche":     niche,
-                "platform":  platform,
-                "video_url": video_url,
-                "scene_count": data.get("scene_count", 0),
-                "duration":    data.get("duration",    0),
-                "ts":          data.get("ts",          data.get("completed_at", "")),
-                "status":      "complete",
-            })
-        except Exception:
-            continue
-
-    # Sort newest first
-    renders.sort(key=lambda r: r.get("ts", ""), reverse=True)
-    return {"renders": renders[:limit], "total": len(renders)}
+        renders.sort(key=lambda r: r.get("ts", ""), reverse=True)
+        return {"renders": renders[:limit], "total": len(renders)}
+    finally:
+        await redis.aclose()
 
 
 class RenderSceneRequest(BaseModel):
