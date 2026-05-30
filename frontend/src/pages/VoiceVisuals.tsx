@@ -76,6 +76,7 @@ export default function VoiceVisuals() {
       const req = getRenderRequest()
       const { job_id } = await startRender(req)
       setJobId(job_id)
+      useStore.getState().setPrevJobId(null)  // clear after use
       setRenderProgress(0, 'Queued…', 'queued')
       markStepComplete('voice')
       setStep('export')
