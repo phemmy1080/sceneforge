@@ -125,6 +125,7 @@ async def start_render(
         await check_recursive_job(redis, user_id, job_id, getattr(req, "prev_job_id", None))
 
         if not prev_job_id:
+            # ── Scene count limit ─────────────────────────────────────────────
             scene_count = len(req.scenes)
             allowed, max_scenes = check_scene_limit(user_plan, scene_count)
             if not allowed:
@@ -133,39 +134,13 @@ async def start_render(
                     status_code=403,
                     detail={
                         "error": "scene_limit_exceeded",
-                        "message": f"Free plan is limited to {max_scenes} scenes. You have {scene_count}. Upgrade to create longer videos.",
+                        "message": f"Free plan is limited to {max_scenes} scenes. Upgrade to create longer videos.",
                         "max_scenes": max_scenes,
                         "upgrade_required": True,
                     }
                 )
 
-
-        # DALL-E plan gating — Studio and Agency only
-        # Personal renders: check user's own plan. Agency renders: check workspace plan.
-        if getattr(req, "visual_source", "") == "dalle":
-            dalle_plans = {"studio", "agency"}
-            _render_plan = user_plan
-            # For agency renders, use the workspace plan
-            _ws_plan = user_data.get("workspace_plan", user_plan) if ws_id else user_plan
-            _effective_plan = _ws_plan if ws_id and not getattr(req, "agency_project_id", None) is None else user_plan
-            # Simpler: check current render context
-            if agencyProjectId := getattr(req, "agency_project_id", None):
-                # Agency render — check workspace plan
-                pass  # agency workspace plan check handled by token pool
-            else:
-                # Personal render — strictly check user's own plan
-                if user_plan not in dalle_plans:
-                    await redis.aclose()
-                    raise HTTPException(
-                        status_code=403,
-                        detail={
-                            "error": "dalle_not_allowed",
-                            "message": "AI image generation (DALL-E) requires Studio or Agency plan. Upgrade to unlock.",
-                            "upgrade_required": True,
-                        }
-                    )
-
-            # Daily render limit
+            # ── Daily render limit ────────────────────────────────────────────
             max_daily = limits["max_renders_per_day"]
             if max_daily != -1:
                 import datetime
@@ -173,7 +148,11 @@ async def start_render(
                 daily_key = f"renders:daily:{user_id}:{today}"
                 daily_count_raw = await redis.get(daily_key)
                 if daily_count_raw:
-                    daily_count = int(daily_count_raw.decode() if isinstance(daily_count_raw, bytes) else daily_count_raw)
+                    daily_count = int(
+                        daily_count_raw.decode()
+                        if isinstance(daily_count_raw, bytes)
+                        else daily_count_raw
+                    )
                 else:
                     daily_count = 0
 
@@ -183,16 +162,34 @@ async def start_render(
                         status_code=403,
                         detail={
                             "error": "daily_limit_exceeded",
-                            "message": f"{limits['label']} plan allows {max_daily} renders per day. You've used all {max_daily} today. Try again tomorrow.",
+                            "message": (
+                                f"{limits['label']} plan allows {max_daily} render"
+                                f"{'s' if max_daily != 1 else ''} per day. "
+                                f"You've used all {max_daily} today. Try again tomorrow or upgrade."
+                            ),
                             "daily_limit": max_daily,
                             "used_today": daily_count,
                             "upgrade_required": True,
                         }
                     )
-
-                # Increment daily counter (expires after 25 hours for safety)
+                # Increment daily counter (expires after 25 hours)
                 await redis.incr(daily_key)
                 await redis.expire(daily_key, 90000)
+
+            # ── DALL-E plan gating (new renders only) ─────────────────────────
+            if getattr(req, "visual_source", "") == "dalle":
+                # Personal render — check user's own plan
+                if not getattr(req, "agency_project_id", None):
+                    if user_plan not in {"studio", "agency"}:
+                        await redis.aclose()
+                        raise HTTPException(
+                            status_code=403,
+                            detail={
+                                "error": "dalle_not_allowed",
+                                "message": "AI image generation (DALL-E) requires Studio or Agency plan.",
+                                "upgrade_required": True,
+                            }
+                        )
 
         logger.info(
             "Render %s | user %s | re_render=%s | tokens=%s",
