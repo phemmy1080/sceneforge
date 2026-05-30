@@ -11,9 +11,11 @@ PLAN_LIMITS = {
         "max_resolution": "720p",
         "ai_voices": False,
         "upload_footage": False,
+        "max_saved_videos": 5,      # gallery limit — upgrade to unlock more
         "label": "Free",
     },
     "starter": {
+        "max_saved_videos": -1,     # unlimited
         "max_scenes": 20,
         "max_renders_per_day": -1,   # unlimited
         "max_resolution": "1080p",
@@ -22,6 +24,7 @@ PLAN_LIMITS = {
         "label": "Starter",
     },
     "pro": {
+        "max_saved_videos": -1,     # unlimited
         "max_scenes": -1,       # unlimited
         "max_renders_per_day": -1,
         "max_resolution": "1080p",
@@ -30,6 +33,7 @@ PLAN_LIMITS = {
         "label": "Pro",
     },
     "studio": {
+        "max_saved_videos": -1,     # unlimited
         "max_scenes": -1,
         "max_renders_per_day": -1,
         "max_resolution": "1080p",
@@ -38,6 +42,7 @@ PLAN_LIMITS = {
         "label": "Studio",
     },
     "agency": {
+        "max_saved_videos": -1,     # unlimited
         "max_scenes": -1,
         "max_renders_per_day": -1,
         "max_resolution": "1080p",
