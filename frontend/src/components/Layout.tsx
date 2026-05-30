@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useStore, type AppStep } from '../store'
+import MobileBottomNav from './MobileBottomNav'
+import InstallPrompt from './InstallPrompt'
 import { useAuthStore } from '../authStore'
 import StepNav from './StepNav'
 import UserMenu from './UserMenu'
@@ -118,6 +120,8 @@ function AgencyNav({ currentStep, onStep }: { currentStep: string; onStep: (s: A
           </button>
         )
       })}
+      <MobileBottomNav />
+      <InstallPrompt />
     </>
   )
 }
@@ -376,6 +380,8 @@ function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => v
       </button>
       <TokenGateBar onUpgrade={() => useStore.getState().setStep('upgrade')} />
       <UserMenu onLogout={onLogout} />
+      <MobileBottomNav />
+      <InstallPrompt />
     </>
   )
 }
@@ -467,7 +473,7 @@ export default function Layout({ children, onLogout, onNewProject }: LayoutProps
 
           {/* Page content */}
           <main className="flex-1 overflow-y-auto">
-            <div className="max-w-5xl mx-auto px-4 sm:px-6 md:px-8 py-5 md:py-8">
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 md:px-8 py-5 md:py-8 pb-24 md:pb-8">
               <StepNav />
               {children}
             </div>
@@ -516,6 +522,8 @@ export default function Layout({ children, onLogout, onNewProject }: LayoutProps
           </div>
         </div>
       )}
+      <MobileBottomNav />
+      <InstallPrompt />
     </>
   )
 }
