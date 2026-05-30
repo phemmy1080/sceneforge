@@ -9,15 +9,20 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     server: {
       port: 5173,
-      // Only proxy in development when no VITE_API_BASE_URL is set
       proxy: env.VITE_API_BASE_URL ? {} : {
-        '/api': {
-          target: 'http://localhost:8000',
-          changeOrigin: true,
-        },
-        '/renders': {
-          target: 'http://localhost:8000',
-          changeOrigin: true,
+        '/api': { target: 'http://localhost:8000', changeOrigin: true },
+        '/renders': { target: 'http://localhost:8000', changeOrigin: true },
+      },
+    },
+    // Copy sw.js and manifest.json from public/ without hashing
+    // so the service worker URL is always /sw.js
+    build: {
+      rollupOptions: {
+        output: {
+          // Ensure assets are fingerprinted for cache busting
+          assetFileNames: 'assets/[name].[hash][extname]',
+          chunkFileNames: 'assets/[name].[hash].js',
+          entryFileNames: 'assets/[name].[hash].js',
         },
       },
     },
