@@ -165,7 +165,8 @@ async def generate_ideas(
             for k, v in kit_fields.items():
                 if v and not getattr(req, k, ""):
                     setattr(req, k, v)
-        ideas = await ai.generate_ideas(req, plan=plan)
+        _uid_ideas = auth_service.verify_token((authorization or "").removeprefix("Bearer ").strip())
+        ideas = await ai.generate_ideas(req, plan=plan, user_id=_uid_ideas)
 
         # Track niche usage — fire and forget
         if req.niche and authorization:
@@ -207,7 +208,8 @@ async def generate_script(
             for k, v in kit_fields.items():
                 if v and not getattr(req, k, ""):
                     setattr(req, k, v)
-        script = await ai.generate_script(req, plan=plan)
+        _uid_script = auth_service.verify_token((authorization or "").removeprefix("Bearer ").strip())
+        script = await ai.generate_script(req, plan=plan, user_id=_uid_script)
         word_count = len(script.split())
         estimated_duration = int(word_count / 150 * 60)
         logger.info("Script generated via %s for plan=%s",
@@ -274,7 +276,18 @@ async def generate_scenes(
             for k, v in kit_fields.items():
                 if v and not getattr(req, k, ""):
                     setattr(req, k, v)
-        scenes  = await ai.generate_scenes(req, plan=plan)
+        _uid_scenes = auth_service.verify_token((authorization or "").removeprefix("Bearer ").strip())
+        scenes  = await ai.generate_scenes(req, plan=plan, user_id=_uid_scenes)
+        # Store accumulated AI usage so render job can record it in cost tracker
+        if _uid_scenes:
+            try:
+                _ai_usage = ai.get_and_clear_ai_usage(_uid_scenes)
+                if _ai_usage["ai_input_tokens"] or _ai_usage["ai_output_tokens"]:
+                    import json as _aij
+                    await redis.set(f"user:{_uid_scenes}:pending_ai_tokens",
+                                   _aij.dumps(_ai_usage), ex=3600)
+            except Exception:
+                pass
 
         # Enforce scene limit — truncate to max for free users
         limits     = get_limits(plan)
