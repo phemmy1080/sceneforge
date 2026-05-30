@@ -52,6 +52,19 @@ export default function VoiceVisuals() {
   const effectivePlan = isPersonalMode ? personalPlan : userPlan
   const canUseDalle   = effectivePlan === 'studio' || effectivePlan === 'agency'
 
+  const voiceConfig       = useStore((s) => s.voiceConfig)
+  const setVoiceConfig    = useStore((s) => s.setVoiceConfig)
+  const getRenderRequest  = useStore((s) => s.getRenderRequest)
+  const setJobId          = useStore((s) => s.setJobId)
+  const setRenderProgress = useStore((s) => s.setRenderProgress)
+  const setStep           = useStore((s) => s.setStep)
+  const markStepComplete  = useStore((s) => s.markStepComplete)
+  const scenes            = useStore((s) => s.scenes)
+
+  const [loading,      setLoading]      = useState(false)
+  const [renderError,  setRenderError]  = useState('')
+  const [tokenBalance, setTokenBalance] = useState<TokenBalance | null>(null)
+
   useEffect(() => {
     getTokenBalance(isPersonalMode).then(setTokenBalance).catch(() => {})
   }, [isPersonalMode])
