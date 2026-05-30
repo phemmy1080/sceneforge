@@ -246,32 +246,57 @@ def _make_ass_file(
 
     if word_timings:
         # ── Path A: Edge TTS word boundaries — perfect sync ───────────────────
-        # Group words into max_words-sized cards, timing from actual speech data.
-        cur_words: list[dict] = []
+        # IMPORTANT: Edge TTS doesn't emit a WordBoundary for every token in the
+        # script (contractions, punctuation and some function words get merged or
+        # skipped).  Using word_timings["word"] as the display text therefore drops
+        # words from the subtitles.
+        #
+        # Solution:  use scene.text (the full script) for what is DISPLAYED, and
+        # use the word_timings boundary events only for TIMING — interpolating
+        # across the full word list so every word is shown and properly timed.
 
-        def _flush(words_list: list[dict]) -> None:
-            if not words_list:
-                return
-            txt = " ".join(w["word"] for w in words_list)
-            # Card stays on screen from first word start → just before next card
-            cards.append({
-                "text":  txt,
-                "start": words_list[0]["start"],
-                "end":   words_list[-1]["end"] + 0.08,  # tiny tail after last word
-            })
+        # Full list of display words (from the script, guaranteed complete)
+        all_words = [w for w in text.replace("\n", " ").split() if w.strip()]
+        n_text    = len(all_words)
+        n_timing  = len(word_timings)
 
-        for wt in word_timings:
-            cur_words.append(wt)
-            # Check char budget too — long words may need early flush
-            cur_text = " ".join(w["word"] for w in cur_words)
-            if len(cur_words) >= max_words or len(cur_text) > max_chars:
-                _flush(cur_words)
-                cur_words = []
-        _flush(cur_words)
+        # Anchor points: evenly spread timing events across display words
+        audio_start = word_timings[0]["start"]
+        audio_end   = word_timings[-1]["end"]
 
-        # Extend each card's end to the start of the next card (no gap between cards)
-        for i in range(len(cards) - 1):
-            cards[i]["end"] = cards[i + 1]["start"] - 0.01
+        def _interp_start(word_idx: int) -> float:
+            """Interpolate a start time for display-word at word_idx."""
+            if n_timing == 1:
+                return audio_start
+            ratio   = word_idx / max(n_text - 1, 1)
+            t_float = ratio * (n_timing - 1)
+            lo, hi  = int(t_float), min(int(t_float) + 1, n_timing - 1)
+            frac    = t_float - lo
+            return word_timings[lo]["start"] + frac * (word_timings[hi]["start"] - word_timings[lo]["start"])
+
+        # Group all_words into max_words-sized cards with interpolated timing
+        for i in range(0, n_text, max_words):
+            batch = all_words[i : i + max_words]
+            # Further split if the batch is too wide for one line
+            if len(" ".join(batch)) > max_chars and len(batch) > 1:
+                # Break at max_chars boundary
+                sub, sub_len = [], 0
+                for word in batch:
+                    if sub and sub_len + len(word) + 1 > max_chars:
+                        t_s = _interp_start(i)
+                        t_e = _interp_start(min(i + len(sub), n_text - 1))
+                        cards.append({"text": " ".join(sub), "start": t_s, "end": t_e + 0.05})
+                        i += len(sub); sub, sub_len = [], 0
+                    sub.append(word); sub_len += len(word) + 1
+                if sub:
+                    batch = sub
+            t_start = _interp_start(i)
+            t_end   = _interp_start(min(i + len(batch), n_text - 1)) if i + len(batch) < n_text else audio_end + 0.1
+            cards.append({"text": " ".join(batch), "start": t_start, "end": t_end})
+
+        # Extend each card's end to just before the next card's start
+        for k in range(len(cards) - 1):
+            cards[k]["end"] = cards[k + 1]["start"] - 0.02
 
     else:
         # ── Path B: No timing data — equal-duration fallback ─────────────────
@@ -464,9 +489,22 @@ async def render_scene(
     ass_filter = ""
     if subtitle_style != "none" and _SUBTITLES_ENABLED:
         _ass_path = output_path.replace(".mp4", "_subs.ass")
+        # Use actual audio duration (not scene.duration) so Path B timing is accurate
+        # when Edge TTS speaks faster/slower than the user-set scene length.
+        _audio_dur = duration
+        try:
+            _probe = subprocess.run(
+                ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
+                 "-of", "default=noprint_wrappers=1:nokey=1", audio_path],
+                capture_output=True, text=True, timeout=5,
+            )
+            if _probe.returncode == 0 and _probe.stdout.strip():
+                _audio_dur = float(_probe.stdout.strip())
+        except Exception:
+            pass  # fall back to scene duration
         _ok = _make_ass_file(
             text=scene.text,
-            duration=duration,
+            duration=_audio_dur,
             style=subtitle_style,
             w=w, h=h,
             ass_path=_ass_path,
