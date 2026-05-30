@@ -242,6 +242,29 @@ async def start_render(
 
 
 
+
+@router.get("/job/{job_id}/scenes")
+async def get_job_scenes(
+    job_id: str,
+    authorization: Optional[str] = Header(None),
+):
+    """Return the scenes for a completed job so the frontend can restore
+    them into the store before re-rendering."""
+    user_id = _extract_user_id(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    redis = await _get_redis()
+    try:
+        raw = await redis.get(f"render:scenes:{job_id}")
+        if not raw:
+            raise HTTPException(status_code=404, detail="Scenes not found — too old or not stored")
+        scenes = json.loads(raw)
+        return {"scenes": scenes, "job_id": job_id}
+    finally:
+        await redis.aclose()
+
+
 @router.get("/history")
 async def get_render_history(
     authorization: Optional[str] = Header(None),
