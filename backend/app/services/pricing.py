@@ -27,10 +27,10 @@ GEO_CACHE_PREFIX = "sceneforge:geo:"
 GEO_TTL          = 86400      # cache IP geolocation for 24 hours
 
 DEFAULT_PLANS = {
-    "starter": {"amount": 1000, "currency": "NGN", "tokens": 500,  "label": "Starter", "videos": 5},
-    "pro":     {"amount": 2000, "currency": "NGN", "tokens": 1200, "label": "Pro",     "videos": 12},
-    "studio":  {"amount": 5000, "currency": "NGN", "tokens": 3500, "label": "Studio",  "videos": 35},
-    "agency":  {"amount": 100000, "currency": "NGN", "tokens": 50000, "seats": 5, "label": "Agency",  "videos": 500},
+    "starter": {"amount": 3000,  "currency": "NGN", "tokens": 500,   "label": "Starter", "videos": 5},
+    "pro":     {"amount": 5000,  "currency": "NGN", "tokens": 1200,  "label": "Pro",     "videos": 12},
+    "studio":  {"amount": 7000,  "currency": "NGN", "tokens": 3500,  "label": "Studio",  "videos": 35},
+    "agency":  {"amount": 25000, "currency": "NGN", "tokens": 50000, "label": "Agency",  "videos": 500, "seats": 5},
 }
 
 
