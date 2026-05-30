@@ -357,11 +357,29 @@ async def render_video(ctx, job_id: str, payload: dict):
         r2_urls:   dict[str, str] = {}
         video_url: str | None     = None
 
+        # ── Rename final video to project title ─────────────────────────────────
+        _raw_title = getattr(req, "project_title", None) or payload.get("project_title", "") or "SceneForge Video"
+        import re as _re
+        # Slug: keep letters/numbers/spaces, replace spaces with underscores, max 60 chars
+        _slug = _re.sub(r"[^\w\s-]", "", _raw_title).strip()
+        _slug = _re.sub(r"[\s]+", "_", _slug)[:60] or "SceneForge_Video"
+        _friendly_name = f"{_slug}.mp4"
+        # Rename the final video file so R2 key and download filename match the project
+        for _candidate in ("final_video_music.mp4", "final_video.mp4"):
+            _src_path = output_dir / _candidate
+            if _src_path.exists():
+                _dst_path = output_dir / _friendly_name
+                import shutil as _shutil
+                _shutil.copy2(str(_src_path), str(_dst_path))
+                logger.info("Renamed final video → %s", _friendly_name)
+                break
+
         if r2_enabled():
             await _set_progress(redis, job_id, "Uploading to cloud storage...", 92)
             try:
                 r2_urls = await upload_job_files(job_id, str(output_dir))
-                for name in ("final_video_music.mp4", "final_video.mp4"):
+                # Prefer project-titled file, fall back to generic names
+                for name in (_friendly_name, "final_video_music.mp4", "final_video.mp4"):
                     if name in r2_urls:
                         video_url = r2_urls[name]
                         break
@@ -381,8 +399,7 @@ async def render_video(ctx, job_id: str, payload: dict):
                 from app.services.auth import deduct_tokens, get_token_balance
                 if not is_re_render:
                     scene_count = len(req.scenes) if hasattr(req, 'scenes') else 0
-                    from app.services.auth_service import calculate_render_cost
-                    render_cost = calculate_render_cost(scene_count)
+                    render_cost = max(100, scene_count * 100)  # 100 tokens per scene, min 100
                     proj_id    = payload.get("agency_project_id", "")
                     proj_title = payload.get("project_title", "")
                     if ws_id:
@@ -445,7 +462,6 @@ async def render_video(ctx, job_id: str, payload: dict):
                         duration=int(sum(s.duration for s in req.scenes)),
                         video_url=video_url,
                         tokens_remaining=tokens_remaining,
-                        job_id=job_id,
                     )
                     logger.info("Render complete email sent → %s", user_data.get("email"))
             except Exception as e:
