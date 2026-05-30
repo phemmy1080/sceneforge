@@ -1082,10 +1082,17 @@ async def get_recent_costs(
     records = await get_recent_cost_records(redis, limit=min(limit, 500))
 
     # Enrich with username and render metadata
+    # New records have username/user_email baked in; old records need Redis lookup
     user_name_cache: dict = {}
     for rec in records:
         uid = rec.get("user_id", "")
-        if uid:
+        # Use cached values from cost record if present
+        if rec.get("username"):
+            rec["full_name"] = rec["username"]
+        if rec.get("user_email"):
+            rec["email"] = rec.get("user_email", "")
+        # Fall back to Redis lookup for old records
+        if uid and (not rec.get("full_name")):
             if uid not in user_name_cache:
                 try:
                     raw = await redis.get(f"user:{uid}")
@@ -1099,8 +1106,11 @@ async def get_recent_costs(
                         user_name_cache[uid] = {"full_name": "", "email": ""}
                 except Exception:
                     user_name_cache[uid] = {"full_name": "", "email": ""}
-            rec["full_name"] = user_name_cache[uid]["full_name"]
-            rec["email"]     = user_name_cache[uid]["email"]
+            rec["full_name"] = rec.get("full_name") or user_name_cache[uid]["full_name"]
+            rec["email"]     = rec.get("email")     or user_name_cache[uid]["email"]
+        # Fallback: ai_provider defaults to "groq" for old records that predate the field
+        if not rec.get("ai_provider"):
+            rec["ai_provider"] = "groq"
 
         # Pull extra render metadata from job Redis keys
         job_id = rec.get("job_id", "")
