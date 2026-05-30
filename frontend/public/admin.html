@@ -3518,12 +3518,12 @@ function exportCostCSV() {
 }
 
 function exportRenderLogCSV() {
-  var rows = [['time','job_id','user_id','plan','scenes','voice','ai','render_s',
+  var rows = [['time','job_id','user','email','plan','niche','scenes','tokens_consumed','voice','ai','ai_tokens_in','ai_tokens_out','render_s',
     'cost_voice','cost_visual','cost_ai','cost_compute','cost_storage',
     'total_cost','revenue','margin','margin_pct']];
   COST_LOG_ALL.forEach(function(r) {
-    rows.push([r.ts, r.job_id, r.user_id, r.plan, r.scenes||0,
-      r.voice_provider, r.ai_provider, (r.render_seconds||0).toFixed(2),
+    rows.push([r.ts, r.job_id, r.full_name||r.user_id, r.email||'', r.plan, r.niche||'', r.scenes||0,r.tokens_consumed||0,
+      r.voice_provider, r.ai_provider||'groq', r.ai_input_tokens||0, r.ai_output_tokens||0,(r.render_seconds||0).toFixed(2),
       (r.cost_voice_usd||0).toFixed(6), (r.cost_visual_usd||0).toFixed(6),
       (r.cost_ai_usd||0).toFixed(6), (r.cost_compute_usd||0).toFixed(6),
       (r.cost_storage_usd||0).toFixed(6), (r.total_cost_usd||0).toFixed(6),
