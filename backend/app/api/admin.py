@@ -19,12 +19,14 @@ from fastapi import APIRouter, HTTPException, Header, Depends, Request, Backgrou
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from fastapi import Query
 from app.config import get_settings
 from app.dependencies import get_redis
 from app.services import auth as auth_service
 from app.services import pricing as pricing_service
 from app.services import admin_auth as admin_auth_service
 from app.services import coupons as coupon_service
+from app.middleware.rate_limit import limiter
 from app.services import analytics as analytics_service
 from app.services.email import send_token_confirmation
 
@@ -356,6 +358,7 @@ async def get_workspace_pools(redis=Depends(get_redis), admin: dict = Depends(_r
 
 
 @router.get("/users")
+@limiter.limit("30/minute")
 async def list_users(redis=Depends(get_redis), admin: dict = Depends(_require_admin)):
     users = await _all_users(redis)
     users.sort(key=lambda u: u.get("created_at", ""), reverse=True)
@@ -1155,7 +1158,9 @@ async def get_job_cost(
     return rec
 
 @router.post("/costs/backfill")
+@limiter.limit("5/hour")
 async def backfill_cost_records(
+    request: Request,
     redis=Depends(get_redis),
     admin: dict = Depends(_require_admin),
 ):
@@ -1649,7 +1654,9 @@ async def get_campaign_status(redis=Depends(get_redis), admin: dict = Depends(_r
 
 
 @router.post("/campaigns/run")
+@limiter.limit("3/minute")
 async def run_engagement_campaign(
+    request: Request,
     background_tasks: BackgroundTasks,
     redis=Depends(get_redis),
     admin: dict = Depends(_require_admin),
