@@ -221,34 +221,47 @@ export default function MyVideos() {
     return matchFilter && matchSearch
   })
 
-  function handleRerender(record: RenderRecord) {
+  async function handleRerender(record: RenderRecord) {
     const linked = projects.find(p => p.job_id === record.job_id)
 
-    if (linked) {
-      // openProject already knows where to go — for exported projects it
-      // restores the export page with the video URL. From there the user
-      // can click "Open Scene Editor" to change scenes, or just re-render.
-      openProject(linked.id)
-      return
+    try {
+      // Fetch the original scenes from the backend (stored for 7 days after render)
+      const res = await api.get(`/api/render/job/${record.job_id}/scenes`)
+      const fetchedScenes = res.data.scenes || []
+
+      if (fetchedScenes.length > 0) {
+        // Restore config + scenes into the store, then go to voice to re-render
+        if (linked) openProject(linked.id)
+        else {
+          useStore.getState().setConfig({
+            niche:    record.niche    || '',
+            platform: record.platform || 'TikTok',
+          } as any)
+        }
+        // Load the scenes back — openProject cleared them via CLEAR_WORKFLOW
+        useStore.getState().setScenes(fetchedScenes)
+        setStep('voice')
+        return
+      }
+    } catch {
+      // Scenes expired or unavailable — fall through to setup
     }
 
-    // Project not in store (was deleted or this is a different device).
-    // Pre-fill config with what we know from the video record and send
-    // the user to Setup so they can re-generate the video.
+    // Scenes not available (render is older than 7 days or not yet stored).
+    // Pre-fill config and send user to Setup to regenerate.
+    if (linked) openProject(linked.id)
     useStore.getState().setConfig({
       niche:    record.niche    || '',
       platform: record.platform || 'TikTok',
-      style:    '',
-      tone:     '',
-      audience: '',
-      context:  '',
-      ideaHints: '',
-      ideaTags:  [],
-      objective: '',
-      duration_hint:    60,
       scene_count_hint: record.scene_count || 8,
     } as any)
     setStep('setup')
+    // Brief toast so user knows why they landed on Setup
+    setTimeout(() => {
+      document.dispatchEvent(new CustomEvent('show-toast', {
+        detail: { message: 'Scenes expired — reconfigure your video to re-render', type: 'info' }
+      }))
+    }, 300)
   }
 
   return (
