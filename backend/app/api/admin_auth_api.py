@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException, Depends, Header
 from pydantic import BaseModel
 
 from app.dependencies import get_redis
+from app.middleware.rate_limit import limiter
 from app.services import admin_auth as admin_auth_service
 from app.services.auth import issue_token, verify_token
 
@@ -99,7 +100,8 @@ def _require_admin():
 # ─── Login ────────────────────────────────────────────────────────────────────
 
 @router.post("/login", response_model=AdminLoginResponse)
-async def admin_login(req: AdminLoginRequest, redis=Depends(get_redis)):
+@limiter.limit("10/minute")
+async def admin_login(request: Request, req: AdminLoginRequest, redis=Depends(get_redis)):
     """
     Authenticate as an admin user.
     Uses same email/password but checks the admin user store.
