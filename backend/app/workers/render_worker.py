@@ -489,6 +489,19 @@ async def render_video(ctx, job_id: str, payload: dict):
                 ex=86400 * 7
             )
 
+        # Store scenes for re-render restoration (7-day TTL)
+        # This allows My Videos to restore scenes without the user
+        # needing to go through the full workflow again.
+        try:
+            scenes_payload = [s.dict() if hasattr(s, 'dict') else vars(s) for s in req.scenes]
+            await redis.set(
+                f"render:scenes:{job_id}",
+                json.dumps(scenes_payload),
+                ex=86400 * 7
+            )
+        except Exception:
+            pass
+
         final_result = {
             "status":           "complete",
             "stage":            "Done",
