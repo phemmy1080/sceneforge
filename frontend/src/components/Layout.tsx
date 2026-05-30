@@ -139,15 +139,17 @@ function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => v
   const inWorkspace   = !!(user?.workspace_id || user?.workspace_role)
   const isNonOwner    = !!(wsRole && wsRole !== 'owner')
 
-  // inAgencyMode — computed from both stores, all fresh values
-  // Three conditions, ANY one is enough:
-  // 1. agencyProjectId is set                → creating video for an agency project
-  // 2. currentStep is an agency screen       → on agency dashboard/projects/team/kits
-  // 3. user is a non-owner workspace member  → editors/admins/clients always in agency
+  // inAgencyMode — agency owners can switch freely between personal and agency views.
+  // Non-owners (editor/admin/client) are always in agency mode.
+  // Personal steps: when the owner navigates to projects/setup/script/voice/export
+  //   they are explicitly in personal mode, regardless of workspace membership.
+  const PERSONAL_STEPS = new Set(['projects','setup','script','voice','export','upgrade','plans'])
+  const onPersonalStep = PERSONAL_STEPS.has(currentStepRaw)
   const inAgencyMode  = !!agencyProjectId ||
                         (currentStepRaw.startsWith('agency') || currentStepRaw === 'agency-workflow') ||
-                        (inWorkspace && isNonOwner)
-  const showPersonal  = !inAgencyMode
+                        (inWorkspace && isNonOwner && !onPersonalStep)
+  // Agency owners on a personal step → show personal sidebar
+  const showPersonal  = !inAgencyMode || (isAgencyOwner && onPersonalStep)
   const scenes         = useStore((s) => s.scenes)
   const renderStatus   = useStore((s) => s.renderStatus)
   const projects       = useStore((s) => s.projects)
