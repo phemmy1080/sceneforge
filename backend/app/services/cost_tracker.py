@@ -60,17 +60,21 @@ def build_cost_record(
     user_id: str,
     plan: str,
     scenes: int,
-    visual_source: str,          # "pexels_video" | "pexels_photo" | "dalle" | "mixed"
-    voice_provider: str,         # "edge_tts" | "elevenlabs"
-    total_chars: int,            # total text chars across all scenes
-    ai_provider: str,            # "groq" | "openai"
-    ai_input_tokens: int,        # tokens used for script/idea gen
+    visual_source: str,
+    voice_provider: str,
+    total_chars: int,
+    ai_provider: str,
+    ai_input_tokens: int,
     ai_output_tokens: int,
-    render_seconds: float,       # wall-clock FFmpeg time
-    dalle_images: int = 0,       # number of DALL-E images generated
+    render_seconds: float,
+    dalle_images: int = 0,
     plan_price_ngn: float = 0.0,
-    plan_tokens: int = 100,      # tokens included in this plan purchase
+    plan_tokens: int = 100,
     exchange_rate: float = 1600.0,
+    niche: str = "",
+    tokens_consumed: int = 0,    # actual SceneForge tokens deducted from user balance
+    username: str = "",          # cached full_name for fast display
+    user_email: str = "",        # cached email for fast display
 ) -> dict:
     """Compute itemised cost breakdown for one render job."""
 
@@ -115,11 +119,15 @@ def build_cost_record(
     return {
         "job_id":              job_id,
         "user_id":             user_id,
+        "username":            username,
+        "user_email":          user_email,
         "plan":                plan,
         "ts":                  datetime.now(timezone.utc).isoformat(),
         "scenes":              scenes,
+        "niche":               niche,
         "visual_source":       visual_source,
         "voice_provider":      voice_provider,
+        "tokens_consumed":     tokens_consumed or max(100, scenes * TOKENS_PER_VIDEO),
         # Itemised costs (USD)
         "cost_voice_usd":      round(voice_cost, 6),
         "cost_visual_usd":     round(visual_cost, 6),
