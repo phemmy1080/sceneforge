@@ -401,7 +401,8 @@ async def render_video(ctx, job_id: str, payload: dict):
                 from app.services.auth import deduct_tokens, get_token_balance
                 if not is_re_render:
                     scene_count = len(req.scenes) if hasattr(req, 'scenes') else 0
-                    render_cost = max(100, scene_count * 100)  # 100 tokens per scene, min 100
+                    _dalle_count = int(getattr(req, 'dalle_images', 0) or 0)
+                    render_cost  = 100 + (_dalle_count * 200)  # 100 base + 200 per DALL-E image
                     proj_id    = payload.get("agency_project_id", "")
                     proj_title = payload.get("project_title", "")
                     if ws_id:
@@ -610,7 +611,7 @@ async def render_video(ctx, job_id: str, payload: dict):
                 plan_tokens=_plan_tokens,
                 exchange_rate=_exchange_rate,
                 niche=_niche,
-                tokens_consumed=max(100, len(req.scenes) * 100),
+                tokens_consumed=render_cost,  # 100 base + 200 per DALL-E image
                 username=_username,
                 user_email=_user_email,
             )
