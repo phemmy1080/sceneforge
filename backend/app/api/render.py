@@ -145,6 +145,10 @@ async def start_render(
 
             # ── Daily render limit ────────────────────────────────────────────
             max_daily = limits["max_renders_per_day"]
+            logger.info(
+                "Daily limit check — user=%s plan=%s max_daily=%s",
+                user_id, user_plan, max_daily
+            )
             if max_daily != -1:
                 import datetime
                 today = datetime.date.today().isoformat()
@@ -158,6 +162,11 @@ async def start_render(
                     )
                 else:
                     daily_count = 0
+
+                logger.info(
+                    "Daily counter — user=%s key=%s count=%d max=%d",
+                    user_id, daily_key, daily_count, max_daily
+                )
 
                 if daily_count >= max_daily:
                     await redis.aclose()
