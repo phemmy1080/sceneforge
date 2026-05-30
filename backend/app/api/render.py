@@ -292,7 +292,34 @@ async def get_render_history(
                 continue
 
         renders.sort(key=lambda r: r.get("ts", ""), reverse=True)
-        return {"renders": renders[:limit], "total": len(renders)}
+
+        # Apply per-plan gallery limit
+        max_saved = -1  # unlimited by default
+        try:
+            from app.services.plans import get_limits
+            raw_user = await redis.get(f"user:{user_id}")
+            if raw_user:
+                import json as _j
+                _ud = _j.loads(raw_user)
+                _plan = _ud.get("plan", "free")
+                max_saved = get_limits(_plan).get("max_saved_videos", -1)
+        except Exception:
+            pass
+
+        all_renders = renders[:limit]
+        if max_saved != -1:
+            visible   = all_renders[:max_saved]
+            locked    = len(all_renders) - len(visible)
+        else:
+            visible   = all_renders
+            locked    = 0
+
+        return {
+            "renders":    visible,
+            "total":      len(all_renders),
+            "locked":     locked,
+            "max_saved":  max_saved,
+        }
     finally:
         await redis.aclose()
 
