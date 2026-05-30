@@ -18,7 +18,6 @@ from fastapi import APIRouter, HTTPException, Depends, Header
 from pydantic import BaseModel
 
 from app.dependencies import get_redis
-from app.middleware.rate_limit import limiter
 from app.services import admin_auth as admin_auth_service
 from app.services.auth import issue_token, verify_token
 
@@ -100,13 +99,25 @@ def _require_admin():
 # ─── Login ────────────────────────────────────────────────────────────────────
 
 @router.post("/login", response_model=AdminLoginResponse)
-@limiter.limit("10/minute")
-async def admin_login(request: Request, req: AdminLoginRequest, redis=Depends(get_redis)):
+async def admin_login(req: AdminLoginRequest, redis=Depends(get_redis), request=None):
     """
     Authenticate as an admin user.
     Uses same email/password but checks the admin user store.
     Returns an admin token prefixed with 'admin:' to distinguish from user tokens.
     """
+    # ── Brute-force protection — max 10 attempts per email per minute ─────────
+    _rl_key = f"admin_login_rl:{req.email}"
+    try:
+        _attempts = await redis.incr(_rl_key)
+        if _attempts == 1:
+            await redis.expire(_rl_key, 60)   # 1-minute window
+        if _attempts > 10:
+            raise HTTPException(status_code=429, detail="Too many login attempts. Try again in a minute.")
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # Redis failure — don't block login
+
     admin = await admin_auth_service.authenticate_admin(redis, req.email, req.password)
     if not admin:
         raise HTTPException(status_code=401, detail="Invalid credentials or not an admin account")
