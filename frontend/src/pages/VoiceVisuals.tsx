@@ -39,25 +39,18 @@ const TRANSITION_OPTIONS = [
 
 export default function VoiceVisuals() {
   const user              = useAuthStore((s: any) => s.user)
-  // Use plan-limits hook so workspace plan is factored in for agency members
   const { plan: userPlan, isFree } = usePlanLimits()
-  const canUseDalle       = userPlan === 'pro' || userPlan === 'studio' || userPlan === 'agency'
-  const voiceConfig       = useStore((s) => s.voiceConfig)
-  const setVoiceConfig    = useStore((s) => s.setVoiceConfig)
-  const getRenderRequest  = useStore((s) => s.getRenderRequest)
-  const setJobId          = useStore((s) => s.setJobId)
-  const setRenderProgress = useStore((s) => s.setRenderProgress)
-  const setStep           = useStore((s) => s.setStep)
-  const markStepComplete  = useStore((s) => s.markStepComplete)
-  const scenes            = useStore((s) => s.scenes)
-
-  const [loading,      setLoading]      = useState(false)
-  const [renderError,  setRenderError]  = useState('')
-  const [tokenBalance, setTokenBalance] = useState<TokenBalance | null>(null)
 
   // Detect if user is in personal mode (no agency project context)
   const agencyProjectId = useGlobalStore((s: any) => s.agencyProjectId)
   const isPersonalMode  = !agencyProjectId
+
+  // DALL-E requires Studio or Agency plan.
+  // Personal mode → check user's own personal plan.
+  // Agency mode   → check workspace plan from usePlanLimits.
+  const personalPlan  = user?.plan || 'free'
+  const effectivePlan = isPersonalMode ? personalPlan : userPlan
+  const canUseDalle   = effectivePlan === 'studio' || effectivePlan === 'agency'
 
   useEffect(() => {
     getTokenBalance(isPersonalMode).then(setTokenBalance).catch(() => {})
@@ -89,6 +82,11 @@ export default function VoiceVisuals() {
         setRenderError(detail.message)
         document.dispatchEvent(new CustomEvent('show-upgrade-prompt', {
           detail: { reason: 'daily_limit', max: detail.daily_limit }
+        }))
+      } else if (detail?.error === 'dalle_not_allowed') {
+        setRenderError('AI image generation (DALL-E) requires Studio or Agency plan.')
+        document.dispatchEvent(new CustomEvent('show-upgrade-prompt', {
+          detail: { reason: 'dalle', max: 0 }
         }))
       } else {
         const friendly = (e as any)?.friendlyMessage || 'Unable to start render. Please try again.'
