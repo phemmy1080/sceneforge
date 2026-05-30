@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="google-site-verification" content="lmS-6xQIM-JM90C1y4LkUYskevE7FBVt5Lmxdc8Rtzo" />
 
     <title>SceneForge — AI Video Studio | Create Viral Videos in Minutes</title>
@@ -10,6 +10,28 @@
     <meta name="keywords" content="AI video creator, AI video studio, TikTok video maker, YouTube Shorts generator, AI voiceover, script generator, viral video AI" />
     <meta name="author" content="SceneForge" />
     <link rel="canonical" href="https://sceneraforge.com/" />
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#7C5CFF" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SceneForge" />
+    <meta name="application-name" content="SceneForge" />
+
+    <!-- Apple touch icons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png" />
+    <link rel="apple-touch-icon" sizes="144x144" href="/icons/icon-144.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- Favicon -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+
+    <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://sceneraforge.com/" />
     <meta property="og:title" content="SceneForge — AI Video Studio" />
@@ -21,20 +43,15 @@
     <meta name="twitter:description" content="Create viral TikTok and YouTube videos with AI." />
     <meta name="twitter:image" content="https://sceneraforge.com/og-image.png" />
     <meta name="robots" content="index, follow" />
-   
-    <link rel="icon" type="image/png" href="/favicon-32.png" />
 
-    <!-- Step 1: Open connections early -->
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-
-    <!-- Step 2: Load the actual font stylesheet (THIS is what was missing) -->
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap"
     />
 
-    <!-- Step 3: Apply fonts immediately before React renders -->
     <style>
       *, *::before, *::after { box-sizing: border-box; }
       body {
@@ -43,15 +60,38 @@
         background: #0A0A0F;
         color: #F0F0FF;
         -webkit-font-smoothing: antialiased;
+        overscroll-behavior: none;
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+      h1, h2, h3, h4, h5, h6,
+      .font-display, [data-font="display"] {
+        font-family: 'Syne', system-ui, -apple-system, sans-serif;
       }
       :root {
         --font-display: 'Syne', system-ui, -apple-system, sans-serif;
         --font-body:    'DM Sans', system-ui, -apple-system, sans-serif;
+        --safe-top:    env(safe-area-inset-top, 0px);
+        --safe-bottom: env(safe-area-inset-bottom, 0px);
+        --safe-left:   env(safe-area-inset-left, 0px);
+        --safe-right:  env(safe-area-inset-right, 0px);
       }
+      html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+      * { -webkit-tap-highlight-color: transparent; }
+      .overflow-y-auto, main { -webkit-overflow-scrolling: touch; }
     </style>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js', { scope: '/' })
+            .then(reg => console.log('[SW] registered:', reg.scope))
+            .catch(err => console.warn('[SW] registration failed:', err))
+        })
+      }
+    </script>
   </body>
 </html>
