@@ -13,6 +13,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import Signup from './pages/Signup'
 import Projects from './pages/Projects'
+import MyVideos from './pages/MyVideos'
 import Setup from './pages/Setup'
 import Ideas from './pages/Ideas'
 import Script from './pages/Script'
@@ -150,6 +151,7 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
       <NewProjectModal open={modalOpen} onClose={() => setModalOpen(false)} />
       <Layout onLogout={onLogout} onNewProject={() => setModalOpen(true)}>
         {currentStep === 'projects'        && <Projects />}
+        {currentStep === 'my-videos'       && <MyVideos />}
         {currentStep === 'setup'           && <Setup />}
         {currentStep === 'ideas'           && <Ideas />}
         {currentStep === 'script'          && <Script />}
