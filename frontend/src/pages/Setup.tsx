@@ -69,6 +69,131 @@ const AGENCY_INDUSTRIES = [
   { key: 'nonprofit',   label: 'Non-profit' },
 ]
 
+
+// ── Niche templates ───────────────────────────────────────────────────────────
+const NICHE_TEMPLATES = [
+  {
+    id: 'personal-finance',
+    icon: '💰', label: 'Personal Finance',
+    niche: 'personal finance', style: 'Educational', platform: 'TikTok',
+    tone: 'Energetic & punchy', audience: 'Young Nigerians aged 18-35',
+    objective: 'awareness',
+    context: 'Help Nigerians understand money management, investing, and wealth building',
+    ideaHints: 'How to save money on a Nigerian salary',
+    duration_hint: 45, scene_count_hint: 6,
+  },
+  {
+    id: 'real-estate',
+    icon: '🏡', label: 'Real Estate',
+    niche: 'real estate', style: 'Product showcase', platform: 'Instagram Reels',
+    tone: 'Professional', audience: 'Property buyers and investors in Nigeria',
+    objective: 'lead_gen',
+    context: 'Showcase properties, land, or real estate investment opportunities in Nigeria',
+    ideaHints: '3 reasons to buy land in Ibeju-Lekki now',
+    duration_hint: 30, scene_count_hint: 5,
+  },
+  {
+    id: 'fitness',
+    icon: '💪', label: 'Fitness & Health',
+    niche: 'fitness', style: 'Tutorial', platform: 'TikTok',
+    tone: 'Energetic & punchy', audience: 'Fitness enthusiasts aged 20-40',
+    objective: 'awareness',
+    context: 'Workout tips, nutrition advice, and healthy lifestyle content for Nigerians',
+    ideaHints: '5-minute home workout with no equipment',
+    duration_hint: 45, scene_count_hint: 6,
+  },
+  {
+    id: 'ecommerce',
+    icon: '🛍️', label: 'E-commerce / Product',
+    niche: 'e-commerce', style: 'Product showcase', platform: 'Instagram Reels',
+    tone: 'Urgent / Sales', audience: 'Online shoppers in Nigeria',
+    objective: 'sales',
+    context: 'Showcase products, announce deals, and drive purchases on your Nigerian online store',
+    ideaHints: 'Why our customers love this product',
+    duration_hint: 30, scene_count_hint: 5,
+  },
+  {
+    id: 'motivational',
+    icon: '🔥', label: 'Motivational',
+    niche: 'motivation', style: 'Viral / Hook-first', platform: 'TikTok',
+    tone: 'Inspirational', audience: 'Young Nigerian entrepreneurs and hustlers',
+    objective: 'awareness',
+    context: 'Motivational content for Nigerian youth — mindset, hustle culture, success stories',
+    ideaHints: 'How I built my business from nothing',
+    duration_hint: 30, scene_count_hint: 5,
+  },
+  {
+    id: 'food',
+    icon: '🍲', label: 'Food & Restaurant',
+    niche: 'food', style: 'Behind the scenes', platform: 'TikTok',
+    tone: 'Conversational', audience: 'Food lovers and restaurant-goers in Nigeria',
+    objective: 'awareness',
+    context: 'Nigerian food content — recipes, restaurant tours, street food, and food reviews',
+    ideaHints: 'How to make perfect jollof rice',
+    duration_hint: 45, scene_count_hint: 6,
+  },
+  {
+    id: 'tech',
+    icon: '📱', label: 'Tech & Gadgets',
+    niche: 'technology', style: 'Opinion / Hot take', platform: 'YouTube Shorts',
+    tone: 'Conversational', audience: 'Tech-savvy Nigerians aged 18-35',
+    objective: 'awareness',
+    context: 'Tech reviews, tips, and opinions relevant to Nigerian tech consumers',
+    ideaHints: 'Best budget smartphones in Nigeria 2025',
+    duration_hint: 60, scene_count_hint: 8,
+  },
+  {
+    id: 'business',
+    icon: '🚀', label: 'Business & Entrepreneurship',
+    niche: 'business', style: 'Educational', platform: 'LinkedIn',
+    tone: 'Professional', audience: 'Nigerian entrepreneurs and business owners',
+    objective: 'awareness',
+    context: 'Business advice, startup tips, and entrepreneurship insights for Nigerian founders',
+    ideaHints: 'How to register your business in Nigeria',
+    duration_hint: 60, scene_count_hint: 8,
+  },
+  {
+    id: 'education',
+    icon: '🎓', label: 'Education / Tutorial',
+    niche: 'education', style: 'Tutorial', platform: 'YouTube Shorts',
+    tone: 'Calm & informative', audience: 'Students and learners across Nigeria',
+    objective: 'tutorial',
+    context: 'Educational content — explain concepts, skills, and knowledge in simple terms',
+    ideaHints: 'Learn this skill in 60 seconds',
+    duration_hint: 60, scene_count_hint: 8,
+  },
+  {
+    id: 'fashion',
+    icon: '👗', label: 'Fashion & Style',
+    niche: 'fashion', style: 'Product showcase', platform: 'Instagram Reels',
+    tone: 'Luxury', audience: 'Fashion-conscious Nigerians aged 20-35',
+    objective: 'awareness',
+    context: 'Nigerian fashion — Ankara styles, accessories, designer brands, and style tips',
+    ideaHints: '5 Ankara styles trending right now',
+    duration_hint: 30, scene_count_hint: 5,
+  },
+  {
+    id: 'comedy',
+    icon: '😂', label: 'Comedy / Entertainment',
+    niche: 'entertainment', style: 'Storytelling', platform: 'TikTok',
+    tone: 'Humorous', audience: 'General Nigerian audience all ages',
+    objective: 'awareness',
+    context: 'Nigerian comedy, relatable skits, and entertainment content',
+    ideaHints: 'Things every Nigerian parent says',
+    duration_hint: 30, scene_count_hint: 5,
+  },
+  {
+    id: 'travel',
+    icon: '✈️', label: 'Travel & Lifestyle',
+    niche: 'travel', style: 'Documentary', platform: 'YouTube Shorts',
+    tone: 'Conversational', audience: 'Nigerian travel enthusiasts aged 25-45',
+    objective: 'story',
+    context: 'Travel content — destinations in Nigeria and abroad, budget travel tips, visa guides',
+    ideaHints: 'Hidden gems in Lagos you need to visit',
+    duration_hint: 60, scene_count_hint: 8,
+  },
+]
+
 export default function Setup() {
   const [niches, setNiches]         = useState<Niche[]>([])
   const [nicheMap, setNicheMap]     = useState<Record<string, string[]>>({})
@@ -96,6 +221,30 @@ export default function Setup() {
   const [sceneCount, setSceneCount]   = useState<number>(config.scene_count_hint || 8)
   const [clientBrief, setClientBrief] = useState<string>(config.client_brief || '')
   const [customDuration, setCustomDuration] = useState<string>('')
+  const [showTemplates, setShowTemplates] = useState(false)
+
+
+  function applyTemplate(t: typeof NICHE_TEMPLATES[0]) {
+    setConfig({
+      niche:            t.niche,
+      style:            t.style,
+      platform:         t.platform,
+      tone:             t.tone,
+      audience:         t.audience,
+      objective:        t.objective,
+      context:          t.context,
+      ideaHints:        t.ideaHints,
+      ideaTags:         [],
+      duration_hint:    t.duration_hint,
+      scene_count_hint: t.scene_count_hint,
+    })
+    setObjective(t.objective)
+    setDuration(t.duration_hint)
+    setSceneCount(t.scene_count_hint)
+    setIdeaInput(t.ideaHints)
+    setIdeaTags([])
+    setShowTemplates(false)
+  }
 
   useEffect(() => {
     getNiches().then((data) => {
@@ -190,6 +339,45 @@ export default function Setup() {
           ? "Configure the brief — SceneForge will generate scripts and scenes from here"
           : "Configure your content — SceneForge will generate everything from here"}
       />
+
+
+      {/* ── Quick-start templates (personal mode only) ── */}
+      {!isAgencyMode && (
+        <div className="mb-5">
+          <button
+            onClick={() => setShowTemplates(!showTemplates)}
+            className="flex items-center gap-2 text-[12px] font-semibold text-violet-300 hover:text-violet-200 transition-colors group"
+          >
+            <span className="w-5 h-5 rounded-full bg-violet-500/15 flex items-center justify-center group-hover:bg-violet-500/25 transition-colors">
+              <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8">
+                {showTemplates
+                  ? <path d="M2 7l3-3 3 3"/>
+                  : <path d="M2 3l3 3 3-3"/>
+                }
+              </svg>
+            </span>
+            {showTemplates ? 'Hide templates' : '⚡ Quick-start with a template'}
+          </button>
+
+          {showTemplates && (
+            <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
+              {NICHE_TEMPLATES.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => applyTemplate(t)}
+                  className="flex items-center gap-2.5 px-3 py-2.5 bg-[#111118] border border-white/[0.07] rounded-xl hover:border-violet-500/30 hover:bg-violet-500/[0.06] transition-all text-left group"
+                >
+                  <span className="text-xl flex-shrink-0">{t.icon}</span>
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-medium text-white/75 group-hover:text-white/90 truncate">{t.label}</p>
+                    <p className="text-[10px] text-white/30 truncate">{t.platform}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Brand kit banner — shown when kit auto-loaded */}
       {brandKit && (
