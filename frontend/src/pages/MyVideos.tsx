@@ -144,14 +144,14 @@ function VideoCard({ record, onRerender }: { record: RenderRecord; onRerender: (
             {/* Re-render */}
             <button
               onClick={(e) => { e.stopPropagation(); onRerender(record) }}
-              title="Re-render this video"
+              title="Open this project to edit or re-render"
               className="h-7 px-2.5 bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/25 text-violet-300 text-[11px] font-medium rounded-lg transition-colors flex items-center gap-1"
             >
               <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M1 6A5 5 0 0 1 9.5 2.5M11 6A5 5 0 0 1 2.5 9.5"/>
                 <path d="M9 2l.5 2-2-.5M3 10l-.5-2 2 .5"/>
               </svg>
-              Re-render
+              Open
             </button>
 
             {/* Download */}
@@ -222,15 +222,33 @@ export default function MyVideos() {
   })
 
   function handleRerender(record: RenderRecord) {
-    // Find the project linked to this job_id and open it
     const linked = projects.find(p => p.job_id === record.job_id)
+
     if (linked) {
+      // openProject already knows where to go — for exported projects it
+      // restores the export page with the video URL. From there the user
+      // can click "Open Scene Editor" to change scenes, or just re-render.
       openProject(linked.id)
-      setStep('voice')
-    } else {
-      // Go to voice/visuals step so user can re-render
-      setStep('voice')
+      return
     }
+
+    // Project not in store (was deleted or this is a different device).
+    // Pre-fill config with what we know from the video record and send
+    // the user to Setup so they can re-generate the video.
+    useStore.getState().setConfig({
+      niche:    record.niche    || '',
+      platform: record.platform || 'TikTok',
+      style:    '',
+      tone:     '',
+      audience: '',
+      context:  '',
+      ideaHints: '',
+      ideaTags:  [],
+      objective: '',
+      duration_hint:    60,
+      scene_count_hint: record.scene_count || 8,
+    } as any)
+    setStep('setup')
   }
 
   return (
