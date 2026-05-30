@@ -152,42 +152,46 @@ export default function Export() {
           </div>
 
 
-          {/* ── Feature discovery — shown on first render success ── */}
+
+          {/* ── Feature discovery ── */}
           <div className="grid grid-cols-1 gap-3 mb-6 sm:grid-cols-3">
-            {[
-              {
-                icon: '🔁',
-                title: 'Single-scene re-render',
-                desc: 'Not happy with one scene? Re-render just that scene — free, instant, without touching the rest.',
-                action: 'Try it below',
-                color: 'violet',
-              },
-              {
-                icon: '✂️',
-                title: 'Open in CapCut',
-                desc: 'Your video exports as a CapCut draft. Add transitions, effects and music in one tap.',
-                action: 'Download CapCut draft',
-                color: 'teal',
-              },
-              {
-                icon: '📤',
-                title: 'Share & go viral',
-                desc: 'Get platform-optimised captions, hashtags and the best posting times for maximum reach.',
-                action: 'See share tips below',
-                color: 'gold',
-              },
-            ].map(card => (
-              <div key={card.title} className={`bg-[#111118] border rounded-xl p-4 border-white/[0.07]`}>
-                <div className="text-2xl mb-2">{card.icon}</div>
-                <p className="text-[13px] font-semibold text-white/85 mb-1">{card.title}</p>
-                <p className="text-[12px] text-white/40 leading-relaxed mb-2">{card.desc}</p>
-                <p className={`text-[11px] font-semibold ${
-                  card.color === 'violet' ? 'text-violet-400'
-                  : card.color === 'teal' ? 'text-teal-400'
-                  : 'text-amber-400'
-                }`}>↓ {card.action}</p>
-              </div>
-            ))}
+            {/* Single-scene re-render */}
+            <div className="bg-[#111118] border border-white/[0.07] rounded-xl p-4">
+              <div className="text-2xl mb-2">🔁</div>
+              <p className="text-[13px] font-semibold text-white/85 mb-1">Single-scene re-render</p>
+              <p className="text-[12px] text-white/40 leading-relaxed mb-3">
+                One scene looks off? Go back to the Scene Editor, click that scene, and hit Re-render.
+                Only that scene is rebuilt — the rest of the video stays untouched and no tokens are charged.
+              </p>
+              <button
+                onClick={() => useStore.getState().setStep('scenes')}
+                className="text-[11px] font-semibold text-violet-400 hover:text-violet-300 transition-colors"
+              >
+                → Open Scene Editor
+              </button>
+            </div>
+
+            {/* CapCut export */}
+            <div className="bg-[#111118] border border-white/[0.07] rounded-xl p-4">
+              <div className="text-2xl mb-2">✂️</div>
+              <p className="text-[13px] font-semibold text-white/85 mb-1">Open in CapCut</p>
+              <p className="text-[12px] text-white/40 leading-relaxed mb-3">
+                Download the CapCut draft below. Open CapCut on your phone, tap Import, and your
+                scenes, audio and timings load ready to add effects, text and music.
+              </p>
+              <p className="text-[11px] font-semibold text-teal-400">↓ Download CapCut draft below</p>
+            </div>
+
+            {/* Share panel */}
+            <div className="bg-[#111118] border border-white/[0.07] rounded-xl p-4">
+              <div className="text-2xl mb-2">📤</div>
+              <p className="text-[13px] font-semibold text-white/85 mb-1">Share &amp; post</p>
+              <p className="text-[12px] text-white/40 leading-relaxed mb-3">
+                Scroll down to the Share panel for captions, hashtags and the best posting times
+                — already written for your niche and platform.
+              </p>
+              <p className="text-[11px] font-semibold text-amber-400">↓ See share panel below</p>
+            </div>
           </div>
 
           {/* Video preview */}
