@@ -549,13 +549,43 @@ async def render_video(ctx, job_id: str, payload: dict):
                 else "groq"
             )
 
-            # Actual render wall-clock time (measured in render_full_pipeline result)
+            # Actual render wall-clock time
             _render_secs = float(result.get("render_seconds", 0) if isinstance(result, dict) else 0) or 30.0
 
-            # AI token estimates from result metadata if available, else use
-            # per-plan estimates: premium models ~1200 input / 600 output; free ~800/400
-            _ai_in  = int(result.get("ai_input_tokens",  1200 if _ai_provider == "openai" else 800))                        if isinstance(result, dict) else (1200 if _ai_provider == "openai" else 800)
-            _ai_out = int(result.get("ai_output_tokens",  600 if _ai_provider == "openai" else 400))                        if isinstance(result, dict) else (600 if _ai_provider == "openai" else 400)
+            # Real AI token usage — stored by generate.py when scenes were generated
+            _ai_in, _ai_out = 0, 0
+            if user_id:
+                try:
+                    _tok_raw = await redis.get(f"user:{user_id}:pending_ai_tokens")
+                    if _tok_raw:
+                        _tok_data = json.loads(_tok_raw if isinstance(_tok_raw, str) else _tok_raw.decode())
+                        _ai_in  = int(_tok_data.get("ai_input_tokens",  0))
+                        _ai_out = int(_tok_data.get("ai_output_tokens", 0))
+                        await redis.delete(f"user:{user_id}:pending_ai_tokens")
+                except Exception:
+                    pass
+            if not _ai_in:  _ai_in  = 1200 if _ai_provider == "openai" else 800
+            if not _ai_out: _ai_out = 600  if _ai_provider == "openai" else 400
+
+            # Niche from Redis (stored by render.py at job creation, 86400s TTL)
+            _niche = ""
+            try:
+                _n_raw = await redis.get(f"job:{job_id}:niche")
+                _niche = (_n_raw.decode() if isinstance(_n_raw, bytes) else _n_raw) or ""
+            except Exception:
+                pass
+
+            # Username / email for display in cost log
+            _username, _user_email = "", ""
+            if user_id:
+                try:
+                    _u_raw = await redis.get(f"user:{user_id}")
+                    if _u_raw:
+                        _ud2 = json.loads(_u_raw)
+                        _username   = _ud2.get("full_name", "")
+                        _user_email = _ud2.get("email", "")
+                except Exception:
+                    pass
 
             _cost_rec = build_cost_record(
                 job_id=job_id,
@@ -573,6 +603,10 @@ async def render_video(ctx, job_id: str, payload: dict):
                 plan_price_ngn=_plan_price_ngn,
                 plan_tokens=_plan_tokens,
                 exchange_rate=_exchange_rate,
+                niche=_niche,
+                tokens_consumed=max(100, len(req.scenes) * 100),
+                username=_username,
+                user_email=_user_email,
             )
             await store_cost_record(redis, _cost_rec)
         except Exception as _cost_err:
