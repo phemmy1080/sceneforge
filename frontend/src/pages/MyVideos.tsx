@@ -198,10 +198,16 @@ export default function MyVideos() {
   const [loading, setLoading]   = useState(true)
   const [filter,  setFilter]    = useState<'all' | string>('all')
   const [search,  setSearch]    = useState('')
+  const [locked,  setLocked]    = useState(0)
+  const [maxSaved, setMaxSaved] = useState(-1)
 
   useEffect(() => {
     api.get('/api/render/history?limit=100')
-      .then(res => { setRenders(res.data.renders || []) })
+      .then(res => {
+        setRenders(res.data.renders || [])
+        setLocked(res.data.locked || 0)
+        setMaxSaved(res.data.max_saved ?? -1)
+      })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
@@ -229,7 +235,7 @@ export default function MyVideos() {
 
   return (
     <div>
-      <PageHeader title="My Videos" subtitle={`${renders.length} video${renders.length !== 1 ? 's' : ''} rendered`} />
+      <PageHeader title="My Videos" subtitle={`${renders.length} video${renders.length !== 1 ? 's' : ''} saved${locked > 0 ? \` · ${locked} hidden (free plan)\` : ''}`} />
 
       {/* Search + filter bar */}
       {renders.length > 0 && (
@@ -307,6 +313,28 @@ export default function MyVideos() {
           {filtered.map(r => (
             <VideoCard key={r.job_id} record={r} onRerender={handleRerender} />
           ))}
+        </div>
+      )}
+
+
+      {/* Upgrade prompt — shown when free user has hidden videos */}
+      {!loading && locked > 0 && (
+        <div className="mt-4 bg-amber-500/[0.07] border border-amber-500/20 rounded-xl p-4 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-amber-500/12 flex items-center justify-center flex-shrink-0 text-lg">🔒</div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-semibold text-amber-300 mb-0.5">
+              {locked} video{locked !== 1 ? 's' : ''} hidden — free plan stores {maxSaved}
+            </p>
+            <p className="text-[12px] text-white/40">
+              Upgrade to keep your full video library. Paid plans have unlimited saved videos.
+            </p>
+          </div>
+          <button
+            onClick={() => setStep('plans')}
+            className="px-4 py-2 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-[12px] font-semibold rounded-xl transition-colors flex-shrink-0"
+          >
+            Upgrade
+          </button>
         </div>
       )}
 
