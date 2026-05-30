@@ -359,7 +359,7 @@ async def get_workspace_pools(redis=Depends(get_redis), admin: dict = Depends(_r
 
 @router.get("/users")
 @limiter.limit("30/minute")
-async def list_users(redis=Depends(get_redis), admin: dict = Depends(_require_admin)):
+async def list_users(request: Request, redis=Depends(get_redis), admin: dict = Depends(_require_admin)):
     users = await _all_users(redis)
     users.sort(key=lambda u: u.get("created_at", ""), reverse=True)
     return {"users": users, "total": len(users)}
