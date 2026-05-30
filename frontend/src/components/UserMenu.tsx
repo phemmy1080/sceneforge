@@ -26,12 +26,10 @@ export default function UserMenu({ onLogout }: UserMenuProps) {
   const wsRole   = user?.workspace_role  // 'owner' | 'admin' | 'editor' | 'client' | null
   const wsId     = user?.workspace_id
   const inAgency = !!(wsId && wsRole)
-  // Anyone in a workspace can switch to personal mode if they had an account before
-  // joining (indicated by having personal tokens or videos). Clients cannot switch.
-  const hasPersonalHistory = (user?.videos_created ?? 0) > 0 ||
-    (user?.tokens_remaining ?? 0) > 0 ||
-    wsRole === 'owner'
-  const canSwitch = inAgency && wsRole !== 'client' && hasPersonalHistory
+  // Any non-client workspace member can switch to personal studio.
+  // Editors/admins may have 0 personal tokens/projects but still have a personal account.
+  const canSwitch = inAgency && wsRole !== 'client'
+  const isOwner   = wsRole === 'owner'
   // Current mode: editors/admins/clients are always in agency mode
   const currentMode = useStore((s) => s.currentStep)
   const isAgencyMode = currentMode.startsWith('agency')
@@ -74,20 +72,20 @@ export default function UserMenu({ onLogout }: UserMenuProps) {
   function switchToPersonal() {
     setOpen(false)
     const store = useStore.getState()
-    // Clear ALL agency context so nothing bleeds into personal mode
+    // Clear ALL agency context — nothing should bleed into personal mode
     store.setAgencyProjectId('')
     store.setConfig({
       niche: '', style: '', platform: 'TikTok', tone: '', audience: '',
       context: '', ideaHints: '', ideaTags: [],
       objective: '', duration_hint: 60, scene_count_hint: 8, client_brief: '',
     } as any)
-    // Reset agency workflow sub-steps
     if ((store as any).setAgencyWorkflowStep) {
       (store as any).setAgencyWorkflowStep('setup')
     }
-    // Reload personal projects from backend so the sidebar shows them
-    store.loadProjectsFromBackend()
+    // Navigate to personal projects first so the sidebar immediately switches context,
+    // then load from backend — sidebar will populate once data arrives.
     setStep('projects' as any)
+    store.loadProjectsFromBackend()
   }
 
   if (!user) return null
@@ -168,7 +166,10 @@ export default function UserMenu({ onLogout }: UserMenuProps) {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                   <Stat label="Videos created" value={String(user.videos_created ?? 0)} />
-                  <Stat label="Plan" value={planLabel} valueColor={planColor} />
+                  {!isAgencyMode && inAgency
+                    ? <Stat label="Personal tokens" value={(user.tokens_remaining ?? 0).toLocaleString()} />
+                    : <Stat label="Plan" value={planLabel} valueColor={planColor} />
+                  }
                 </div>
               </div>
 
@@ -236,8 +237,8 @@ export default function UserMenu({ onLogout }: UserMenuProps) {
                 </div>
               )}
 
-              {/* ── Workspace badge for non-owner members ── */}
-              {inAgency && !canSwitch && (
+              {/* ── Workspace badge — clients only (cannot switch) ── */}
+              {inAgency && wsRole === 'client' && (
                 <div style={{ padding: '8px 14px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: 8,
@@ -257,7 +258,7 @@ export default function UserMenu({ onLogout }: UserMenuProps) {
               <div style={{ padding: '6px' }}>
                 <DropdownItem icon="✎" label="Edit profile"
                   onClick={() => { setEditName(user.full_name); setEditEmail(user.email); setEditing(true) }} />
-                {(!inAgency || canSwitch) && (
+                {(!isAgencyMode || !inAgency) && (
                   <DropdownItem icon="◈" label="Upgrade plan"
                     onClick={() => { setOpen(false); setStep('plans') }} accent />
                 )}
