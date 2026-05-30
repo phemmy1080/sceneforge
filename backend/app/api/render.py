@@ -266,6 +266,62 @@ async def get_job_scenes(
         await redis.aclose()
 
 
+
+@router.post("/scenes/backfill")
+async def backfill_scenes(
+    authorization: Optional[str] = Header(None),
+):
+    """Backfill render:scenes:{job_id} from job:{job_id}:scenes for
+    all of the calling user's renders that are missing the new key.
+    Safe to call multiple times — only copies when target is missing.
+    """
+    user_id = _extract_user_id(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    redis = await _get_redis()
+    try:
+        # Get all job_ids this user has rendered
+        job_ids_raw = await redis.smembers(f"user:{user_id}:charged_jobs")
+        if not job_ids_raw:
+            return {"backfilled": 0, "total": 0, "message": "No renders found"}
+
+        job_ids = [j.decode() if isinstance(j, bytes) else j for j in job_ids_raw]
+
+        backfilled = 0
+        skipped_no_source = 0
+
+        for job_id in job_ids:
+            # Check if already has the new key
+            already_has = await redis.exists(f"render:scenes:{job_id}")
+            if already_has:
+                continue
+
+            # Try to copy from the original scenes key (set by render worker)
+            source = await redis.get(f"job:{job_id}:scenes")
+            if not source:
+                skipped_no_source += 1
+                continue
+
+            # Copy with 7-day TTL
+            await redis.set(
+                f"render:scenes:{job_id}",
+                source,
+                ex=86400 * 7
+            )
+            backfilled += 1
+
+        return {
+            "backfilled": backfilled,
+            "total": len(job_ids),
+            "skipped_no_source": skipped_no_source,
+            "message": f"Backfilled {backfilled} renders. "
+                       f"{skipped_no_source} renders have no scene data (too old)."
+        }
+    finally:
+        await redis.aclose()
+
+
 @router.get("/history")
 async def get_render_history(
     authorization: Optional[str] = Header(None),
