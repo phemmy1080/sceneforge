@@ -12,6 +12,8 @@ Cost model (all in USD):
 
 Margin = Revenue per render - Cost per render
 Revenue per render = plan_price_ngn / exchange_rate / tokens_per_plan * TOKENS_PER_VIDEO
+# Pricing model: 1 video = 100 tokens (flat, scene count does not affect cost)
+# Example: Starter plan ₦3,000 / ₦6-per-token = 500 tokens = 5 videos at ₦600 each
 """
 from __future__ import annotations
 
@@ -45,7 +47,8 @@ COMPUTE_COST_PER_SEC    = 0.000008
 STORAGE_COST_PER_RENDER = 0.000025
 
 # Tokens consumed per video render (from your deduct_tokens logic)
-TOKENS_PER_VIDEO        = 100
+TOKENS_PER_VIDEO        = 100   # base cost per render (flat, regardless of scenes)
+DALLE_TOKENS_PER_IMAGE  = 200   # extra tokens charged per DALL-E image generated
 
 # Redis key patterns
 COST_KEY_PREFIX         = "render:cost:"    # render:cost:{job_id}
@@ -107,14 +110,17 @@ def build_cost_record(
 
     total_cost_usd = voice_cost + visual_cost + ai_cost + compute_cost + storage_cost
 
-    # Revenue per render
-    # plan_price covers `plan_tokens` tokens; each render costs TOKENS_PER_VIDEO tokens
-    # so revenue per render = (plan_price / plan_tokens) * TOKENS_PER_VIDEO
-    plan_price_usd = plan_price_ngn / exchange_rate
-    renders_per_plan = max(plan_tokens / TOKENS_PER_VIDEO, 1)
-    revenue_per_render_usd = plan_price_usd / renders_per_plan
-    margin_usd = revenue_per_render_usd - total_cost_usd
-    margin_pct  = (margin_usd / revenue_per_render_usd * 100) if revenue_per_render_usd > 0 else 0
+    # Every render costs 100 tokens flat (TOKENS_PER_VIDEO) regardless of scene count.
+    # Revenue per render = plan_price / (plan_tokens / 100)
+    # e.g. starter plan: N3,000 / 500 tokens * 100 = N600 per render  -> $0.375
+    plan_price_usd         = plan_price_ngn / exchange_rate
+    # Revenue reflects actual tokens consumed (base + DALL-E surcharge if any)
+    actual_tokens_used     = TOKENS_PER_VIDEO + (dalle_images * DALLE_TOKENS_PER_IMAGE)
+    renders_per_plan       = max(plan_tokens / TOKENS_PER_VIDEO, 1)  # capacity based on base render cost
+    revenue_per_render_usd = (plan_price_usd / max(plan_tokens, 1)) * actual_tokens_used
+    # (revenue_per_render_usd already set above using actual_tokens_used)
+    margin_usd             = revenue_per_render_usd - total_cost_usd
+    margin_pct             = (margin_usd / revenue_per_render_usd * 100) if revenue_per_render_usd > 0 else 0
 
     return {
         "job_id":              job_id,
@@ -127,7 +133,7 @@ def build_cost_record(
         "niche":               niche,
         "visual_source":       visual_source,
         "voice_provider":      voice_provider,
-        "tokens_consumed":     tokens_consumed or max(100, scenes * TOKENS_PER_VIDEO),
+        "tokens_consumed":     TOKENS_PER_VIDEO,  # always 100 per video
         # Itemised costs (USD)
         "cost_voice_usd":      round(voice_cost, 6),
         "cost_visual_usd":     round(visual_cost, 6),
