@@ -391,8 +391,10 @@ async def render_video(ctx, job_id: str, payload: dict):
             video_url = f"{WORKER_BASE_URL}/renders/{job_id}/final_video.mp4"
 
         # ── Stage 6: Token deduction ──────────────────────────────────────────
-        tokens_remaining = 0
-        is_re_render     = bool(prev_job_stored or payload.get("prev_job_id"))
+        tokens_remaining  = 0
+        _tokens_deducted  = 0   # track actual deduction for refund on failure
+        _deducted_from_ws = False
+        is_re_render      = bool(prev_job_stored or payload.get("prev_job_id"))
 
         if user_id:
             try:
@@ -411,7 +413,9 @@ async def render_video(ctx, job_id: str, payload: dict):
                                 scene_count=scene_count,
                                 project_id=proj_id, project_title=proj_title,
                             )
-                            tokens_remaining = new_balance
+                            tokens_remaining   = new_balance
+                            _tokens_deducted   = render_cost
+                            _deducted_from_ws  = True
                             logger.info("Pool tokens deducted ✓ — ws=%s remaining=%d",
                                         ws_id, tokens_remaining)
                         except ValueError:
@@ -428,7 +432,9 @@ async def render_video(ctx, job_id: str, payload: dict):
                             redis, user_id, job_id,
                             scene_count=scene_count, project_id=proj_id, project_title=proj_title,
                         )
-                        tokens_remaining = user_out.tokens_remaining
+                        tokens_remaining  = user_out.tokens_remaining
+                        _tokens_deducted  = render_cost
+                        _deducted_from_ws = False
                         logger.info("Tokens deducted ✓ — user=%s remaining=%d",
                                     user_id, tokens_remaining)
                 else:
@@ -620,6 +626,30 @@ async def render_video(ctx, job_id: str, payload: dict):
             "status": "failed", "stage": "Failed",
             "pct": 0, "job_id": job_id, "error": str(e),
         }), ex=3600)
+
+        # ── Token refund ──────────────────────────────────────────────────────
+        # If tokens were deducted (Stage 6 ran) but the job ultimately failed,
+        # refund the full amount so the user is never charged for a failed render.
+        if user_id and _tokens_deducted > 0:
+            try:
+                if _deducted_from_ws and ws_id:
+                    from app.services.agency_service import add_pool_tokens
+                    new_bal = await add_pool_tokens(redis, ws_id, _tokens_deducted)
+                    logger.info("Pool tokens refunded ✓ — ws=%s amount=%d new_balance=%d",
+                                ws_id, _tokens_deducted, new_bal)
+                else:
+                    from app.services.auth_service import add_tokens as _add_tokens
+                    await _add_tokens(redis, user_id, _tokens_deducted)
+                    logger.info("Tokens refunded ✓ — user=%s amount=%d", user_id, _tokens_deducted)
+                # Store refund record so admin panel can see it
+                await redis.set(
+                    f"job:{job_id}:refund",
+                    json.dumps({"amount": _tokens_deducted, "reason": str(e)[:200]}),
+                    ex=86400 * 30,
+                )
+            except Exception as _re:
+                logger.error("Token refund FAILED for job %s user %s: %s", job_id, user_id, _re)
+
         # Always free the concurrency slot — even on failure
         if user_id:
             try:
