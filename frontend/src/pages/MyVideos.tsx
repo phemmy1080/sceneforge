@@ -202,14 +202,15 @@ export default function MyVideos() {
   const [maxSaved, setMaxSaved] = useState(-1)
 
   useEffect(() => {
-    api.get('/api/render/history?limit=100')
-      .then(res => {
-        setRenders(res.data.renders || [])
-        setLocked(res.data.locked || 0)
-        setMaxSaved(res.data.max_saved ?? -1)
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
+    // Fetch history and backfill scenes in parallel
+    Promise.all([
+      api.get('/api/render/history?limit=100'),
+      api.post('/api/render/scenes/backfill').catch(() => {}), // silent — best effort
+    ]).then(([histRes]) => {
+      setRenders(histRes.data.renders || [])
+      setLocked(histRes.data.locked || 0)
+      setMaxSaved(histRes.data.max_saved ?? -1)
+    }).catch(() => {}).finally(() => setLoading(false))
   }, [])
 
   const niches = Array.from(new Set(renders.map(r => r.niche).filter(Boolean)))
