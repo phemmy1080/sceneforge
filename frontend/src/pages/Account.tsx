@@ -330,7 +330,6 @@ export default function Account() {
       {/* Support */}
       <Section title="Support">
         <Row icon="💬" label="Send feedback" onClick={() => document.dispatchEvent(new CustomEvent('open-feedback-modal'))} />
-        <Row icon="📖" label="Help & docs" onClick={() => window.open('https://docs.sceneforge.com', '_blank')} />
       </Section>
 
       {/* Sign out */}
