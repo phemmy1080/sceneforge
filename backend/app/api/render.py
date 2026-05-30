@@ -139,14 +139,43 @@ async def start_render(
                     }
                 )
 
+
+        # DALL-E plan gating — Studio and Agency only
+        # Personal renders: check user's own plan. Agency renders: check workspace plan.
+        if getattr(req, "visual_source", "") == "dalle":
+            dalle_plans = {"studio", "agency"}
+            _render_plan = user_plan
+            # For agency renders, use the workspace plan
+            _ws_plan = user_data.get("workspace_plan", user_plan) if ws_id else user_plan
+            _effective_plan = _ws_plan if ws_id and not getattr(req, "agency_project_id", None) is None else user_plan
+            # Simpler: check current render context
+            if agencyProjectId := getattr(req, "agency_project_id", None):
+                # Agency render — check workspace plan
+                pass  # agency workspace plan check handled by token pool
+            else:
+                # Personal render — strictly check user's own plan
+                if user_plan not in dalle_plans:
+                    await redis.aclose()
+                    raise HTTPException(
+                        status_code=403,
+                        detail={
+                            "error": "dalle_not_allowed",
+                            "message": "AI image generation (DALL-E) requires Studio or Agency plan. Upgrade to unlock.",
+                            "upgrade_required": True,
+                        }
+                    )
+
             # Daily render limit
             max_daily = limits["max_renders_per_day"]
             if max_daily != -1:
                 import datetime
                 today = datetime.date.today().isoformat()
                 daily_key = f"renders:daily:{user_id}:{today}"
-                daily_count = await redis.get(daily_key)
-                daily_count = int(daily_count) if daily_count else 0
+                daily_count_raw = await redis.get(daily_key)
+                if daily_count_raw:
+                    daily_count = int(daily_count_raw.decode() if isinstance(daily_count_raw, bytes) else daily_count_raw)
+                else:
+                    daily_count = 0
 
                 if daily_count >= max_daily:
                     await redis.aclose()
