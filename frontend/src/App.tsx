@@ -13,7 +13,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import Signup from './pages/Signup'
 import Projects from './pages/Projects'
-import MyVideos from './pages/MyVideos'
+import MyVideos from './pages/Myvideos'
 import Setup from './pages/Setup'
 import Ideas from './pages/Ideas'
 import Script from './pages/Script'
@@ -22,6 +22,7 @@ import VoiceVisuals from './pages/VoiceVisuals'
 import Export from './pages/Export'
 import UploadScript from './pages/UploadScript'
 import Plans from './pages/Plans'
+import Account from './pages/Account'
 import PaymentCallback from './pages/PaymentCallback'
 import ErrorBoundary from './components/ErrorBoundary'
 import Blog from './pages/Blog'
@@ -161,6 +162,7 @@ function AppPages({ onLogout }: { onLogout: () => void }) {
         {currentStep === 'upload'          && <UploadScript />}
         {/* Agency workflow — same components, keeps agency sidebar context */}
         {currentStep === 'agency-workflow' && <AgencyWorkflow />}
+        {currentStep === 'profile'          && <Account />}
         {currentStep === 'upgrade'         && <Plans onBack={() => setStep('setup')} />}
         {currentStep === 'plans'           && <Plans onBack={() => setStep('setup')} />}
         {currentStep === 'agency'          && <AgencyDashboard />}
