@@ -49,7 +49,14 @@ export default function Account() {
   const wsName    = (user as any)?.workspace_name as string | undefined
   const inAgency  = !!(wsId && wsRole)
   const canSwitch = inAgency && wsRole !== 'client'
-  const isAgencyMode = !!(agencyProjectId) || (inAgency && !['projects','my-videos','setup','ideas','script','scenes','voice','export','upgrade','plans','profile'].includes(useStore.getState().currentStep))
+  // isAgencyMode: user came from agency workflow, or they have workspace membership
+  // We check if agencyProjectId is set OR if it was recently cleared (still in agency context).
+  // Since profile is a neutral step, we default to showing the switcher for any agency member.
+  const [cameFromAgency] = useState(() => {
+    const s = useStore.getState()
+    return !!(s.agencyProjectId) || (inAgency && (s.currentStep as string).startsWith('agency'))
+  })
+  const isAgencyMode = cameFromAgency
 
   const PLAN_LABEL: Record<string, string> = {
     free: 'Free', starter: 'Starter', pro: 'Pro', studio: 'Studio', agency: 'Agency'
