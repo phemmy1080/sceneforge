@@ -3,7 +3,7 @@ import { devtools, persist } from 'zustand/middleware'
 import type { IdeaItem, Scene, RenderRequest } from './lib/api'
 import { projectsApi } from './lib/api'
 
-export type AppStep = 'projects' | 'setup' | 'ideas' | 'script' | 'scenes' | 'voice' | 'export' | 'profile' | 'upload' | 'upgrade' | 'plans' | 'agency' | 'agency-projects' | 'agency-new' | 'agency-detail' | 'agency-team' | 'agency-kits' | 'agency-workflow'
+export type AppStep = 'projects' | 'my-videos' | 'setup' | 'ideas' | 'script' | 'scenes' | 'voice' | 'export' | 'profile' | 'upload' | 'upgrade' | 'plans' | 'agency' | 'agency-projects' | 'agency-new' | 'agency-detail' | 'agency-team' | 'agency-kits' | 'agency-workflow'
 
 export interface ProjectConfig {
   niche: string; style: string; platform: string
