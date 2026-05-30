@@ -3441,15 +3441,28 @@ function showJobCostDetail(idx) {
   html += '</div>';
 
   // ── Job & render info ─────────────────────────────────────────────────────
+  // ── Render info with plain-English labels ──────────────────────────────────
+  var expectedTok = (r.scenes||0) * 100;
+  var tokMismatch = r.tokens_consumed && r.tokens_consumed !== expectedTok
+    ? ' <span style="color:#f87171;font-size:9px" title="Expected '+expectedTok+' for '+r.scenes+' scenes. May be a pre-fix record.">(!) check</span>' : '';
+  var revenueNote = r.plan_price_ngn > 0
+    ? '&#x20A6;'+fmt(r.plan_price_ngn||0)+' plan &divide; '+fmt(r.plan_tokens||100)+' plan tokens &times; '+fmt(r.tokens_consumed||100)+' tokens used = revenue'
+    : 'Free plan — no revenue this render';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'
     + kv('Job ID', '<span style="font-family:DM Mono,monospace;font-size:10px;word-break:break-all">'+(r.job_id||'')+'</span>')
-    + kv('Time', ago(r.ts))
-    + kv('Scenes', r.scenes||0)
-    + kv('Render time', (r.render_seconds||0).toFixed(2)+'s')
-    + kv('Voice', r.voice_provider||'--')
-    + kv('AI provider', r.ai_provider||'--')
-    + kv('Total chars', fmt(r.total_chars||0))
-    + kv('AI tokens in/out', fmt(r.ai_input_tokens||0)+' / '+fmt(r.ai_output_tokens||0))
+    + kv('Rendered', ago(r.ts))
+    + kv('Scenes in video', r.scenes||0)
+    + kv('FFmpeg render time', (r.render_seconds||0).toFixed(2)+'s')
+    + kv('Voice engine', r.voice_provider === 'elevenlabs' ? 'ElevenLabs (paid per char)' : 'Edge TTS (free)')
+    + kv('AI model', r.ai_provider === 'openai' ? 'OpenAI GPT-4o mini' : 'Groq llama3 (free tier)')
+    + kv('Voice chars <span style="font-size:9px;opacity:.6">used for TTS cost</span>', fmt(r.total_chars||0))
+    + kv('LLM tokens <span style="font-size:9px;opacity:.6">prompt in / response out</span>', fmt(r.ai_input_tokens||0)+' / '+fmt(r.ai_output_tokens||0))
+    + '</div>';
+  html += '<div style="background:rgba(124,58,237,0.06);border:1px solid rgba(124,58,237,0.15);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:11.5px;line-height:1.9;color:var(--text2)">\n'
+    + '<b style="color:var(--text)">SceneForge tokens deducted:</b> '+fmt(r.tokens_consumed||0)+tokMismatch
+    + ' &nbsp;<span style="color:var(--text3)">'+fmt(r.scenes||0)+' scenes &times; 100 tokens/scene</span><br>\n'
+    + '<b style="color:var(--text)">Revenue per render:</b> '+revenueNote+'<br>\n'
+    + '<b style="color:var(--text)">LLM tokens explained:</b> Groq/OpenAI tokens consumed to generate your script and scenes. Free on Groq tier. Separate from SceneForge tokens.'
     + '</div>';
 
   // ── Cost breakdown bar chart ──────────────────────────────────────────────
@@ -3466,7 +3479,7 @@ function showJobCostDetail(idx) {
   html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">'
     + metricBox('Total cost', usd(r.total_cost_usd,5), 'var(--rose)')
     + metricBox('Revenue/render', usd(r.revenue_per_render,5), 'var(--teal)')
-    + metricBox('Margin', usd(r.margin_usd,5)+' ('+( r.margin_pct||0).toFixed(1)+'%)', mc)
+    + metricBox('Margin (revenue − cost)', usd(r.margin_usd,5)+' ('+( r.margin_pct||0).toFixed(1)+'%)', mc)
     + '</div>';
 
   html += '<div style="font-size:11px;color:var(--text3);padding:8px 0">'
