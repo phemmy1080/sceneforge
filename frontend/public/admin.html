@@ -1530,7 +1530,8 @@ tr:hover td{background:rgba(255,255,255,0.018)}
                 <option value="edge_tts">Edge TTS</option>
                 <option value="elevenlabs">ElevenLabs</option>
               </select>
-              <button class="btn btn-ghost btn-sm" onclick="exportRenderLogCSV()">⬇ Export</button>
+              <button class="btn btn-ghost btn-sm" onclick="exportRenderLogCSV()">&#11015; Export</button>
+              <button class="btn btn-ghost btn-sm" onclick="backfillCostRecords()" id="backfill-btn" title="Re-enrich existing records with niche, username, AI provider">&#9881; Backfill old records</button>
               <span id="cost-log-count" style="font-size:11px;color:var(--text3)"></span>
             </div>
           </div>
@@ -3538,6 +3539,21 @@ function downloadCSV(name, rows) {
   var a = document.createElement('a');
   a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
   a.download = name; a.click();
+}
+
+async function backfillCostRecords() {
+  var btn = document.getElementById('backfill-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '\u23F3 Backfilling\u2026'; }
+  try {
+    var r = await apiFetch('/costs/backfill', {method: 'POST'});
+    showAlert('costs', '\u2713 ' + (r.message || 'Backfill complete'), 'success');
+    // Reload the cost log to show updated values
+    setTimeout(loadCosts, 800);
+  } catch(e) {
+    showAlert('costs', 'Backfill failed: ' + e.message, 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '\u2699 Backfill old records'; }
+  }
 }
 
 async function loadCosts() {
