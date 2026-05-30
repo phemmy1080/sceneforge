@@ -66,6 +66,7 @@ export default function UserMenu({ onLogout }: UserMenuProps) {
 
   function switchToAgency() {
     setOpen(false)
+    useStore.getState().setViewMode('agency')
     setStep('agency' as any)
   }
 
@@ -82,8 +83,8 @@ export default function UserMenu({ onLogout }: UserMenuProps) {
     if ((store as any).setAgencyWorkflowStep) {
       (store as any).setAgencyWorkflowStep('setup')
     }
-    // Navigate to personal projects first so the sidebar immediately switches context,
-    // then load from backend — sidebar will populate once data arrives.
+    // Set viewMode before navigating so Account page reflects the change immediately
+    store.setViewMode('personal')
     setStep('projects' as any)
     store.loadProjectsFromBackend()
   }
