@@ -74,7 +74,7 @@ export default function MobileBottomNav() {
     { id: 'export',    label: 'Export',   active: isExport,   icon: <ExportIcon /> },
     { id: 'my-videos', label: 'Videos',   active: isVideos,   icon: <VideosIcon /> },
     { id: 'projects',  label: 'Projects', active: isProjects, icon: <ProjectsIcon /> },
-    { id: 'profile',   label: 'Account',  active: isProfile,  icon: <ProfileIcon /> },
+    { id: 'profile',  label: 'Account',  active: isProfile,  icon: <ProfileIcon /> },
   ]
 
   return (
