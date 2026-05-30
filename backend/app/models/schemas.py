@@ -137,6 +137,7 @@ class RenderRequest(BaseModel):
     motion: str = "auto"            # "auto" | "kenburns_in" | "kenburns_out" | "pan_left" | "pan_right" | "none"
     transition: str = "fade"        # "fade" | "blur" | "none"
     transition_duration: float = 0.4
+    prev_job_id: Optional[str] = None    # set for re-renders — skips token deduction
 
 
 class RenderJobResponse(BaseModel):
