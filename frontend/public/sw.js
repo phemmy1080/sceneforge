@@ -4,7 +4,7 @@
 //   - API calls: Network-first with cache fallback (fresh data preferred)
 //   - Video files: Network-only (too large to cache, streamed from R2)
 
-const CACHE_VERSION  = 'sceneforge-v1'
+const CACHE_VERSION  = 'sceneforge-v2'
 const STATIC_CACHE   = `${CACHE_VERSION}-static`
 const API_CACHE      = `${CACHE_VERSION}-api`
 
