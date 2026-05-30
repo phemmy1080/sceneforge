@@ -151,6 +151,45 @@ export default function Export() {
             </span>
           </div>
 
+
+          {/* ── Feature discovery — shown on first render success ── */}
+          <div className="grid grid-cols-1 gap-3 mb-6 sm:grid-cols-3">
+            {[
+              {
+                icon: '🔁',
+                title: 'Single-scene re-render',
+                desc: 'Not happy with one scene? Re-render just that scene — free, instant, without touching the rest.',
+                action: 'Try it below',
+                color: 'violet',
+              },
+              {
+                icon: '✂️',
+                title: 'Open in CapCut',
+                desc: 'Your video exports as a CapCut draft. Add transitions, effects and music in one tap.',
+                action: 'Download CapCut draft',
+                color: 'teal',
+              },
+              {
+                icon: '📤',
+                title: 'Share & go viral',
+                desc: 'Get platform-optimised captions, hashtags and the best posting times for maximum reach.',
+                action: 'See share tips below',
+                color: 'gold',
+              },
+            ].map(card => (
+              <div key={card.title} className={`bg-[#111118] border rounded-xl p-4 border-white/[0.07]`}>
+                <div className="text-2xl mb-2">{card.icon}</div>
+                <p className="text-[13px] font-semibold text-white/85 mb-1">{card.title}</p>
+                <p className="text-[12px] text-white/40 leading-relaxed mb-2">{card.desc}</p>
+                <p className={`text-[11px] font-semibold ${
+                  card.color === 'violet' ? 'text-violet-400'
+                  : card.color === 'teal' ? 'text-teal-400'
+                  : 'text-amber-400'
+                }`}>↓ {card.action}</p>
+              </div>
+            ))}
+          </div>
+
           {/* Video preview */}
           {videoUrl && (
             <div className="mb-6">
