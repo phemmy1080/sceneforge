@@ -143,7 +143,7 @@ function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => v
   // Non-owners (editor/admin/client) are always in agency mode.
   // Personal steps: when the owner navigates to projects/setup/script/voice/export
   //   they are explicitly in personal mode, regardless of workspace membership.
-  const PERSONAL_STEPS = new Set(['projects','setup','script','voice','export','upgrade','plans'])
+  const PERSONAL_STEPS = new Set(['projects','my-videos','setup','script','voice','export','upgrade','plans'])
   const onPersonalStep = PERSONAL_STEPS.has(currentStepRaw)
   const inAgencyMode  = !!agencyProjectId ||
                         (currentStepRaw.startsWith('agency') || currentStepRaw === 'agency-workflow') ||
@@ -278,9 +278,45 @@ function SidebarContent({ onLogout, onNewProject, onClose }: { onLogout: () => v
         {/* ── Agency (only shown on agency plan) ── */}
         <AgencyNav currentStep={currentStep} onStep={handleSetStep} />
 
-        {/* Personal projects — only in personal mode */}
+
+          {/* My Videos shortcut */}
+          <button
+            onClick={() => { handleSetStep('my-videos' as AppStep); onClose?.() }}
+            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12.5px] font-medium transition-all mb-0.5 text-left border
+              ${currentStep === 'my-videos'
+                ? 'bg-teal-500/12 text-teal-300 border-teal-500/20'
+                : 'text-white/40 border-transparent hover:bg-white/4 hover:text-white/70'}`}
+          >
+            <span className={currentStep === 'my-videos' ? 'text-teal-400' : 'text-white/25'}>
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="1" y="3" width="12" height="9" rx="1.5"/>
+                <path d="M5.5 6l3 1.5-3 1.5V6z" fill="currentColor" stroke="none"/>
+              </svg>
+            </span>
+            My Videos
+          </button>
+
+        {/* My Videos + Personal projects — only in personal mode */}
         {showPersonal && (
-          <><div className="flex items-center justify-between px-2 pt-3 pb-1">
+          <>
+          {/* My Videos shortcut */}
+          <button
+            onClick={() => { handleSetStep('my-videos' as AppStep); onClose?.() }}
+            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12.5px] font-medium transition-all mb-0.5 text-left border
+              ${currentStep === 'my-videos'
+                ? 'bg-teal-500/12 text-teal-300 border-teal-500/20'
+                : 'text-white/40 border-transparent hover:bg-white/4 hover:text-white/70'}`}
+          >
+            <span className={currentStep === 'my-videos' ? 'text-teal-400' : 'text-white/25'}>
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="1" y="3" width="12" height="9" rx="1.5"/>
+                <path d="M5.5 6l3 1.5-3 1.5V6z" fill="currentColor" stroke="none"/>
+              </svg>
+            </span>
+            My Videos
+          </button>
+
+<div className="flex items-center justify-between px-2 pt-3 pb-1">
           <p className="text-[9.5px] font-bold text-white/25 uppercase tracking-widest">Projects</p>
           {showPersonal && <button onClick={() => { onNewProject(); onClose?.() }} className="text-white/25 hover:text-white/55 text-[14px] leading-none px-1 transition-colors">+</button>}
         </div>
