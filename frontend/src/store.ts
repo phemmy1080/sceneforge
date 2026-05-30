@@ -537,7 +537,8 @@ export const useStore = create<AppState>()(
         loadProjectsFromBackend: async () => {
           try {
             const serverProjects = await projectsApi.list()
-            if (serverProjects.length === 0) return
+            // Always update store — even empty array clears stale agency projects
+            // from the sidebar when switching to personal view
             const converted: Project[] = serverProjects.map((sp) => ({
               id: sp.id, name: sp.name, niche: sp.niche, style: sp.style,
               platform: sp.platform, folder: sp.folder,
