@@ -256,8 +256,8 @@ export const updateMe = async (full_name?: string, email?: string): Promise<User
   return data
 }
 
-export const getTokenBalance = async (): Promise<TokenBalance> => {
-  const { data } = await api.get('/api/auth/tokens')
+export const getTokenBalance = async (personal = false): Promise<TokenBalance> => {
+  const { data } = await api.get('/api/auth/tokens', { params: personal ? { personal: true } : {} })
   return data
 }
 
