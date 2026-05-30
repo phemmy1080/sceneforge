@@ -1154,6 +1154,149 @@ async def get_job_cost(
         raise HTTPException(status_code=404, detail="Cost record not found for this job")
     return rec
 
+@router.post("/costs/backfill")
+async def backfill_cost_records(
+    redis=Depends(get_redis),
+    admin: dict = Depends(_require_admin),
+):
+    """One-time backfill: re-enrich all cost log records with missing fields.
+
+    Fixes records that predate storage of: niche, tokens_consumed, username,
+    user_email, ai_provider.  Safe to run multiple times — already-correct
+    fields are never overwritten.
+    """
+    from app.services.cost_tracker import COST_LOG_KEY, COST_KEY_PREFIX, TOKENS_PER_VIDEO
+
+    raw_list = await redis.lrange(COST_LOG_KEY, 0, 499)
+    if not raw_list:
+        return {"status": "ok", "updated": 0, "total": 0}
+
+    records = []
+    for r in raw_list:
+        try:
+            records.append(json.loads(r))
+        except Exception:
+            pass
+
+    user_cache: dict = {}
+    updated = 0
+
+    for rec in records:
+        dirty = False
+        job_id = rec.get("job_id", "")
+        uid    = rec.get("user_id", "")
+
+        # ── username / user_email ─────────────────────────────────────────────
+        if uid and (not rec.get("username") or not rec.get("user_email")):
+            if uid not in user_cache:
+                try:
+                    raw = await redis.get(f"user:{uid}")
+                    user_cache[uid] = json.loads(raw) if raw else {}
+                except Exception:
+                    user_cache[uid] = {}
+            ud = user_cache[uid]
+            if not rec.get("username") and ud.get("full_name"):
+                rec["username"]   = ud["full_name"]
+                dirty = True
+            if not rec.get("user_email") and ud.get("email"):
+                rec["user_email"] = ud["email"]
+                dirty = True
+            # keep full_name/email populated for backward compat with JS
+            if ud.get("full_name") and not rec.get("full_name"):
+                rec["full_name"] = ud["full_name"]
+                dirty = True
+            if ud.get("email") and not rec.get("email"):
+                rec["email"] = ud["email"]
+                dirty = True
+
+        # ── niche (may still be in Redis with 1-day TTL) ──────────────────────
+        if job_id and not rec.get("niche"):
+            try:
+                niche_r = await redis.get(f"job:{job_id}:niche")
+                if niche_r:
+                    rec["niche"] = niche_r.decode() if isinstance(niche_r, bytes) else niche_r
+                    dirty = True
+            except Exception:
+                pass
+
+        # ── platform / project_title ─────────────────────────────────────────
+        if job_id:
+            for field, redis_key in [("platform", f"job:{job_id}:platform"),
+                                      ("project_title", f"job:{job_id}:project_title")]:
+                if not rec.get(field):
+                    try:
+                        val = await redis.get(redis_key)
+                        if val:
+                            rec[field] = val.decode() if isinstance(val, bytes) else val
+                            dirty = True
+                    except Exception:
+                        pass
+
+        # ── ai_provider ───────────────────────────────────────────────────────
+        if not rec.get("ai_provider"):
+            rec["ai_provider"] = "groq"
+            dirty = True
+
+        # ── tokens_consumed ───────────────────────────────────────────────────
+        if not rec.get("tokens_consumed"):
+            rec["tokens_consumed"] = max(100, rec.get("scenes", 0) * TOKENS_PER_VIDEO)
+            dirty = True
+
+        # ── voice_provider default ────────────────────────────────────────────
+        if not rec.get("voice_provider"):
+            rec["voice_provider"] = "edge_tts"
+            dirty = True
+
+        if dirty:
+            updated += 1
+
+    if updated == 0:
+        return {"status": "ok", "updated": 0, "total": len(records), "message": "All records already complete"}
+
+    # Rewrite the entire cost log list atomically
+    pipe = redis.pipeline()
+    pipe.delete(COST_LOG_KEY)
+    for rec in records:
+        pipe.rpush(COST_LOG_KEY, json.dumps(rec))
+    pipe.ltrim(COST_LOG_KEY, 0, 499)
+    await pipe.execute()
+
+    # Also update individual job records in render:cost:{job_id}
+    individual_updated = 0
+    for rec in records:
+        jid = rec.get("job_id", "")
+        if not jid:
+            continue
+        try:
+            existing_raw = await redis.get(f"{COST_KEY_PREFIX}{jid}")
+            if existing_raw:
+                existing = json.loads(existing_raw)
+                # Merge in the enriched fields
+                for field in ("username", "user_email", "full_name", "email",
+                              "niche", "platform", "project_title",
+                              "ai_provider", "tokens_consumed", "voice_provider"):
+                    if rec.get(field) and not existing.get(field):
+                        existing[field] = rec[field]
+                await redis.set(
+                    f"{COST_KEY_PREFIX}{jid}",
+                    json.dumps(existing),
+                    keepttl=True,
+                )
+                individual_updated += 1
+        except Exception:
+            pass
+
+    logger.info("Cost backfill complete — %d/%d records updated, %d individual records patched",
+                updated, len(records), individual_updated)
+    return {
+        "status": "ok",
+        "updated": updated,
+        "total": len(records),
+        "individual_records_patched": individual_updated,
+        "message": f"Backfilled {updated} of {len(records)} records",
+    }
+
+
 
 @router.get("/costs/user/{user_id}")
 async def get_user_render_costs(
