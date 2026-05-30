@@ -74,6 +74,7 @@ interface AppState {
   voiceConfig: VoiceConfig
   uploadedVoicePath: string | null
   jobId: string | null
+  prevJobId: string | null       // set before navigating to voice for re-renders
   renderProgress: number
   renderStage: string
   renderStatus: 'idle' | 'queued' | 'processing' | 'complete' | 'failed'
@@ -115,6 +116,7 @@ interface AppState {
   setVoiceConfig: (cfg: Partial<VoiceConfig>) => void
   setUploadedVoicePath: (path: string | null) => void
   setJobId: (id: string) => void
+  setPrevJobId: (id: string | null) => void
   setRenderProgress: (progress: number, stage: string, status: AppState['renderStatus']) => void
   setVideoUrl: (url: string) => void
   getIdeasRequest: () => Record<string, any>
@@ -139,7 +141,7 @@ const CLEAR_WORKFLOW = {
   ideas: [] as IdeaItem[], selectedIdea: null, script: '', wordCount: 0,
   estimatedDuration: 0, scenes: [] as Scene[], activeSceneIndex: 0,
         sceneHistory: [], sceneHistoryIndex: -1,
-  jobId: null, videoUrl: null, renderProgress: 0, renderStage: '',
+  jobId: null, prevJobId: null, videoUrl: null, renderProgress: 0, renderStage: '',
   renderStatus: 'idle' as const, uploadedVoicePath: null,
   voiceConfig: DEFAULT_VOICE,
 }
@@ -446,6 +448,7 @@ export const useStore = create<AppState>()(
         setVoiceConfig: (cfg) => set((s) => ({ voiceConfig: { ...s.voiceConfig, ...cfg } })),
         setUploadedVoicePath: (path) => set({ uploadedVoicePath: path }),
         setJobId: (id) => set({ jobId: id }),
+        setPrevJobId: (id) => set({ prevJobId: id }),
         setRenderProgress: (progress, stage, status) => set({
           renderProgress: progress, renderStage: stage, renderStatus: status
         }),
@@ -535,6 +538,7 @@ export const useStore = create<AppState>()(
             motion:     voiceConfig.motion      ?? 'auto',
             transition: voiceConfig.transition  ?? 'fade',
             transition_duration: 0.4,
+            prev_job_id: get().prevJobId ?? undefined,
           }
         },
 
