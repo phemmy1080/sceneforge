@@ -193,6 +193,7 @@ function VideoCard({ record, onRerender }: { record: RenderRecord; onRerender: (
 export default function MyVideos() {
   const setStep        = useStore((s) => s.setStep)
   const openProject    = useStore((s) => s.openProject)
+  const setPrevJobId   = useStore((s) => (s as any).setPrevJobId as (id: string | null) => void)
   const projects       = useStore((s) => s.projects)
   const [renders, setRenders]   = useState<RenderRecord[]>([])
   const [loading, setLoading]   = useState(true)
@@ -232,7 +233,7 @@ export default function MyVideos() {
       const found = res.data.found !== false && fetchedScenes.length > 0
 
       if (found) {
-        // Restore config + scenes into the store, then go to voice to re-render
+        // Restore scenes and mark as re-render so no tokens are deducted
         if (linked) openProject(linked.id)
         else {
           useStore.getState().setConfig({
@@ -240,8 +241,8 @@ export default function MyVideos() {
             platform: record.platform || 'TikTok',
           } as any)
         }
-        // Load the scenes back — openProject cleared them via CLEAR_WORKFLOW
         useStore.getState().setScenes(fetchedScenes)
+        setPrevJobId(record.job_id)   // tells getRenderRequest to send prev_job_id → free re-render
         setStep('voice')
         return
       }
