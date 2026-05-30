@@ -7,6 +7,8 @@ import { PageHeader } from '../components/ui'
 export default function Account() {
   const setStep            = useStore((s) => s.setStep)
   const agencyProjectId    = useStore((s) => s.agencyProjectId)
+  const viewMode           = useStore((s) => (s as any).viewMode as string)
+  const setViewMode        = useStore((s) => (s as any).setViewMode as (m: string) => void)
   const user               = useAuthStore((s) => s.user)
   const updateUser         = useAuthStore((s) => s.updateUser)
   const logout             = useAuthStore((s) => s.logout)
@@ -49,14 +51,8 @@ export default function Account() {
   const wsName    = (user as any)?.workspace_name as string | undefined
   const inAgency  = !!(wsId && wsRole)
   const canSwitch = inAgency && wsRole !== 'client'
-  // isAgencyMode: user came from agency workflow, or they have workspace membership
-  // We check if agencyProjectId is set OR if it was recently cleared (still in agency context).
-  // Since profile is a neutral step, we default to showing the switcher for any agency member.
-  const [cameFromAgency] = useState(() => {
-    const s = useStore.getState()
-    return !!(s.agencyProjectId) || (inAgency && (s.currentStep as string).startsWith('agency'))
-  })
-  const isAgencyMode = cameFromAgency
+  // isAgencyMode: driven by persistent viewMode in store so it survives step changes
+  const isAgencyMode = inAgency && viewMode === 'agency'
 
   const PLAN_LABEL: Record<string, string> = {
     free: 'Free', starter: 'Starter', pro: 'Pro', studio: 'Studio', agency: 'Agency'
@@ -68,6 +64,7 @@ export default function Account() {
 
   // ── actions ──────────────────────────────────────────────────────────────────
   function switchToAgency() {
+    setViewMode('agency')
     setStep('agency' as any)
   }
 
@@ -80,6 +77,7 @@ export default function Account() {
       duration_hint: 60, scene_count_hint: 8, client_brief: '',
     } as any)
     if ((store as any).setAgencyWorkflowStep) (store as any).setAgencyWorkflowStep('setup')
+    setViewMode('personal')
     setStep('projects' as any)
     store.loadProjectsFromBackend()
   }
@@ -138,13 +136,15 @@ export default function Account() {
     icon: string; label: string; value?: string; sub?: string
     onClick?: () => void; accent?: boolean; danger?: boolean
     right?: React.ReactNode
-  }) => (
-    <button
+  }) => {
+    // Use div when right (toggle) is present to avoid disabled-button blocking child clicks
+    const Tag = (right || !onClick) && !danger ? 'div' : 'button' as any
+    return (
+    <Tag
       onClick={onClick}
-      disabled={!onClick}
       className={`w-full flex items-center gap-3 px-4 py-3 border-b border-white/[0.05] last:border-0 transition-colors text-left
         ${onClick ? 'hover:bg-white/[0.04] active:bg-white/[0.06] cursor-pointer' : 'cursor-default'}
-        ${danger ? 'hover:bg-rose-500/5' : ''}`}
+        ${danger ? 'hover:bg-rose-500/5 cursor-pointer' : ''}`}
     >
       <span className="text-[17px] flex-shrink-0 w-6 text-center">{icon}</span>
       <div className="flex-1 min-w-0">
@@ -158,8 +158,8 @@ export default function Account() {
           <path d="M5 3l4 4-4 4"/>
         </svg>
       )}
-    </button>
-  )
+    </Tag>
+  )}
 
   const Toggle = ({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) => (
     <button
@@ -312,9 +312,15 @@ export default function Account() {
             </button>
           </div>
         )}
+        {pushPermission === 'granted' && (
+          <div className="px-4 py-2.5 border-b border-white/[0.05] flex items-center gap-2">
+            <span className="text-teal-400 text-[13px]">✓</span>
+            <p className="text-[11.5px] text-teal-400/80 font-medium">Push notifications enabled</p>
+          </div>
+        )}
         {pushPermission === 'denied' && (
           <div className="px-4 py-3 border-b border-white/[0.05]">
-            <p className="text-[11.5px] text-white/35">Notifications blocked. Enable in your browser settings to receive render alerts.</p>
+            <p className="text-[11.5px] text-white/35">Notifications blocked. Go to your browser settings → Notifications → allow sceneraforge.com</p>
           </div>
         )}
         <Row
