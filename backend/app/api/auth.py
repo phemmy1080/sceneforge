@@ -2,7 +2,7 @@ import asyncio
 import json
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Header, Request
+from fastapi import Query, APIRouter, Depends, HTTPException, Header, Request
 
 import logging
 from app.dependencies import get_redis
@@ -127,34 +127,35 @@ async def update_profile(
 @router.get("/tokens", response_model=TokenBalanceResponse)
 async def get_tokens(
     authorization: Optional[str] = Header(None),
+    personal: bool = Query(False, description="Return personal balance even for agency members"),
     redis=Depends(get_redis),
 ):
-    """Get the current user's token balance."""
+    """Return token balance. Pass ?personal=true to get individual balance in agency view."""
     token = (authorization or "").removeprefix("Bearer ").strip()
     if not token:
         raise HTTPException(status_code=401, detail="Missing token")
     user_id = auth_service.verify_token(token)
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
-    # If user belongs to an agency workspace, return the shared pool balance
-    # so the render screen reflects what will actually be deducted
-    try:
-        from app.services.agency_service import get_workspace_id_for_user, get_pool_balance
-        ws_id = await get_workspace_id_for_user(redis, user_id)
-        if ws_id:
-            pool = await get_pool_balance(redis, ws_id)
-            # Also get personal balance for reference
-            personal = await auth_service.get_token_balance(redis, user_id)
-            return TokenBalanceResponse(
-                tokens_remaining=pool,
-                tokens_total=pool,          # pool has no fixed ceiling
-                videos_created=personal.get("videos_created", 0),
-                can_render=pool >= 100,
-                is_agency=True,
-                ws_id=ws_id,
-            )
-    except Exception:
-        pass  # fall through to personal balance
+    # Return agency pool unless the user is in personal workspace view
+    if not personal:
+        try:
+            from app.services.agency_service import get_workspace_id_for_user, get_pool_balance
+            ws_id = await get_workspace_id_for_user(redis, user_id)
+            if ws_id:
+                pool = await get_pool_balance(redis, ws_id)
+                _pb = await auth_service.get_token_balance(redis, user_id)
+                return TokenBalanceResponse(
+                    tokens_remaining=pool,
+                    tokens_total=pool,
+                    videos_created=_pb.get("videos_created", 0),
+                    can_render=pool >= 100,
+                    is_agency=True,
+                    ws_id=ws_id,
+                )
+        except Exception:
+            pass
+
 
     bal = await auth_service.get_token_balance(redis, user_id)
 
