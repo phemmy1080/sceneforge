@@ -258,9 +258,10 @@ async def get_job_scenes(
     try:
         raw = await redis.get(f"render:scenes:{job_id}")
         if not raw:
-            raise HTTPException(status_code=404, detail="Scenes not found — too old or not stored")
+            # Return empty list — frontend will fall back to Setup gracefully
+            return {"scenes": [], "job_id": job_id, "found": False}
         scenes = json.loads(raw)
-        return {"scenes": scenes, "job_id": job_id}
+        return {"scenes": scenes, "job_id": job_id, "found": True}
     finally:
         await redis.aclose()
 
@@ -725,14 +726,14 @@ async def get_job_scenes(job_id: str):
     try:
         raw = await redis.get(f"job:{job_id}:scenes")
         if not raw:
-            raise HTTPException(404, "Scenes not found for this job")
+            return {"scenes": [], "scene_urls": [], "found": False}
         scenes = json.loads(raw)
 
         # Also return the current per-scene clip URLs (updated on partial re-renders)
         raw_urls = await redis.get(f"job:{job_id}:scene_urls")
         scene_urls: list[str] = json.loads(raw_urls) if raw_urls else []
 
-        return {"scenes": scenes, "scene_urls": scene_urls}
+        return {"scenes": scenes, "scene_urls": scene_urls, "found": True}
     finally:
         await redis.aclose()
 
