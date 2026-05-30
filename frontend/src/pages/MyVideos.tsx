@@ -225,11 +225,12 @@ export default function MyVideos() {
     const linked = projects.find(p => p.job_id === record.job_id)
 
     try {
-      // Fetch the original scenes from the backend (stored for 7 days after render)
-      const res = await api.get(`/api/render/job/${record.job_id}/scenes`)
+      // Fetch the original scenes from the existing scene-editor endpoint
+      const res = await api.get(`/api/render/scenes/${record.job_id}`)
       const fetchedScenes = res.data.scenes || []
+      const found = res.data.found !== false && fetchedScenes.length > 0
 
-      if (fetchedScenes.length > 0) {
+      if (found) {
         // Restore config + scenes into the store, then go to voice to re-render
         if (linked) openProject(linked.id)
         else {
