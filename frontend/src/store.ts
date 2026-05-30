@@ -81,9 +81,11 @@ interface AppState {
   backendSynced: boolean
 
   agencyProjectId: string
+  viewMode: 'agency' | 'personal'
   agencyProjectMeta: { title: string; client_name: string } | null
   setAgencyProjectMeta: (meta: { title: string; client_name: string } | null) => void
   setAgencyProjectId: (id: string) => void
+  setViewMode: (mode: 'agency' | 'personal') => void
   startAgencyVideo: (projectId: string, subStep?: string, sceneIndex?: number) => void
   startAgencyExport: (projectId: string, jobId: string, videoUrl: string) => void
   agencyWorkflowStep: string
@@ -157,8 +159,10 @@ export const useStore = create<AppState>()(
         backendSynced: false,
 
         agencyProjectId: '',
+        viewMode: 'personal',
         agencyProjectMeta: null as { title: string; client_name: string } | null,
         setAgencyProjectId: (id) => set({ agencyProjectId: id }),
+        setViewMode: (mode) => set({ viewMode: mode }),
         setAgencyProjectMeta: (meta: { title: string; client_name: string } | null) => set({ agencyProjectMeta: meta }),
 
         // Atomic: sets agencyProjectId + currentStep in a single update
