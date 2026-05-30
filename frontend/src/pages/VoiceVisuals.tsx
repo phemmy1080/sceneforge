@@ -3,6 +3,7 @@ import { useStore } from '../store'
 import { usePlanLimits } from '../hooks/usePlanLimits'
 import { useAuthStore } from '../authStore'
 import { getTokenBalance, startRender, type TokenBalance } from '../lib/api'
+import { useStore as useGlobalStore } from '../store'
 import { Button, Card, CardTitle, Chip, PageHeader } from '../components/ui'
 import VoiceDropdown from '../components/VoiceDropdown'
 import { getVoiceByName } from '../lib/voice_config'
@@ -54,9 +55,13 @@ export default function VoiceVisuals() {
   const [renderError,  setRenderError]  = useState('')
   const [tokenBalance, setTokenBalance] = useState<TokenBalance | null>(null)
 
+  // Detect if user is in personal mode (no agency project context)
+  const agencyProjectId = useGlobalStore((s: any) => s.agencyProjectId)
+  const isPersonalMode  = !agencyProjectId
+
   useEffect(() => {
-    getTokenBalance().then(setTokenBalance).catch(() => {})
-  }, [])
+    getTokenBalance(isPersonalMode).then(setTokenBalance).catch(() => {})
+  }, [isPersonalMode])
 
   async function handleRender() {
     setLoading(true)
@@ -74,7 +79,7 @@ export default function VoiceVisuals() {
         setRenderError(
           `Not enough tokens. You have ${detail.tokens_remaining} tokens but need ${detail.cost_per_video} to render a new video.`
         )
-        getTokenBalance().then(setTokenBalance).catch(() => {})
+        getTokenBalance(isPersonalMode).then(setTokenBalance).catch(() => {})
       } else if (detail?.error === 'scene_limit_exceeded') {
         setRenderError(detail.message)
         document.dispatchEvent(new CustomEvent('show-upgrade-prompt', {
@@ -287,7 +292,7 @@ export default function VoiceVisuals() {
         <div className="mb-4 bg-[#111118] border border-white/[0.07] rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[11px] font-semibold text-white/40 uppercase tracking-widest">
-              {tokenBalance.is_agency ? 'Agency pool balance' : 'Token balance'}
+              {tokenBalance.is_agency && !isPersonalMode ? 'Agency pool balance' : 'Token balance'}
             </span>
             <span className="text-[13px] font-bold text-white">
               {tokenBalance.tokens_remaining.toLocaleString()}
