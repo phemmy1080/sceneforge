@@ -281,6 +281,157 @@ async def download_custom_image(url: str, output_dir: str, scene_id: int) -> Vis
     return VisualFile(path=out_path, media_type="image", source="custom")
 
 
+# ── Unsplash ──────────────────────────────────────────────────────────────────
+UNSPLASH_BASE = "https://api.unsplash.com"
+
+# Niches where Unsplash has better African content than Pexels
+PREFER_UNSPLASH_NICHES = {
+    "Finance", "Business", "Real Estate", "Fashion", "Health",
+    "Food", "Education", "E-commerce", "General", "Mindset",
+}
+
+
+def _build_unsplash_query(scene: Scene, niche: str) -> str:
+    """Build a targeted search query from the scene visual description + niche context."""
+    base = (scene.visual or scene.text or "").strip()
+    # Take first 6 words max to keep the query focused
+    words = base.split()[:6]
+    query = " ".join(words)
+    # Add African context keywords for relevant niches
+    context_map = {
+        "Finance":     "African business",
+        "Business":    "Nigerian professional",
+        "Real Estate": "African property",
+        "Fashion":     "African fashion",
+        "Health":      "African wellness",
+        "Food":        "Nigerian food",
+        "Education":   "African student",
+        "E-commerce":  "African market",
+    }
+    suffix = context_map.get(niche, "")
+    return f"{query} {suffix}".strip() if suffix else query
+
+
+async def search_unsplash(query: str, per_page: int = 10) -> list[dict]:
+    """Search Unsplash for photos. Returns list of photo dicts."""
+    if not settings.unsplash_api_key:
+        return []
+    headers = {"Authorization": f"Client-ID {settings.unsplash_api_key}"}
+    params  = {
+        "query":       query,
+        "orientation": "portrait",
+        "per_page":    per_page,
+        "content_filter": "high",
+    }
+    async with aiohttp.ClientSession() as session:
+        async with session.get(
+            f"{UNSPLASH_BASE}/search/photos",
+            headers=headers, params=params
+        ) as resp:
+            if resp.status != 200:
+                logger.warning("Unsplash search failed (%s) for query: %s", resp.status, query)
+                return []
+            data = await resp.json()
+            return data.get("results", [])
+
+
+async def download_unsplash_photo(url: str, output_path: str) -> str:
+    """Download a photo from Unsplash to disk."""
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            resp.raise_for_status()
+            async with aiofiles.open(output_path, "wb") as f:
+                await f.write(await resp.read())
+    return output_path
+
+
+async def apply_ken_burns(
+    photo_path: str,
+    output_path: str,
+    duration: float = 6.0,
+    width: int = 1080,
+    height: int = 1920,
+) -> str:
+    """
+    Convert a static photo to a video clip using the Ken Burns effect
+    (slow zoom-in with subtle pan) via FFmpeg. Makes photos look cinematic.
+    """
+    import subprocess, asyncio
+    fps    = 30
+    frames = int(duration * fps)
+    # Zoom from 1.0 to 1.3 over the duration: z = 1 + (0.3/frames)*n
+    zoom_step = round(0.3 / frames, 6)
+    cmd = [
+        "ffmpeg", "-y",
+        "-loop", "1",
+        "-i", photo_path,
+        "-vf", (
+            f"scale=8000:-1,"
+            f"zoompan="
+            f"z='min(zoom+{zoom_step},1.3)':"
+            f"x='iw/2-(iw/zoom/2)':"
+            f"y='ih/2-(ih/zoom/2)':"
+            f"d={frames}:"
+            f"s={width}x{height},"
+            f"setsar=1"
+        ),
+        "-t", str(duration),
+        "-r", str(fps),
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-preset", "fast",
+        output_path,
+    ]
+    proc = await asyncio.create_subprocess_exec(
+        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+    )
+    _, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        raise RuntimeError(f"Ken Burns FFmpeg failed: {stderr.decode()[-300:]}")
+    return output_path
+
+
+async def fetch_unsplash_for_scene(
+    scene: Scene, output_dir: str, niche: str = ""
+) -> VisualFile:
+    """
+    Search Unsplash for a portrait photo matching the scene, then apply
+    Ken Burns zoom/pan to produce a cinematic video clip.
+    Falls back to Pexels if Unsplash is unavailable or returns no results.
+    """
+    if not settings.unsplash_api_key:
+        logger.info("Unsplash API key not set — falling back to Pexels")
+        return await fetch_pexels_for_scene(scene, output_dir)
+
+    query   = _build_unsplash_query(scene, niche)
+    results = await search_unsplash(query, per_page=10)
+
+    if not results:
+        # Retry with simpler query
+        simple = " ".join((scene.text or "").split()[:3])
+        results = await search_unsplash(simple, per_page=5)
+
+    if not results:
+        logger.info("Unsplash returned no results for '%s' — falling back to Pexels", query)
+        return await fetch_pexels_for_scene(scene, output_dir)
+
+    photo     = results[0]
+    photo_url = photo["urls"].get("regular") or photo["urls"]["full"]
+    photo_id  = photo.get("id", "photo")
+
+    photo_path  = str(Path(output_dir) / f"scene_{scene.id:02d}_unsplash_{photo_id}.jpg")
+    video_path  = str(Path(output_dir) / f"scene_{scene.id:02d}_unsplash.mp4")
+
+    await download_unsplash_photo(photo_url, photo_path)
+    await apply_ken_burns(photo_path, video_path, duration=scene.duration or 6.0)
+
+    logger.info(
+        "Unsplash Ken Burns ✓ scene=%s query='%s' photo=%s",
+        scene.id, query, photo_id,
+    )
+    return VisualFile(path=video_path, media_type="video", source="unsplash")
+
+
 async def get_visual_for_scene(
     scene: Scene,
     output_dir: str,
@@ -303,6 +454,9 @@ async def get_visual_for_scene(
         except Exception as e:
             logger.warning("Custom image download failed for scene %s: %s — falling back", scene.id, e)
 
+    if source == VisualSource.unsplash:
+        return await fetch_unsplash_for_scene(scene, output_dir, niche=niche)
+
     if source == VisualSource.dalle:
         # DALL-E requires Studio or Agency plan
         if user_plan not in {"studio", "agency"}:
@@ -318,6 +472,12 @@ async def get_visual_for_scene(
             return await fetch_pexels_for_scene(scene, output_dir)
 
     if source in (VisualSource.pexels_video, VisualSource.pexels_photo):
+        # For African-context niches, try Unsplash first if API key is available
+        if niche in PREFER_UNSPLASH_NICHES and settings.unsplash_api_key:
+            try:
+                return await fetch_unsplash_for_scene(scene, output_dir, niche=niche)
+            except Exception as e:
+                logger.info("Unsplash failed for scene %s (%s) — using Pexels", scene.id, e)
         return await fetch_pexels_for_scene(scene, output_dir)
 
     # mixed: Pexels first, solid-color placeholder fallback (no DALL-E needed)
