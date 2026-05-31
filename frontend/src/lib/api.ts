@@ -162,7 +162,7 @@ export interface RenderRequest {
   scenes: Scene[]
   voice_name: string
   voice_speed: number
-  visual_source: 'pexels_video' | 'pexels_photo' | 'dalle' | 'mixed'
+  visual_source: 'pexels_video' | 'pexels_photo' | 'dalle' | 'mixed' | 'unsplash'
   subtitle_style: 'viral' | 'minimal' | 'karaoke' | 'none'
   music: string
   project_title: string
