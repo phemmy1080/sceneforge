@@ -15,11 +15,12 @@ class SceneType(str, Enum):
 
 
 class VisualSource(str, Enum):
-    pexels_video = "pexels_video"
-    pexels_photo = "pexels_photo"
-    dalle = "dalle"
-    custom = "custom"       # user-uploaded images per scene
-    mixed = "mixed"         # auto-detect per scene
+    pexels_video  = "pexels_video"
+    pexels_photo  = "pexels_photo"
+    unsplash      = "unsplash"       # Unsplash photo + Ken Burns zoom/pan effect
+    dalle         = "dalle"
+    custom        = "custom"         # user-uploaded images per scene
+    mixed         = "mixed"          # auto-detect per scene
 
 
 class ExportType(str, Enum):
