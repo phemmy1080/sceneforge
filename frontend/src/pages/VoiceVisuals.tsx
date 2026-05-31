@@ -10,12 +10,12 @@ import { getVoiceByName } from '../lib/voice_config'
 
 const STABILITY_OPTIONS = ['high', 'medium', 'low']
 const VISUAL_SOURCES = [
-  { value: 'mixed',        label: 'Auto (Pexels + AI)',          plan: 'free'   },
+  { value: 'mixed'       , label: 'Auto (Pexels + AI)',          plan: 'free'   },
   { value: 'pexels_video', label: 'Stock video (Pexels)',         plan: 'free'   },
-  { value: 'unsplash',     label: 'Photos + Motion (Unsplash)',   plan: 'free'   },
+  { value: 'unsplash'    , label: 'Photos + Motion (Unsplash)',   plan: 'free'   },
   { value: 'pexels_photo', label: 'Stock photos (Pexels)',        plan: 'free'   },
-  { value: 'dalle',        label: 'AI images (DALL-E 3)',         plan: 'studio' },
-]
+  { value: 'dalle'       , label: 'AI images (DALL-E 3)',         plan: 'studio' },
+] as const
 const SUBTITLE_STYLES = ['viral', 'minimal', 'karaoke', 'none']
 const SUBTITLE_LABELS: Record<string, string> = {
   viral:   'Viral (kinetic)',
