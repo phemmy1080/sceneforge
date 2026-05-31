@@ -316,17 +316,22 @@ async def search_visuals(req: SearchVisualsRequest):
         if req.source == VisualSource.unsplash:
             # Search Unsplash and convert to VisualResult format
             photos = await search_unsplash(req.keyword, per_page=9)
-            results = []
-            for p in photos:
-                urls = p.get("urls", {})
-                results.append(VisualResult(
-                    id=str(p.get("id", "")),
-                    thumbnail_url=urls.get("thumb") or urls.get("small") or "",
-                    preview_url=urls.get("regular") or urls.get("full") or "",
-                    source="unsplash",
-                    width=p.get("width", 1080),
-                    height=p.get("height", 1920),
-                ))
+            if photos:
+                results = []
+                for p in photos:
+                    urls = p.get("urls", {})
+                    results.append(VisualResult(
+                        id=str(p.get("id", "")),
+                        thumbnail_url=urls.get("thumb") or urls.get("small") or "",
+                        preview_url=urls.get("regular") or urls.get("full") or "",
+                        source="unsplash",
+                        width=p.get("width", 1080),
+                        height=p.get("height", 1920),
+                    ))
+                return SearchVisualsResponse(results=results)
+            # Unsplash unavailable or no key — fall back to Pexels
+            logger.info("Unsplash returned no results for '%s' — falling back to Pexels", req.keyword)
+            results = await visuals.search_pexels_videos(req.keyword, per_page=6)
             return SearchVisualsResponse(results=results)
         else:
             # Default: Pexels video or photo
