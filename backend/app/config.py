@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str = ""
     tts_provider: str = "gtts"   # "gtts" or "edge"
     pexels_api_key: str = ""
+    unsplash_api_key: str = ""       # Unsplash Access Key — register at unsplash.com/developers
 
     # ── Flutterwave payments ───────────────────────────────────────────────
     flutterwave_public_key: str = ""   # FLWPUBK_TEST-xxx or FLWPUBK-xxx
