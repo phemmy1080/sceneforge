@@ -12,7 +12,8 @@ from app.models.schemas import (
     GenerateIdeasRequest, GenerateIdeasResponse,
     GenerateScriptRequest, GenerateScriptResponse,
     GenerateScenesRequest, GenerateScenesResponse,
-    SearchVisualsRequest, SearchVisualsResponse,
+    SearchVisualsRequest, SearchVisualsResponse, VisualResult,
+    VisualSource,
     UploadScriptResponse,
 )
 from app.services import ai, visuals
