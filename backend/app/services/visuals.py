@@ -38,6 +38,26 @@ class VisualFile:
 
 # ─── Pexels ───────────────────────────────────────────────────────────────────
 
+# ── African/Nigerian context injection for DALL-E ─────────────────────────────
+# When a niche has strong African relevance, inject context into DALL-E prompts
+# so generated images look relevant to Nigerian creators and their audiences.
+AFRICAN_CONTEXT = {
+    "Finance":     "Nigerian financial context, modern Lagos office, African professional",
+    "Business":    "Nigerian entrepreneur, Lagos business district, West African professional",
+    "Real Estate": "Nigerian property, modern Lagos apartment, Abuja architecture, African home",
+    "Fashion":     "Nigerian fashion, Afrocentric style, Lagos streetwear, African model",
+    "Health":      "African wellness, Nigerian healthcare, West African lifestyle",
+    "Food":        "Nigerian cuisine, West African food, Lagos street food, Jollof, suya",
+    "Education":   "Nigerian student, Lagos classroom, African university, West African learning",
+    "E-commerce":  "Nigerian online business, Lagos market, African product photography",
+    "Travel":      "Nigerian travel, Lagos skyline, West African landscape, Abuja cityscape",
+    "Comedy":      "Nigerian everyday life, relatable African scenes, Lagos hustle",
+    "History":     "African history, Nigerian heritage, West African culture and tradition",
+    "Mindset":     "African professional, Nigerian success story, West African ambition",
+    "General":     "African setting, Nigerian context, West African lifestyle",
+}
+
+
 async def search_pexels_videos(keyword: str, per_page: int = 6) -> list[VisualResult]:
     """Search Pexels for stock videos. Returns thumbnail + preview URLs."""
     headers = {"Authorization": settings.pexels_api_key}
@@ -171,11 +191,17 @@ async def fetch_pexels_for_scene(scene: Scene, output_dir: str) -> VisualFile:
 
 # ─── DALL-E 3 ─────────────────────────────────────────────────────────────────
 
-async def generate_dalle_image(scene: Scene, output_dir: str) -> VisualFile:
-    """Generate an AI image via DALL-E 3 for a scene."""
+async def generate_dalle_image(scene: Scene, output_dir: str, niche: str = "") -> VisualFile:
+    """Generate an AI image via DALL-E 3 for a scene.
+    Automatically injects African/Nigerian context for relevant niches so
+    generated images feel relevant to Nigerian creators and their audience.
+    """
+    # Inject African context when the niche maps to one
+    context_hint = AFRICAN_CONTEXT.get(niche, "")
+    context_clause = f" {context_hint}." if context_hint else ""
     prompt = (
         f"Cinematic vertical video frame (9:16 portrait orientation). "
-        f"{scene.visual}. "
+        f"{scene.visual}.{context_clause} "
         f"Professional stock photo quality. No text, no watermarks, no logos. "
         f"Clean, high contrast, visually striking."
     )
@@ -261,6 +287,7 @@ async def get_visual_for_scene(
     source: VisualSource = VisualSource.mixed,
     user_plan: str = "free",
     custom_image_url: Optional[str] = None,
+    niche: str = "",
 ) -> VisualFile:
     """
     Route visual sourcing based on preference.
@@ -277,15 +304,15 @@ async def get_visual_for_scene(
             logger.warning("Custom image download failed for scene %s: %s — falling back", scene.id, e)
 
     if source == VisualSource.dalle:
-        # Gate DALL-E to pro and studio plans only
-        if user_plan not in {"pro", "studio"}:
-            logger.info("DALL-E requires pro/studio plan (user is '%s') — using Pexels", user_plan)
+        # DALL-E requires Studio or Agency plan
+        if user_plan not in {"studio", "agency"}:
+            logger.info("DALL-E requires studio/agency plan (user is '%s') — using Pexels", user_plan)
             return await fetch_pexels_for_scene(scene, output_dir)
         if not settings.openai_api_key:
             logger.warning("OPENAI_API_KEY not set — falling back to Pexels for scene %s", scene.id)
             return await fetch_pexels_for_scene(scene, output_dir)
         try:
-            return await generate_dalle_image(scene, output_dir)
+            return await generate_dalle_image(scene, output_dir, niche=niche)
         except Exception as e:
             logger.warning("DALL-E failed for scene %s: %s — falling back to Pexels", scene.id, e)
             return await fetch_pexels_for_scene(scene, output_dir)
