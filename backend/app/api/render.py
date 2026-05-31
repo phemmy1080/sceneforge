@@ -62,6 +62,11 @@ async def start_render(
     redis = await _get_redis()
     user_id = _extract_user_id(authorization)
 
+    # Require authentication — all limits (daily, tokens, DALL-E) depend on user_id
+    if not user_id:
+        await redis.aclose()
+        raise HTTPException(status_code=401, detail="Authentication required to render")
+
     # ── Security checks ───────────────────────────────────────────────────────
     from fastapi import Request as _Req
     client_ip = (
