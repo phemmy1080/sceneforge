@@ -18,7 +18,7 @@ export interface ProjectConfig {
 
 export interface VoiceConfig {
   voice_name: string; voice_speed: number; voice_stability: string
-  visual_source: 'pexels_video' | 'pexels_photo' | 'dalle' | 'mixed'
+  visual_source: 'pexels_video' | 'pexels_photo' | 'dalle' | 'mixed' | 'unsplash'
   subtitle_style: 'viral' | 'minimal' | 'karaoke' | 'none'
   music: string
   motion: string
