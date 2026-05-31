@@ -382,10 +382,12 @@ export async function uploadVoiceClip(
 export const searchVisuals = async (
   keyword: string,
   sceneId?: number,
+  source: RenderRequest['visual_source'] = 'pexels_video',
 ): Promise<VisualResult[]> => {
   const { data } = await api.post('/api/generate/visuals/search', {
     keyword,
     scene_id: sceneId,
+    source,
   })
   return data.results ?? []
 }
