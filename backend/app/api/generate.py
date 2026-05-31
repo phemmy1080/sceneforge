@@ -17,6 +17,7 @@ from app.models.schemas import (
     UploadScriptResponse,
 )
 from app.services import ai, visuals
+from app.services.visuals import search_unsplash
 from app.services import auth as auth_service
 from app.services.plans import get_limits, check_scene_limit
 from app.dependencies import get_redis
@@ -314,7 +315,6 @@ async def search_visuals(req: SearchVisualsRequest):
     try:
         if req.source == VisualSource.unsplash:
             # Search Unsplash and convert to VisualResult format
-            from app.services.visuals import search_unsplash
             photos = await search_unsplash(req.keyword, per_page=9)
             results = []
             for p in photos:
