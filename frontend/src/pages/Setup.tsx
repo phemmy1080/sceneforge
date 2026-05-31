@@ -75,7 +75,7 @@ const NICHE_TEMPLATES = [
   {
     id: 'personal-finance',
     icon: '💰', label: 'Personal Finance',
-    niche: 'personal finance', style: 'Educational', platform: 'TikTok',
+    niche: 'Finance', style: 'Educational', platform: 'TikTok',
     tone: 'Energetic & punchy', audience: 'Young Nigerians aged 18-35',
     objective: 'awareness',
     context: 'Help Nigerians understand money management, investing, and wealth building',
@@ -85,7 +85,7 @@ const NICHE_TEMPLATES = [
   {
     id: 'real-estate',
     icon: '🏡', label: 'Real Estate',
-    niche: 'real estate', style: 'Product showcase', platform: 'Instagram Reels',
+    niche: 'Real Estate', style: 'Product showcase', platform: 'Instagram Reels',
     tone: 'Professional', audience: 'Property buyers and investors in Nigeria',
     objective: 'lead_gen',
     context: 'Showcase properties, land, or real estate investment opportunities in Nigeria',
@@ -95,7 +95,7 @@ const NICHE_TEMPLATES = [
   {
     id: 'fitness',
     icon: '💪', label: 'Fitness & Health',
-    niche: 'fitness', style: 'Tutorial', platform: 'TikTok',
+    niche: 'Fitness', style: 'Tutorial', platform: 'TikTok',
     tone: 'Energetic & punchy', audience: 'Fitness enthusiasts aged 20-40',
     objective: 'awareness',
     context: 'Workout tips, nutrition advice, and healthy lifestyle content for Nigerians',
@@ -105,7 +105,7 @@ const NICHE_TEMPLATES = [
   {
     id: 'ecommerce',
     icon: '🛍️', label: 'E-commerce / Product',
-    niche: 'e-commerce', style: 'Product showcase', platform: 'Instagram Reels',
+    niche: 'E-commerce', style: 'Product showcase', platform: 'Instagram Reels',
     tone: 'Urgent / Sales', audience: 'Online shoppers in Nigeria',
     objective: 'sales',
     context: 'Showcase products, announce deals, and drive purchases on your Nigerian online store',
@@ -115,7 +115,7 @@ const NICHE_TEMPLATES = [
   {
     id: 'motivational',
     icon: '🔥', label: 'Motivational',
-    niche: 'motivation', style: 'Viral / Hook-first', platform: 'TikTok',
+    niche: 'Mindset', style: 'Viral / Hook-first', platform: 'TikTok',
     tone: 'Inspirational', audience: 'Young Nigerian entrepreneurs and hustlers',
     objective: 'awareness',
     context: 'Motivational content for Nigerian youth — mindset, hustle culture, success stories',
@@ -125,7 +125,7 @@ const NICHE_TEMPLATES = [
   {
     id: 'food',
     icon: '🍲', label: 'Food & Restaurant',
-    niche: 'food', style: 'Behind the scenes', platform: 'TikTok',
+    niche: 'Food', style: 'Behind the scenes', platform: 'TikTok',
     tone: 'Conversational', audience: 'Food lovers and restaurant-goers in Nigeria',
     objective: 'awareness',
     context: 'Nigerian food content — recipes, restaurant tours, street food, and food reviews',
@@ -135,7 +135,7 @@ const NICHE_TEMPLATES = [
   {
     id: 'tech',
     icon: '📱', label: 'Tech & Gadgets',
-    niche: 'technology', style: 'Opinion / Hot take', platform: 'YouTube Shorts',
+    niche: 'Tech', style: 'Opinion / Hot take', platform: 'YouTube Shorts',
     tone: 'Conversational', audience: 'Tech-savvy Nigerians aged 18-35',
     objective: 'awareness',
     context: 'Tech reviews, tips, and opinions relevant to Nigerian tech consumers',
@@ -145,7 +145,7 @@ const NICHE_TEMPLATES = [
   {
     id: 'business',
     icon: '🚀', label: 'Business & Entrepreneurship',
-    niche: 'business', style: 'Educational', platform: 'LinkedIn',
+    niche: 'Business', style: 'Educational', platform: 'LinkedIn',
     tone: 'Professional', audience: 'Nigerian entrepreneurs and business owners',
     objective: 'awareness',
     context: 'Business advice, startup tips, and entrepreneurship insights for Nigerian founders',
@@ -155,7 +155,7 @@ const NICHE_TEMPLATES = [
   {
     id: 'education',
     icon: '🎓', label: 'Education / Tutorial',
-    niche: 'education', style: 'Tutorial', platform: 'YouTube Shorts',
+    niche: 'Education', style: 'Tutorial', platform: 'YouTube Shorts',
     tone: 'Calm & informative', audience: 'Students and learners across Nigeria',
     objective: 'tutorial',
     context: 'Educational content — explain concepts, skills, and knowledge in simple terms',
@@ -165,7 +165,7 @@ const NICHE_TEMPLATES = [
   {
     id: 'fashion',
     icon: '👗', label: 'Fashion & Style',
-    niche: 'fashion', style: 'Product showcase', platform: 'Instagram Reels',
+    niche: 'Fashion', style: 'Product showcase', platform: 'Instagram Reels',
     tone: 'Luxury', audience: 'Fashion-conscious Nigerians aged 20-35',
     objective: 'awareness',
     context: 'Nigerian fashion — Ankara styles, accessories, designer brands, and style tips',
@@ -175,7 +175,7 @@ const NICHE_TEMPLATES = [
   {
     id: 'comedy',
     icon: '😂', label: 'Comedy / Entertainment',
-    niche: 'entertainment', style: 'Storytelling', platform: 'TikTok',
+    niche: 'Comedy', style: 'Storytelling', platform: 'TikTok',
     tone: 'Humorous', audience: 'General Nigerian audience all ages',
     objective: 'awareness',
     context: 'Nigerian comedy, relatable skits, and entertainment content',
@@ -185,7 +185,7 @@ const NICHE_TEMPLATES = [
   {
     id: 'travel',
     icon: '✈️', label: 'Travel & Lifestyle',
-    niche: 'travel', style: 'Documentary', platform: 'YouTube Shorts',
+    niche: 'Travel', style: 'Documentary', platform: 'YouTube Shorts',
     tone: 'Conversational', audience: 'Nigerian travel enthusiasts aged 25-45',
     objective: 'story',
     context: 'Travel content — destinations in Nigeria and abroad, budget travel tips, visa guides',
@@ -253,8 +253,9 @@ export default function Setup() {
       data.forEach((n) => { map[n.key] = n.suggestions })
       setNicheMap(map)
 
-      // Guard: if personal mode but config has an agency industry key, clear it
-      if (!isAgencyMode && ['fmcg','finance','healthcare','automotive','tech','fashion','realestate','food','education','ecommerce','hospitality','nonprofit'].includes(config.niche)) {
+      // Guard: clear niche if personal mode has an agency-only industry key (old lowercase keys)
+      const agencyOnlyKeys = ['fmcg','healthcare','automotive','hospitality','nonprofit']
+      if (!isAgencyMode && agencyOnlyKeys.includes(config.niche.toLowerCase())) {
         setConfig({ niche: '' })
       }
     }).catch(() => {})
