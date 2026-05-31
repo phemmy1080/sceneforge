@@ -225,8 +225,17 @@ export default function Setup() {
 
 
   function applyTemplate(t: typeof NICHE_TEMPLATES[0]) {
+    // Find the best matching niche key from whatever the admin has loaded
+    // Uses case-insensitive match on key or label so template niches
+    // work regardless of how the admin capitalised them
+    const matched = niches.find(n =>
+      n.key.toLowerCase()   === t.niche.toLowerCase() ||
+      n.label?.toLowerCase() === t.niche.toLowerCase()
+    )
+    const nicheKey = matched?.key ?? t.niche  // fallback to raw value if no match yet
+
     setConfig({
-      niche:            t.niche,
+      niche:            nicheKey,
       style:            t.style,
       platform:         t.platform,
       tone:             t.tone,
