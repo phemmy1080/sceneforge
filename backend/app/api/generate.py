@@ -311,8 +311,26 @@ async def generate_scenes(
 @router.post("/visuals/search", response_model=SearchVisualsResponse)
 async def search_visuals(req: SearchVisualsRequest):
     try:
-        results = await visuals.search_pexels_videos(req.keyword, per_page=6)
-        return SearchVisualsResponse(results=results)
+        if req.source == VisualSource.unsplash:
+            # Search Unsplash and convert to VisualResult format
+            from app.services.visuals import search_unsplash
+            photos = await search_unsplash(req.keyword, per_page=9)
+            results = []
+            for p in photos:
+                urls = p.get("urls", {})
+                results.append(VisualResult(
+                    id=str(p.get("id", "")),
+                    thumbnail_url=urls.get("thumb") or urls.get("small") or "",
+                    preview_url=urls.get("regular") or urls.get("full") or "",
+                    source="unsplash",
+                    width=p.get("width", 1080),
+                    height=p.get("height", 1920),
+                ))
+            return SearchVisualsResponse(results=results)
+        else:
+            # Default: Pexels video or photo
+            results = await visuals.search_pexels_videos(req.keyword, per_page=6)
+            return SearchVisualsResponse(results=results)
     except Exception as e:
         logger.exception("search_visuals failed")
         raise HTTPException(status_code=500, detail=str(e))
