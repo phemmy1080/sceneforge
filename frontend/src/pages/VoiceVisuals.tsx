@@ -92,10 +92,7 @@ export default function VoiceVisuals() {
           detail: { reason: 'scene_limit', max: detail.max_scenes }
         }))
       } else if (detail?.error === 'daily_limit_exceeded') {
-        setRenderError(detail.message)
-        document.dispatchEvent(new CustomEvent('show-upgrade-prompt', {
-          detail: { reason: 'daily_limit', max: detail.daily_limit }
-        }))
+        setRenderError(`DAILY_LIMIT:${detail.daily_limit}`)
       } else if (detail?.error === 'dalle_not_allowed') {
         setRenderError('AI image generation (DALL-E) requires Studio or Agency plan.')
         document.dispatchEvent(new CustomEvent('show-upgrade-prompt', {
@@ -378,12 +375,47 @@ export default function VoiceVisuals() {
         </div>
       )}
 
-      {/* ── Error ── */}
-      {renderError && (
+      {/* ── Error display ── */}
+      {renderError && renderError.startsWith('DAILY_LIMIT:') ? (
+        <div className="mb-4 bg-[#1a1a2e] border border-violet-500/25 rounded-xl p-4">
+          <div className="flex items-start gap-3 mb-3">
+            <span className="text-[20px] flex-shrink-0">🎬</span>
+            <div>
+              <p className="text-[13.5px] font-semibold text-white/85">Daily render limit reached</p>
+              <p className="text-[12px] text-white/45 mt-0.5">
+                Free plan allows {renderError.split(':')[1]} renders per day.
+                Upgrade for unlimited renders or come back tomorrow.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setStep('plans')}
+              className="flex-1 py-2 bg-violet-500 hover:bg-violet-600 text-white text-[12.5px] font-semibold rounded-xl transition-colors"
+            >
+              Upgrade plan
+            </button>
+            <button
+              onClick={() => setRenderError('')}
+              className="px-4 py-2 bg-white/[0.06] hover:bg-white/10 text-white/50 text-[12.5px] rounded-xl transition-colors"
+            >
+              Wait till tomorrow
+            </button>
+          </div>
+        </div>
+      ) : renderError ? (
         <div className="mb-4 bg-red-500/10 border border-red-500/25 rounded-xl p-4 text-[13px] text-red-300">
           {renderError}
+          {(renderError.includes('tokens') || renderError.includes('insufficient')) && (
+            <button
+              onClick={() => setStep('plans')}
+              className="mt-2 block w-full py-2 bg-violet-500/15 border border-violet-500/30 text-violet-300 text-[12px] font-semibold rounded-lg"
+            >
+              View plans →
+            </button>
+          )}
         </div>
-      )}
+      ) : null}
 
       <Button
         variant="primary"
@@ -397,11 +429,38 @@ export default function VoiceVisuals() {
         Render video
       </Button>
 
+      {canRender && tokenBalance && tokenBalance.tokens_remaining < 300 && tokenBalance.tokens_remaining > 0 && (
+        <div className="mb-3 flex items-center justify-between bg-amber-500/8 border border-amber-500/20 rounded-xl px-4 py-2.5">
+          <p className="text-[12px] text-amber-300/80">
+            ⚠️ Low balance — {tokenBalance.tokens_remaining} tokens left (≈{Math.floor(tokenBalance.tokens_remaining / 100)} renders)
+          </p>
+          <button
+            onClick={() => setStep('plans')}
+            className="text-[11.5px] font-semibold text-amber-300 hover:text-amber-200 transition-colors"
+          >
+            Top up →
+          </button>
+        </div>
+      )}
+
       {!canRender && (
-        <p className="mt-3 text-[12px] text-white/35">
-          You need {tokenBalance?.cost_per_video ?? 100} tokens to render.
-          Contact support to top up your balance.
-        </p>
+        <div className="mt-3 flex items-center gap-3 bg-amber-500/8 border border-amber-500/20 rounded-xl px-4 py-3">
+          <span className="text-amber-400 text-[16px] flex-shrink-0">⚡</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-[12.5px] text-amber-300/90 font-medium">
+              You need {tokenBalance?.cost_per_video ?? 100} tokens to render
+            </p>
+            <p className="text-[11px] text-white/35 mt-0.5">
+              {tokenBalance?.tokens_remaining ?? 0} tokens remaining
+            </p>
+          </div>
+          <button
+            onClick={() => setStep('plans')}
+            className="flex-shrink-0 px-3 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-[12px] font-semibold rounded-lg transition-colors"
+          >
+            Top up
+          </button>
+        </div>
       )}
     </div>
   )
