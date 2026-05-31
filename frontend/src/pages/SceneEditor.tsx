@@ -36,6 +36,7 @@ export default function SceneEditor() {
   const sceneHistoryIndex = useStore((s: any) => s.sceneHistoryIndex)
   const sceneHistory = useStore((s: any) => s.sceneHistory)
   const { canAddScene, scenesRemaining, maxScenes, isFree } = usePlanLimits()
+  const voiceConfig = useStore((s) => s.voiceConfig)
   const setStep = useStore((s) => s.setStep)
   const markStepComplete = useStore((s) => s.markStepComplete)
 
@@ -113,7 +114,7 @@ export default function SceneEditor() {
         <h3 className="text-white font-bold text-base text-center mb-1">Delete Scene {confirmDeleteIndex + 1}?</h3>
         <p className="text-white/40 text-sm text-center mb-6 leading-relaxed">
           This scene will be permanently removed from your video.<br/>
-          <span className="text-white/25 text-xs">You cannot undo this.</span>
+          <span className="text-white/25 text-xs">You can undo this with Ctrl+Z.</span>
         </p>
         <div className="flex gap-3">
           <button
@@ -220,7 +221,7 @@ export default function SceneEditor() {
       // Trigger partial re-render for just this scene
       const res = await api.post(`/api/render/scenes/${lastJobId}/${activeSceneIndex}`, {
         scene: activeScene,
-        visual_source: 'pexels_video',
+        visual_source: voiceConfig.visual_source === 'mixed' ? 'pexels_video' : voiceConfig.visual_source,
         subtitle_style: 'viral',
         platform: useStore.getState().config?.platform || 'TikTok',
         motion: 'auto',
@@ -260,7 +261,8 @@ export default function SceneEditor() {
     setVisualLoading(true)
     setVisualResults([])
     try {
-      const results = await searchVisuals(activeScene.visual_keyword, activeScene.id)
+      const source = voiceConfig.visual_source === 'mixed' ? 'pexels_video' : voiceConfig.visual_source
+      const results = await searchVisuals(activeScene.visual_keyword, activeScene.id, source as any)
       setVisualResults(results)
     } catch {
       // silently fail — show empty state
