@@ -10,10 +10,11 @@ import { getVoiceByName } from '../lib/voice_config'
 
 const STABILITY_OPTIONS = ['high', 'medium', 'low']
 const VISUAL_SOURCES = [
-  { value: 'mixed',        label: 'Mixed (Pexels + AI)',    plan: 'free' },
-  { value: 'pexels_video', label: 'Stock video (Pexels)',   plan: 'free' },
-  { value: 'pexels_photo', label: 'Stock photos (Pexels)',  plan: 'free' },
-  { value: 'dalle',        label: 'AI images (DALL-E 3)',   plan: 'pro'  },
+  { value: 'mixed',        label: 'Auto (Pexels + AI)',          plan: 'free'   },
+  { value: 'pexels_video', label: 'Stock video (Pexels)',         plan: 'free'   },
+  { value: 'unsplash',     label: 'Photos + Motion (Unsplash)',   plan: 'free'   },
+  { value: 'pexels_photo', label: 'Stock photos (Pexels)',        plan: 'free'   },
+  { value: 'dalle',        label: 'AI images (DALL-E 3)',         plan: 'studio' },
 ]
 const SUBTITLE_STYLES = ['viral', 'minimal', 'karaoke', 'none']
 const SUBTITLE_LABELS: Record<string, string> = {
@@ -186,7 +187,7 @@ export default function VoiceVisuals() {
                   document.dispatchEvent(new CustomEvent('show-upgrade-prompt', { detail: { reason: 'ai_images' } }))
                   return
                 }
-                setVoiceConfig({ visual_source: s.value as any })
+                setVoiceConfig({ visual_source: s.value })
               }}
             />
           ))}
