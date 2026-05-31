@@ -521,19 +521,22 @@ export const useStore = create<AppState>()(
         getRenderRequest: (): RenderRequest => {
           const { scenes, voiceConfig, config, selectedIdea, uploadedVoicePath, projects, activeProjectId, agencyProjectId } = get()
           const activeProject = projects.find(p => p.id === activeProjectId)
+          // Safety: ensure visual_source is a valid backend value
+          const VALID_SOURCES = ['pexels_video','pexels_photo','dalle','mixed','unsplash'] as const
+          const safeSource = (VALID_SOURCES as readonly string[]).includes(voiceConfig.visual_source)
+            ? voiceConfig.visual_source
+            : 'mixed'
           return {
             scenes,
             voice_name: voiceConfig.voice_name,
             voice_speed: voiceConfig.voice_speed,
-            visual_source: voiceConfig.visual_source,
+            visual_source: safeSource,
             subtitle_style: voiceConfig.subtitle_style,
             music: voiceConfig.music,
             project_title: selectedIdea?.title ?? activeProject?.name ?? 'Untitled',
-            // Use config.platform, fall back to active project's platform, then TikTok
             platform: config.platform || activeProject?.platform || 'TikTok',
             uploaded_voice_path: uploadedVoicePath ?? null,
             project_id: activeProjectId ?? undefined,
-            // Pass agency project ID so worker can load brand kit
             agency_project_id: agencyProjectId || undefined,
             motion:     voiceConfig.motion      ?? 'auto',
             transition: voiceConfig.transition  ?? 'fade',
