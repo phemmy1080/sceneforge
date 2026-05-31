@@ -38,11 +38,31 @@ const TRANSITION_OPTIONS = [
   { value: 'none', label: 'Cut',       desc: 'Instant cut — fastest render' },
 ]
 
+type VisualSourceValue = typeof VISUAL_SOURCES[number]['value']
+
+/** Auto-select the best visual source for a given niche.
+ *  Only called when the user hasn't explicitly changed the source (still on default 'mixed').
+ */
+function getRecommendedSource(niche: string): VisualSourceValue {
+  const UNSPLASH_NICHES = new Set([
+    'Finance', 'Business', 'Real Estate', 'Fashion',
+    'Health', 'Food', 'Education', 'E-commerce', 'General', 'Mindset',
+  ])
+  const VIDEO_NICHES = new Set([
+    'Fitness', 'Tech', 'Gaming', 'Travel', 'Comedy', 'Science', 'History',
+  ])
+  if (UNSPLASH_NICHES.has(niche)) return 'unsplash'
+  if (VIDEO_NICHES.has(niche))    return 'pexels_video'
+  return 'mixed'
+}
+
+
 export default function VoiceVisuals() {
   const user              = useAuthStore((s: any) => s.user)
   const { plan: userPlan, isFree } = usePlanLimits()
 
   // Detect if user is in personal mode (no agency project context)
+  const config         = useStore((s) => s.config)
   const agencyProjectId = useGlobalStore((s: any) => s.agencyProjectId)
   const isPersonalMode  = !agencyProjectId
 
@@ -69,6 +89,19 @@ export default function VoiceVisuals() {
   useEffect(() => {
     getTokenBalance(isPersonalMode).then(setTokenBalance).catch(() => {})
   }, [isPersonalMode])
+
+
+  // Auto-select the best visual source when the user first arrives on this step
+  // (only when still on the default 'mixed' — never override an explicit choice)
+  useEffect(() => {
+    if (voiceConfig.visual_source === 'mixed' && config.niche) {
+      const recommended = getRecommendedSource(config.niche)
+      if (recommended !== 'mixed') {
+        setVoiceConfig({ visual_source: recommended })
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.niche])
 
   async function handleRender() {
     setLoading(true)
@@ -178,18 +211,24 @@ export default function VoiceVisuals() {
         <CardTitle>Visual source</CardTitle>
         <div className="flex flex-wrap gap-2">
           {VISUAL_SOURCES.map((s) => (
-            <Chip
-              key={s.value}
-              label={s.value === 'dalle' && !canUseDalle ? s.label + ' 🔒' : s.label}
-              selected={voiceConfig.visual_source === s.value}
-              onClick={() => {
-                if (s.value === 'dalle' && !canUseDalle) {
-                  document.dispatchEvent(new CustomEvent('show-upgrade-prompt', { detail: { reason: 'ai_images' } }))
-                  return
-                }
-                setVoiceConfig({ visual_source: s.value })
-              }}
-            />
+            <div key={s.value} className="relative">
+              <Chip
+                label={s.value === 'dalle' && !canUseDalle ? s.label + ' 🔒' : s.label}
+                selected={voiceConfig.visual_source === s.value}
+                onClick={() => {
+                  if (s.value === 'dalle' && !canUseDalle) {
+                    document.dispatchEvent(new CustomEvent('show-upgrade-prompt', { detail: { reason: 'ai_images' } }))
+                    return
+                  }
+                  setVoiceConfig({ visual_source: s.value })
+                }}
+              />
+              {config.niche && getRecommendedSource(config.niche) === s.value && s.value !== 'mixed' && (
+                <span className="absolute -top-1.5 -right-1.5 bg-teal-500 text-white text-[8px] font-bold px-1 rounded-full leading-[14px]">
+                  ✓
+                </span>
+              )}
+            </div>
           ))}
         </div>
       </Card>
