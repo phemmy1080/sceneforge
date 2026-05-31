@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useStore } from '../store'
 import { usePlanLimits } from '../hooks/usePlanLimits'
 import { useAuthStore } from '../authStore'
@@ -41,18 +41,27 @@ const TRANSITION_OPTIONS = [
 type VisualSourceValue = typeof VISUAL_SOURCES[number]['value']
 
 /** Auto-select the best visual source for a given niche.
- *  Only called when the user hasn't explicitly changed the source (still on default 'mixed').
+ *  Handles both new capitalized format ('Real Estate') and
+ *  old underscore format ('real_estate') from the backend.
  */
 function getRecommendedSource(niche: string): VisualSourceValue {
-  const UNSPLASH_NICHES = new Set([
-    'Finance', 'Business', 'Real Estate', 'Fashion',
-    'Health', 'Food', 'Education', 'E-commerce', 'General', 'Mindset',
-  ])
-  const VIDEO_NICHES = new Set([
-    'Fitness', 'Tech', 'Gaming', 'Travel', 'Comedy', 'Science', 'History',
-  ])
-  if (UNSPLASH_NICHES.has(niche)) return 'unsplash'
-  if (VIDEO_NICHES.has(niche))    return 'pexels_video'
+  // Normalise to lowercase with spaces so both formats match
+  const n = niche.toLowerCase().replace(/_/g, ' ')
+
+  const UNSPLASH: Record<string, boolean> = {
+    'finance': true, 'business': true, 'real estate': true,
+    'fashion': true, 'health': true, 'food': true,
+    'education': true, 'e-commerce': true, 'ecommerce': true,
+    'general': true, 'mindset': true,
+  }
+  const VIDEO: Record<string, boolean> = {
+    'fitness': true, 'tech': true, 'technology': true,
+    'gaming': true, 'travel': true, 'comedy': true,
+    'science': true, 'history': true,
+  }
+
+  if (UNSPLASH[n]) return 'unsplash'
+  if (VIDEO[n])    return 'pexels_video'
   return 'mixed'
 }
 
@@ -91,17 +100,15 @@ export default function VoiceVisuals() {
   }, [isPersonalMode])
 
 
-  // Auto-select the best visual source when the user first arrives on this step
-  // (only when still on the default 'mixed' — never override an explicit choice)
+  // Auto-select visual source based on niche on mount and when niche changes.
+  // Overrides 'mixed' or any previous auto-selection, but not a deliberate
+  // user pick (we track that with hasManuallyPickedSource ref).
+  const hasManuallyPicked = useRef(false)
   useEffect(() => {
-    if (voiceConfig.visual_source === 'mixed' && config.niche) {
-      const recommended = getRecommendedSource(config.niche)
-      if (recommended !== 'mixed') {
-        setVoiceConfig({ visual_source: recommended })
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.niche])
+    if (!config.niche || hasManuallyPicked.current) return
+    const recommended = getRecommendedSource(config.niche)
+    setVoiceConfig({ visual_source: recommended })
+  }, [config.niche])  // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleRender() {
     setLoading(true)
@@ -220,6 +227,7 @@ export default function VoiceVisuals() {
                     document.dispatchEvent(new CustomEvent('show-upgrade-prompt', { detail: { reason: 'ai_images' } }))
                     return
                   }
+                  hasManuallyPicked.current = true
                   setVoiceConfig({ visual_source: s.value })
                 }}
               />
