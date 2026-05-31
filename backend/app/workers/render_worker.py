@@ -162,6 +162,7 @@ async def render_video(ctx, job_id: str, payload: dict):
                     source=("custom" if getattr(scene, "custom_image_url", None) else req.visual_source),
                     custom_image_url=getattr(scene, "custom_image_url", None),
                     user_plan=_visual_user_plan,
+                    niche=getattr(req, "niche", "") or "",
                 )
                 visual_files.append(visual)
                 pct = 42 + int(((i + 1) / len(req.scenes)) * 12)
