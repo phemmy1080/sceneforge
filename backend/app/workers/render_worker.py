@@ -394,6 +394,7 @@ async def render_video(ctx, job_id: str, payload: dict):
         tokens_remaining  = 0
         _tokens_deducted  = 0   # track actual deduction for refund on failure
         _deducted_from_ws = False
+        render_cost       = 100  # default flat cost; updated below for DALL-E renders
         is_re_render      = bool(prev_job_stored or payload.get("prev_job_id"))
 
         if user_id:
