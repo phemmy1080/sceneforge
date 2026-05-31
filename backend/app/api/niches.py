@@ -22,19 +22,23 @@ logger = logging.getLogger(__name__)
 NICHES_KEY = "sceneforge:niches"
 
 DEFAULT_NICHES = [
-    {"key": "Finance",  "label": "Finance",  "suggestions": ["Best investment tips", "Saving money fast", "Stock market basics", "Budget your salary", "Crypto explained"]},
-    {"key": "Fitness",  "label": "Fitness",  "suggestions": ["5 fitness myths", "Home workout routine", "Best protein foods", "Weight loss tips", "Build muscle fast"]},
-    {"key": "Tech",     "label": "Tech",     "suggestions": ["AI tools you need now", "Best free apps 2025", "Productivity hacks", "iPhone hidden features", "Build a side project"]},
-    {"key": "Travel",   "label": "Travel",   "suggestions": ["Budget travel tips", "Hidden gems in Lagos", "Solo travel guide", "Travel hacks 2025", "Best places to visit"]},
-    {"key": "Food",     "label": "Food",     "suggestions": ["Easy 10-min recipes", "Nigerian street food", "Meal prep ideas", "Healthy snacks", "Kitchen hacks"]},
-    {"key": "Business", "label": "Business", "suggestions": ["Start a business with 0", "How I made my first 1M", "Business ideas 2025", "Marketing on a budget", "Side hustle ideas"]},
-    {"key": "Science",  "label": "Science",  "suggestions": ["Mind-blowing facts", "How black holes work", "Space exploration 2025", "Human body secrets", "Climate change explained"]},
-    {"key": "History",  "label": "History",  "suggestions": ["African empires untold", "History they never taught", "Rise and fall of Rome", "Nigeria's history", "WW2 untold stories"]},
-    {"key": "Mindset",  "label": "Mindset",  "suggestions": ["How I changed my mindset", "Morning routine habits", "Stop procrastinating", "Discipline over motivation", "Atomic habits summary"]},
-    {"key": "Gaming",   "label": "Gaming",   "suggestions": ["Best games 2025", "Gaming setup on a budget", "Top 10 mobile games", "How to go pro", "Game review"]},
-    {"key": "Fashion",  "label": "Fashion",  "suggestions": ["Style on a budget", "Outfits for every occasion", "Fashion trends 2025", "How to dress smart", "Thrift shopping tips"]},
-    {"key": "Health",   "label": "Health",   "suggestions": ["Sleep better tonight", "Gut health foods", "Mental health habits", "Vitamin D truth", "Posture fixes at home"]},
-    {"key": "General",  "label": "General",  "suggestions": ["Life lessons I learned", "Things nobody tells you", "How I changed my mindset", "Mistakes to avoid", "Simple habits that work"]},
+    {"key": "Finance",     "label": "Finance",     "suggestions": ["Best investment tips", "Saving money fast", "Stock market basics", "Budget your salary", "Crypto explained"]},
+    {"key": "Fitness",     "label": "Fitness",     "suggestions": ["5 fitness myths", "Home workout routine", "Best protein foods", "Weight loss tips", "Build muscle fast"]},
+    {"key": "Tech",        "label": "Tech",        "suggestions": ["AI tools you need now", "Best free apps 2025", "Productivity hacks", "iPhone hidden features", "Build a side project"]},
+    {"key": "Travel",      "label": "Travel",      "suggestions": ["Budget travel tips", "Hidden gems in Lagos", "Solo travel guide", "Travel hacks 2025", "Best places to visit"]},
+    {"key": "Food",        "label": "Food",        "suggestions": ["Easy 10-min recipes", "Nigerian street food", "Meal prep ideas", "Healthy snacks", "Kitchen hacks"]},
+    {"key": "Business",    "label": "Business",    "suggestions": ["Start a business with 0", "How I made my first 1M", "Business ideas 2025", "Marketing on a budget", "Side hustle ideas"]},
+    {"key": "Real Estate", "label": "Real Estate", "suggestions": ["Buy your first house", "Lagos property tips", "Real estate investment", "How to find a good agent", "Rent vs buy"]},
+    {"key": "Education",   "label": "Education",   "suggestions": ["How to study smarter", "Top skills to learn", "Free online courses", "Study habits that work", "Learn faster tips"]},
+    {"key": "E-commerce",  "label": "E-commerce",  "suggestions": ["Start selling online", "Dropshipping in Nigeria", "How to write product descriptions", "Instagram shop setup", "Scale your online store"]},
+    {"key": "Science",     "label": "Science",     "suggestions": ["Mind-blowing facts", "How black holes work", "Space exploration 2025", "Human body secrets", "Climate change explained"]},
+    {"key": "History",     "label": "History",     "suggestions": ["African empires untold", "History they never taught", "Rise and fall of Rome", "Nigeria's history", "WW2 untold stories"]},
+    {"key": "Mindset",     "label": "Mindset",     "suggestions": ["How I changed my mindset", "Morning routine habits", "Stop procrastinating", "Discipline over motivation", "Atomic habits summary"]},
+    {"key": "Gaming",      "label": "Gaming",      "suggestions": ["Best games 2025", "Gaming setup on a budget", "Top 10 mobile games", "How to go pro", "Game review"]},
+    {"key": "Fashion",     "label": "Fashion",     "suggestions": ["Style on a budget", "Outfits for every occasion", "Fashion trends 2025", "How to dress smart", "Thrift shopping tips"]},
+    {"key": "Health",      "label": "Health",      "suggestions": ["Sleep better tonight", "Gut health foods", "Mental health habits", "Vitamin D truth", "Posture fixes at home"]},
+    {"key": "Comedy",      "label": "Comedy",      "suggestions": ["Funny life moments", "Nigerian parent struggles", "Office life be like", "Things only Nigerians understand", "Relatable everyday fails"]},
+    {"key": "General",     "label": "General",     "suggestions": ["Life lessons I learned", "Things nobody tells you", "How I changed my mindset", "Mistakes to avoid", "Simple habits that work"]},
 ]
 
 
