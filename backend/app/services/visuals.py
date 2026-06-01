@@ -292,24 +292,16 @@ PREFER_UNSPLASH_NICHES = {
 
 
 def _build_unsplash_query(scene: Scene, niche: str) -> str:
-    """Build a targeted search query from the scene visual description + niche context."""
+    """Build a focused search query from the scene visual description.
+    We use the scene's visual keyword directly without appending niche context
+    so results match what users see on unsplash.com for the same search.
+    African relevance comes from Unsplash's own diversity in results +
+    the orientation/content filters applied.
+    """
     base = (scene.visual or scene.text or "").strip()
-    # Take first 6 words max to keep the query focused
-    words = base.split()[:6]
-    query = " ".join(words)
-    # Add African context keywords for relevant niches
-    context_map = {
-        "Finance":     "African business",
-        "Business":    "Nigerian professional",
-        "Real Estate": "African property",
-        "Fashion":     "African fashion",
-        "Health":      "African wellness",
-        "Food":        "Nigerian food",
-        "Education":   "African student",
-        "E-commerce":  "African market",
-    }
-    suffix = context_map.get(niche, "")
-    return f"{query} {suffix}".strip() if suffix else query
+    # Take first 5 words — shorter queries return better Unsplash results
+    words = base.split()[:5]
+    return " ".join(words)
 
 
 async def search_unsplash(query: str, per_page: int = 10) -> list[dict]:
@@ -318,9 +310,9 @@ async def search_unsplash(query: str, per_page: int = 10) -> list[dict]:
         return []
     headers = {"Authorization": f"Client-ID {settings.unsplash_api_key}"}
     params  = {
-        "query":       query,
-        "orientation": "portrait",
-        "per_page":    per_page,
+        "query":          query,
+        "per_page":       per_page,
+        "order_by":       "relevant",
         "content_filter": "high",
     }
     async with aiohttp.ClientSession() as session:
