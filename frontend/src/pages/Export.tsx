@@ -164,7 +164,13 @@ export default function Export() {
                 Only that scene is rebuilt — the rest of the video stays untouched and no tokens are charged.
               </p>
               <button
-                onClick={() => useStore.getState().setStep('scenes')}
+                onClick={() => {
+                    const store = useStore.getState()
+                    // Mark this as a re-render of the existing video so no tokens
+                    // are deducted when the user goes to Voice & Visuals to render
+                    if (store.jobId) store.setPrevJobId(store.jobId)
+                    store.setStep('scenes')
+                  }}
                 className="text-[11px] font-semibold text-violet-400 hover:text-violet-300 transition-colors"
               >
                 → Open Scene Editor
