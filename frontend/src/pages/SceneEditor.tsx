@@ -624,7 +624,7 @@ export default function SceneEditor() {
             {/* Visual keyword + search */}
             <div className="mb-4">
               <label className="block text-[12px] font-medium text-white/50 mb-1.5">
-                Stock footage keyword
+                Search {voiceConfig.visual_source === 'unsplash' ? 'Unsplash' : 'Pexels'} — edit keyword to refine
               </label>
               <div className="flex gap-2">
                 <input
@@ -648,7 +648,7 @@ export default function SceneEditor() {
             {visualResults.length > 0 && (
               <div>
                 <p className="text-[11px] text-white/40 mb-2">
-                  Pexels results for "{activeScene.visual_keyword}" — click to select
+                  {voiceConfig.visual_source === 'unsplash' ? 'Unsplash photos' : 'Pexels videos'} for "{activeScene.visual_keyword}" — click to select
                 </p>
                 <div className="grid grid-cols-3 gap-2">
                   {visualResults.map((v) => (
