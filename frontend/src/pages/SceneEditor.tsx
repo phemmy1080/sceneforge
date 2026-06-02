@@ -656,7 +656,10 @@ export default function SceneEditor() {
                       key={v.id}
                       onClick={() => {
                         setSelectedVisualId(v.id)
-                        updateScene(activeSceneIndex, { visual_keyword: activeScene.visual_keyword })
+                        updateScene(activeSceneIndex, {
+                            selected_visual_url:    v.preview_url,
+                            selected_visual_source: v.source,
+                          } as any)
                       }}
                       className={`
                         aspect-[9/16] rounded-lg overflow-hidden border-2 transition-all
