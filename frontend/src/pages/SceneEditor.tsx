@@ -205,27 +205,39 @@ export default function SceneEditor() {
 
   // Preview a single scene using the partial re-render endpoint
   async function previewScene() {
-    if (!activeScene || !agencyProjectId) return
+    if (!activeScene) return
     setPreviewing(true)
     setPreviewUrl(null)
     try {
-      const projRes = await api.get(`/api/agency/projects/${agencyProjectId}`)
-      const jobIds: string[] = projRes.data.project?.render_job_ids || []
-      if (jobIds.length === 0) {
-        alert('No previous render found. Complete a full render first before previewing individual scenes.')
-        return
+      let lastJobId: string | null = null
+
+      if (agencyProjectId) {
+        // Agency project — get job_id from project record
+        const projRes = await api.get(`/api/agency/projects/${agencyProjectId}`)
+        const jobIds: string[] = projRes.data.project?.render_job_ids || []
+        if (jobIds.length === 0) {
+          alert('No previous render found. Complete a full render first before previewing individual scenes.')
+          return
+        }
+        lastJobId = jobIds[jobIds.length - 1]
+      } else {
+        // Personal project — use the jobId from the store
+        lastJobId = useStore.getState().jobId
+        if (!lastJobId) {
+          alert('No previous render found. Complete a full render first before re-rendering individual scenes.')
+          return
+        }
       }
-      const lastJobId = jobIds[jobIds.length - 1]
+
       // Flush current scenes to Redis first
       await api.put(`/api/render/scenes/${lastJobId}`, { scenes: useStore.getState().scenes })
-      // Trigger partial re-render for just this scene
+      // Trigger partial re-render for just this scene (free — no token deduction)
       const res = await api.post(`/api/render/scenes/${lastJobId}/${activeSceneIndex}`, {
         scene: activeScene,
         visual_source: voiceConfig.visual_source === 'mixed' ? 'pexels_video' : voiceConfig.visual_source,
         subtitle_style: 'viral',
         platform: useStore.getState().config?.platform || 'TikTok',
         motion: 'auto',
-        // Pass custom voice so partial re-render uses it instead of TTS
         custom_voice_url: (activeScene as any).custom_voice_url || null,
       })
       setPreviewUrl(res.data.scene_url || res.data.video_url || null)
@@ -472,16 +484,17 @@ export default function SceneEditor() {
                 Scene {activeSceneIndex + 1}
               </h3>
               <div className="flex items-center gap-2">
-                {agencyProjectId && (
+                {/* Re-render scene button — free for all users (already paid for full render) */}
+                {useStore.getState().jobId && (
                   <button
                     onClick={previewScene}
                     disabled={previewing}
-                    title="Preview this scene — renders a quick clip without saving"
+                    title="Re-render this scene only — free, uses your existing video's token"
                     className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-violet-400/15 border border-violet-400/25 text-violet-300 hover:bg-violet-400/20 transition disabled:opacity-50 flex items-center gap-1"
                   >
                     {previewing
-                      ? <><div className="w-2.5 h-2.5 border border-violet-400/50 border-t-transparent rounded-full animate-spin" />Previewing…</>
-                      : <>▶ Preview scene</>}
+                      ? <><div className="w-2.5 h-2.5 border border-violet-400/50 border-t-transparent rounded-full animate-spin" />Re-rendering…</>
+                      : <>↺ Re-render scene</>}
                   </button>
                 )}
                 <Badge color={TYPE_COLORS[activeScene.type]}>{activeScene.type}</Badge>
