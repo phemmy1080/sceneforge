@@ -315,7 +315,7 @@ async def search_visuals(req: SearchVisualsRequest):
     try:
         if req.source == VisualSource.unsplash:
             # Search Unsplash and convert to VisualResult format
-            photos = await search_unsplash(req.keyword, per_page=9)
+            photos = await search_unsplash(req.keyword, per_page=12)
             if photos:
                 results = []
                 for p in photos:
