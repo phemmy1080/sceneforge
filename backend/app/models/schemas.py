@@ -114,6 +114,10 @@ class Scene(BaseModel):
                                            description="User-uploaded/recorded voice clip URL for this scene")
     custom_voice_duration: Optional[float] = Field(default=None,
                                            description="Detected duration of the custom voice clip in seconds")
+    selected_visual_url: Optional[str] = Field(default=None, max_length=1000,
+                                           description="URL of visual chosen from search results (Pexels/Unsplash)")
+    selected_visual_source: Optional[str] = Field(default=None, max_length=20,
+                                           description="Source of selected visual: 'pexels' | 'unsplash'")
 
 
 class GenerateScenesResponse(BaseModel):
