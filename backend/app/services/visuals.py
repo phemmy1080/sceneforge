@@ -438,6 +438,26 @@ async def get_visual_for_scene(
     DALL-E is only available for pro and studio plans.
     mixed: try Pexels first, fall back to placeholder.
     """
+    # ── Use search-selected visual if set ────────────────────────────────────
+    # When user picks from Scene Editor search results, the URL + source are
+    # saved on the scene. Use them directly instead of searching again.
+    selected_url    = getattr(scene, "selected_visual_url", None)
+    selected_source = getattr(scene, "selected_visual_source", None)
+    if selected_url:
+        if selected_source == "pexels":
+            # Pexels preview_url is an MP4 download link
+            out_path = os.path.join(output_dir, f"scene_{scene.id}_selected.mp4")
+            await download_pexels_video(selected_url, out_path)
+            return VisualFile(path=out_path, media_type="video", source="pexels")
+        else:
+            # Unsplash or unknown — treat as image + apply Ken Burns
+            img_path = os.path.join(output_dir, f"scene_{scene.id}_selected.jpg")
+            await download_unsplash_photo(selected_url, img_path)
+            out_path = os.path.join(output_dir, f"scene_{scene.id}_selected_kb.mp4")
+            await apply_ken_burns(img_path, out_path, duration=float(scene.duration))
+            return VisualFile(path=out_path, media_type="video", source="unsplash")
+
+    # ── Custom uploaded image ─────────────────────────────────────────────────
     # Custom uploaded image takes priority over everything else
     if custom_image_url or getattr(scene, "custom_image_url", None):
         url = custom_image_url or scene.custom_image_url
