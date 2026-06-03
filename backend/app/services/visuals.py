@@ -444,7 +444,7 @@ async def get_visual_for_scene(
     selected_url    = getattr(scene, "selected_visual_url", None)
     selected_source = getattr(scene, "selected_visual_source", None)
     if selected_url:
-        if selected_source == "pexels":
+        if selected_source in ("pexels", "pexels_video"):
             # Pexels preview_url is an MP4 download link
             out_path = os.path.join(output_dir, f"scene_{scene.id}_selected.mp4")
             await download_pexels_video(selected_url, out_path)
