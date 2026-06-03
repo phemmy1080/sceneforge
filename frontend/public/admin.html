@@ -3866,8 +3866,9 @@ async function runCampaign() {
       if (polls >= 12) clearInterval(poll); // stop after 60s
     }, 5000);
   } catch(e) {
-    showAlert('campaigns','Campaign failed: '+e.message,'err');
-    if (lr) lr.innerHTML = '<p style="color:var(--rose);font-size:13px">Failed: '+e.message+'</p>';
+    var msg = e.message || (e.detail ? JSON.stringify(e.detail) : 'Unknown error');
+    showAlert('campaigns','Campaign failed: '+msg,'err');
+    if (lr) lr.innerHTML = '<p style="color:var(--rose);font-size:13px">Failed: '+msg+'</p>';
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '\u25B6 Run Campaign Now'; }
   }
