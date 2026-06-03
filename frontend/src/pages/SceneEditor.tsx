@@ -43,7 +43,7 @@ export default function SceneEditor() {
   const [visualResults, setVisualResults] = useState<VisualResult[]>([])
   const [visualLoading, setVisualLoading] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [previewing, setPreviewing] = useState(false)
+  const [previewing, setPreviewing] = useState<false | 'saving' | 'rendering'>(false)
   const [confirmDeleteIndex, setConfirmDeleteIndex] = useState<number | null>(null)
 
   // Review notes from agency project comments
@@ -203,25 +203,23 @@ export default function SceneEditor() {
   }, [voiceRecording, recordingChunks])
 
 
-  // Preview a single scene using the partial re-render endpoint
+  // Re-render a single scene: saves current changes first, then re-renders
   async function previewScene() {
     if (!activeScene) return
-    setPreviewing(true)
+    setPreviewing('saving')
     setPreviewUrl(null)
     try {
       let lastJobId: string | null = null
 
       if (agencyProjectId) {
-        // Agency project — get job_id from project record
         const projRes = await api.get(`/api/agency/projects/${agencyProjectId}`)
         const jobIds: string[] = projRes.data.project?.render_job_ids || []
         if (jobIds.length === 0) {
-          alert('No previous render found. Complete a full render first before previewing individual scenes.')
+          alert('No previous render found. Complete a full render first before re-rendering individual scenes.')
           return
         }
         lastJobId = jobIds[jobIds.length - 1]
       } else {
-        // Personal project — use the jobId from the store
         lastJobId = useStore.getState().jobId
         if (!lastJobId) {
           alert('No previous render found. Complete a full render first before re-rendering individual scenes.')
@@ -229,20 +227,27 @@ export default function SceneEditor() {
         }
       }
 
-      // Flush current scenes to Redis first
-      await api.put(`/api/render/scenes/${lastJobId}`, { scenes: useStore.getState().scenes })
-      // Trigger partial re-render for just this scene (free — no token deduction)
+      // Always read fresh from store — avoids stale React closure
+      const freshScenes = useStore.getState().scenes
+      const freshScene  = freshScenes[activeSceneIndex]
+
+      // Step 1: Save ALL scenes to backend first so the worker has the latest data
+      await api.put(`/api/render/scenes/${lastJobId}`, { scenes: freshScenes })
+
+      setPreviewing('rendering')
+      // Step 2: Trigger partial re-render passing the fresh scene explicitly
       const res = await api.post(`/api/render/scenes/${lastJobId}/${activeSceneIndex}`, {
-        scene: activeScene,
-        visual_source: voiceConfig.visual_source === 'mixed' ? 'pexels_video' : voiceConfig.visual_source,
+        scene: freshScene,                   // includes selected_visual_url, selected_visual_source
+        visual_source: (freshScene as any).selected_visual_source
+          || (voiceConfig.visual_source === 'mixed' ? 'pexels_video' : voiceConfig.visual_source),
         subtitle_style: 'viral',
         platform: useStore.getState().config?.platform || 'TikTok',
         motion: 'auto',
-        custom_voice_url: (activeScene as any).custom_voice_url || null,
+        custom_voice_url: (freshScene as any).custom_voice_url || null,
       })
       setPreviewUrl(res.data.scene_url || res.data.video_url || null)
     } catch (e: any) {
-      alert(e.response?.data?.detail || 'Preview failed. Try again.')
+      alert(e.response?.data?.detail || 'Re-render failed. Try again.')
     } finally {
       setPreviewing(false)
     }
@@ -488,13 +493,15 @@ export default function SceneEditor() {
                 {useStore.getState().jobId && (
                   <button
                     onClick={previewScene}
-                    disabled={previewing}
-                    title="Re-render this scene only — free, uses your existing video's token"
+                    disabled={previewing !== false}
+                    title="Saves your changes then re-renders this scene — free"
                     className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-violet-400/15 border border-violet-400/25 text-violet-300 hover:bg-violet-400/20 transition disabled:opacity-50 flex items-center gap-1"
                   >
-                    {previewing
+                    {previewing === 'saving'
+                      ? <><div className="w-2.5 h-2.5 border border-violet-400/50 border-t-transparent rounded-full animate-spin" />Saving…</>
+                      : previewing === 'rendering'
                       ? <><div className="w-2.5 h-2.5 border border-violet-400/50 border-t-transparent rounded-full animate-spin" />Re-rendering…</>
-                      : <>↺ Re-render scene</>}
+                      : <>↺ Save & re-render</>}
                   </button>
                 )}
                 <Badge color={TYPE_COLORS[activeScene.type]}>{activeScene.type}</Badge>
