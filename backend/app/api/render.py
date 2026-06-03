@@ -692,10 +692,12 @@ async def rerender_scene(
             except Exception as _ae:
                 logger.warning("mark_scene_comments_actioned failed (non-fatal): %s", _ae)
 
+            import time as _time
+            _cb = f"?t={int(_time.time())}"
             logger.info("Partial re-render complete — job=%s scene=%d url=%s", job_id, scene_index, video_url)
             return {
-                "video_url":  video_url,
-                "scene_url":  new_scene_url,
+                "video_url":  f"{video_url}{_cb}" if video_url else None,
+                "scene_url":  f"{new_scene_url}{_cb}" if new_scene_url else None,
                 "job_id":     job_id,
                 "scene_index": scene_index,
             }
