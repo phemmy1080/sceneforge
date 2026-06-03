@@ -245,14 +245,12 @@ export default function SceneEditor() {
         motion: 'auto',
         custom_voice_url: (freshScene as any).custom_voice_url || null,
       })
-      const rawVideoUrl = res.data.video_url || null
-      const sceneUrl    = res.data.scene_url || null
-      // Append cache-busting timestamp so browser doesn't serve stale version
-      // (the filename final_video_patched.mp4 is always the same on R2)
-      const videoUrl = rawVideoUrl ? `${rawVideoUrl}?t=${Date.now()}` : null
-      setPreviewUrl(sceneUrl ? `${sceneUrl}?t=${Date.now()}` : videoUrl)
-
-      // Update the store so Export page immediately reflects the new video
+      // Backend already appends ?t=timestamp — use URLs as-is (no double cache-bust)
+      const videoUrl = res.data.video_url || null
+      const sceneUrl = res.data.scene_url || null
+      // Show the individual scene clip in the scene editor preview
+      setPreviewUrl(sceneUrl || videoUrl)
+      // Update the store so Export page reflects the patched full video
       if (videoUrl) useStore.getState().setVideoUrl(videoUrl)
     } catch (e: any) {
       alert(e.response?.data?.detail || 'Re-render failed. Try again.')
