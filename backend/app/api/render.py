@@ -591,9 +591,11 @@ async def rerender_scene(
             )
 
             # ── Step 4: Upload new scene clip to R2 ────────────────────────
+            import time as _time
+            _ts = int(_time.time())   # unique per render — avoids CDN cache on same filename
             new_scene_url = scene_urls[scene_index]  # default to old
             if r2_enabled():
-                key = f"renders/{job_id}/scene_{scene_index:02d}_patched.mp4"
+                key = f"renders/{job_id}/scene_{scene_index:02d}_{_ts}.mp4"
                 new_scene_url = await upload_file(scene_out, key)
 
             # ── Step 5: Download all scenes and splice ─────────────────────
@@ -639,7 +641,7 @@ async def rerender_scene(
             # ── Step 6: Upload patched video ───────────────────────────────
             video_url = ""
             if r2_enabled():
-                vid_key = f"renders/{job_id}/final_video_patched.mp4"
+                vid_key = f"renders/{job_id}/final_patched_{_ts}.mp4"
                 video_url = await upload_file(final_out, vid_key)
             else:
                 # Fallback: serve directly from worker
@@ -662,7 +664,7 @@ async def rerender_scene(
                     # Also update r2_urls so all lookup paths find it
                     if "r2_urls" not in progress:
                         progress["r2_urls"] = {}
-                    progress["r2_urls"]["final_video_patched.mp4"] = video_url
+                    progress["r2_urls"][f"final_patched_{_ts}.mp4"] = video_url
                     await redis.set(f"job:{job_id}:progress", _jp.dumps(progress), ex=3600 * 24 * 7)
             except Exception as _e:
                 logger.warning("Failed to update progress with patched url: %s", _e)
@@ -692,13 +694,11 @@ async def rerender_scene(
             except Exception as _ae:
                 logger.warning("mark_scene_comments_actioned failed (non-fatal): %s", _ae)
 
-            import time as _time
-            _cb = f"?t={int(_time.time())}"
             logger.info("Partial re-render complete — job=%s scene=%d url=%s", job_id, scene_index, video_url)
             return {
-                "video_url":  f"{video_url}{_cb}" if video_url else None,
-                "scene_url":  f"{new_scene_url}{_cb}" if new_scene_url else None,
-                "job_id":     job_id,
+                "video_url":   video_url,
+                "scene_url":   new_scene_url,
+                "job_id":      job_id,
                 "scene_index": scene_index,
             }
 
