@@ -245,9 +245,12 @@ export default function SceneEditor() {
         motion: 'auto',
         custom_voice_url: (freshScene as any).custom_voice_url || null,
       })
-      const videoUrl  = res.data.video_url || null
-      const sceneUrl  = res.data.scene_url || null
-      setPreviewUrl(sceneUrl || videoUrl)
+      const rawVideoUrl = res.data.video_url || null
+      const sceneUrl    = res.data.scene_url || null
+      // Append cache-busting timestamp so browser doesn't serve stale version
+      // (the filename final_video_patched.mp4 is always the same on R2)
+      const videoUrl = rawVideoUrl ? `${rawVideoUrl}?t=${Date.now()}` : null
+      setPreviewUrl(sceneUrl ? `${sceneUrl}?t=${Date.now()}` : videoUrl)
 
       // Update the store so Export page immediately reflects the new video
       if (videoUrl) useStore.getState().setVideoUrl(videoUrl)
