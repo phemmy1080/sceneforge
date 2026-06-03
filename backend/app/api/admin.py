@@ -1657,7 +1657,7 @@ async def get_campaign_status(redis=Depends(get_redis), admin: dict = Depends(_r
 @limiter.limit("3/minute")
 async def run_engagement_campaign(
     request: Request,
-    background_tasks,
+    background_tasks: BackgroundTasks,
     redis=Depends(get_redis),
     admin: dict = Depends(_require_admin),
 ):
