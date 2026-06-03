@@ -305,12 +305,26 @@ def _build_unsplash_query(scene: Scene, niche: str) -> str:
 
 
 async def search_unsplash(query: str, per_page: int = 10) -> list[dict]:
-    """Search Unsplash for photos. Returns list of photo dicts."""
+    """Search Unsplash for photos.
+    Strips video-specific terms (footage, clip, aerial footage etc.) that
+    return no results since Unsplash is a photo library, not a video library.
+    """
     if not settings.unsplash_api_key:
         return []
+
+    # Remove video-only terms before searching
+    VIDEO_TERMS = [
+        'aerial footage', 'footage', 'video clip', 'video', 'clip',
+        'slow motion', 'timelapse', 'time lapse', '4k', '1080p',
+    ]
+    clean = query.lower()
+    for term in VIDEO_TERMS:
+        clean = clean.replace(term, ' ')
+    clean = ' '.join(clean.split()).strip() or query  # fallback if everything stripped
+
     headers = {"Authorization": f"Client-ID {settings.unsplash_api_key}"}
     params  = {
-        "query":          query,
+        "query":          clean,
         "per_page":       per_page,
         "order_by":       "relevant",
         "content_filter": "high",
