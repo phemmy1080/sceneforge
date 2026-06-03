@@ -353,11 +353,12 @@ export interface VisualResult {
   id: string
   thumbnail_url: string
   preview_url: string
-  full_url: string
-  duration: number
+  full_url?: string
+  duration?: number
   width: number
   height: number
-  provider: 'pexels' | 'dalle'
+  provider?: 'pexels' | 'dalle' | 'unsplash'
+  source: 'pexels' | 'dalle' | 'unsplash'   // normalised alias for provider
 }
 
 
