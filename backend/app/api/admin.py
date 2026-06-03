@@ -1657,15 +1657,14 @@ async def get_campaign_status(redis=Depends(get_redis), admin: dict = Depends(_r
 @limiter.limit("3/minute")
 async def run_engagement_campaign(
     request: Request,
-    background_tasks: BackgroundTasks,
     redis=Depends(get_redis),
     admin: dict = Depends(_require_admin),
 ):
     """Trigger the engagement campaign. Runs in the background."""
     from app.services.email_campaigns import run_engagement_campaign as _run
     import asyncio
+
     async def _bg():
-        # Get a fresh Redis connection — the request-scoped one is closed after response
         import redis.asyncio as _aioredis
         import datetime as _dt
         from app.config import get_settings as _gs
@@ -1686,7 +1685,7 @@ async def run_engagement_campaign(
         finally:
             await _r.aclose()
 
-    background_tasks.add_task(_bg)
+    asyncio.create_task(_bg())
     return {"status": "started", "message": "Campaign running in background — check /campaigns/last-run for results"}
 
 
