@@ -245,7 +245,12 @@ export default function SceneEditor() {
         motion: 'auto',
         custom_voice_url: (freshScene as any).custom_voice_url || null,
       })
-      setPreviewUrl(res.data.scene_url || res.data.video_url || null)
+      const videoUrl  = res.data.video_url || null
+      const sceneUrl  = res.data.scene_url || null
+      setPreviewUrl(sceneUrl || videoUrl)
+
+      // Update the store so Export page immediately reflects the new video
+      if (videoUrl) useStore.getState().setVideoUrl(videoUrl)
     } catch (e: any) {
       alert(e.response?.data?.detail || 'Re-render failed. Try again.')
     } finally {
