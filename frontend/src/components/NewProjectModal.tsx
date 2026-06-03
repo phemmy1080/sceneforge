@@ -2,12 +2,16 @@ import { useState, useEffect } from 'react'
 import { useStore } from '../store'
 import { getNiches, type Niche } from '../lib/api'
 
-const PLATFORMS = [
-  'TikTok (9:16, 60s)',
-  'YouTube Shorts (9:16, 60s)',
-  'Instagram Reels (9:16, 30s)',
-  'YouTube (16:9, 3–10 min)',
-  'LinkedIn (1:1, 60s)',
+const PLATFORMS: { value: string; label: string }[] = [
+  { value: 'TikTok',           label: 'TikTok — 9:16 · up to 60s' },
+  { value: 'Instagram Reels',  label: 'Instagram Reels — 9:16 · up to 30s' },
+  { value: 'YouTube Shorts',   label: 'YouTube Shorts — 9:16 · up to 60s' },
+  { value: 'YouTube',          label: 'YouTube — 16:9 · 3–10 min' },
+  { value: 'Facebook',         label: 'Facebook — 16:9 · up to 60s' },
+  { value: 'LinkedIn',         label: 'LinkedIn — 1:1 · up to 60s' },
+  { value: 'Twitter/X',        label: 'Twitter/X — 16:9 · up to 30s' },
+  { value: 'Snapchat',         label: 'Snapchat — 9:16 · up to 15s' },
+  { value: 'Pinterest',        label: 'Pinterest — 2:3 · up to 60s' },
 ]
 
 interface Props {
@@ -26,7 +30,7 @@ export default function NewProjectModal({ open, onClose }: Props) {
   const [niche, setNiche]             = useState(config.niche || '')
   const [folder, setFolder]           = useState(config.niche || '')
   const [newFolderName, setNewFolderName] = useState('')
-  const [platform, setPlatform]       = useState('TikTok (9:16, 60s)')
+  const [platform, setPlatform]       = useState('TikTok')
   const [error, setError]             = useState('')
 
   useEffect(() => { getNiches().then(setNiches).catch(() => {}) }, [])
@@ -39,7 +43,7 @@ export default function NewProjectModal({ open, onClose }: Props) {
       setError('')
       setNiche(config.niche || '')
       setFolder(config.niche || '')
-      setPlatform('TikTok (9:16, 60s)')
+      setPlatform('TikTok')
       setNewFolderName('')
     }
   }, [open])
@@ -144,7 +148,7 @@ export default function NewProjectModal({ open, onClose }: Props) {
               onChange={(e) => setPlatform(e.target.value)}
               className="w-full bg-white/5 border border-white/12 rounded-lg text-[13px] text-white/85 px-3 py-2.5 outline-none focus:border-violet-500/60 cursor-pointer"
             >
-              {PLATFORMS.map((p) => <option key={p}>{p}</option>)}
+              {PLATFORMS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
             </select>
           </div>
         </div>
@@ -167,7 +171,7 @@ export default function NewProjectModal({ open, onClose }: Props) {
         <div className="bg-white/[0.03] border border-white/[0.07] rounded-lg px-3.5 py-2.5 mb-5">
           <p className="text-[9.5px] text-white/30 uppercase tracking-widest font-semibold mb-1">Preview</p>
           <p className="text-[12.5px] text-white/55">
-            {niche || 'General'} project · {platform.split(' ')[0]} · saved to /{previewFolder || 'General'}
+            {niche || 'General'} project · {platform} · saved to /{previewFolder || 'General'}
           </p>
         </div>
 
