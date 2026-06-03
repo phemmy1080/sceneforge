@@ -243,7 +243,8 @@ export default function MyVideos() {
         }
         useStore.getState().setScenes(fetchedScenes)
         setPrevJobId(record.job_id)   // tells getRenderRequest to send prev_job_id → free re-render
-        setStep('voice')
+        useStore.getState().setJobId(record.job_id)  // needed so Scene Editor can re-render scenes
+        setStep('scenes')             // go straight to Scene Editor, not Voice & Visuals
         return
       }
     } catch {
