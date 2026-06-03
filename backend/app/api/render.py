@@ -508,6 +508,18 @@ async def rerender_scene(
         work_dir = _Path(tempfile.mkdtemp(prefix=f"scene_patch_{job_id}_"))
         try:
             # ── Step 1: Get visual ──────────────────────────────────────────
+            # selected_visual_url may not survive Pydantic serialisation if
+            # schemas.py hasn't been deployed yet — read from raw dict too.
+            _sel_url = scene_data.get("selected_visual_url") or getattr(scene, "selected_visual_url", None)
+            _sel_src = scene_data.get("selected_visual_source") or getattr(scene, "selected_visual_source", None)
+            if _sel_url:
+                # Inject onto scene object so get_visual_for_scene can use it
+                try:
+                    object.__setattr__(scene, "selected_visual_url", _sel_url)
+                    object.__setattr__(scene, "selected_visual_source", _sel_src or "unsplash")
+                except Exception:
+                    pass
+
             visual_file = await get_visual_for_scene(
                 scene, str(work_dir),
                 source=VS(req.visual_source or "pexels_video"),
