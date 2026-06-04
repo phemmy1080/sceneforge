@@ -5,10 +5,10 @@ import { api, getTokenBalance, type TokenBalance } from '../lib/api'
 const PLAN_STYLE: Record<string, {
   color: string; bg: string; border: string; btnText: string; popular?: boolean; description: string
 }> = {
-  starter:    { color: '#A78BFA', bg: 'rgba(124,92,255,0.10)', border: 'rgba(124,92,255,0.25)', btnText: '#26215C', description: 'Perfect for creators just getting started' },
-  pro:        { color: '#2DD4BF', bg: 'rgba(45,212,191,0.10)',  border: 'rgba(45,212,191,0.40)',  btnText: '#04342C', popular: true, description: 'For creators publishing weekly content' },
-  studio:     { color: '#F59E0B', bg: 'rgba(245,158,11,0.08)',  border: 'rgba(245,158,11,0.25)',  btnText: '#412402', description: 'For agencies and high-volume creators' },
-  agency:     { color: '#C9A84C', bg: 'rgba(201,168,76,0.10)',  border: 'rgba(201,168,76,0.35)',  btnText: '#412402', description: 'Full agency workspace — team collaboration & client review' },
+  starter:    { color: '#A78BFA', bg: 'rgba(124,92,255,0.10)', border: 'rgba(124,92,255,0.25)', btnText: '#26215C', description: 'Perfect for creators just getting started · 7-day storage' },
+  pro:        { color: '#2DD4BF', bg: 'rgba(45,212,191,0.10)',  border: 'rgba(45,212,191,0.40)',  btnText: '#04342C', popular: true, description: 'For creators publishing weekly content · 30-day storage' },
+  studio:     { color: '#F59E0B', bg: 'rgba(245,158,11,0.08)',  border: 'rgba(245,158,11,0.25)',  btnText: '#412402', description: 'DALL-E AI images + priority queue · 45-day storage' },
+  agency:     { color: '#C9A84C', bg: 'rgba(201,168,76,0.10)',  border: 'rgba(201,168,76,0.35)',  btnText: '#412402', description: 'Full agency workspace — team collaboration & client review · 45-day storage' },
 }
 
 // Fallback style for any new plans created in admin
@@ -16,37 +16,85 @@ const DEFAULT_STYLE = { color: '#A78BFA', bg: 'rgba(124,92,255,0.10)', border: '
 
 // Features per plan — enriched from token count dynamically
 function getPlanFeatures(key: string, tokens: number, videos: number): string[] {
-  const base = [
-    `${tokens.toLocaleString()} tokens included`,
-    `${videos} full video renders`,
-    'Pexels stock footage',
+  const videoCount = videos ?? Math.floor(tokens / 100)
+
+  const FEATURES: Record<string, string[]> = {
+    starter: [
+      `${tokens.toLocaleString()} tokens · ${videoCount} video renders`,
+      '7-day video storage',
+      '1080p full HD export',
+      'No watermark',
+      'Pexels & Unsplash visuals',
+      'AI voiceover (Google TTS)',
+      'Scene editor & re-renders',
+      'MP4, CapCut & audio export',
+      'AI creative assistant',
+      'Tokens never expire',
+    ],
+    pro: [
+      `${tokens.toLocaleString()} tokens · ${videoCount} video renders`,
+      '30-day video storage',
+      '1080p full HD export',
+      'No watermark',
+      'Pexels & Unsplash visuals',
+      'AI voiceover (Google TTS)',
+      'Scene editor & re-renders',
+      'MP4, CapCut & audio export',
+      'AI creative assistant',
+      'Priority render queue',
+      'Tokens never expire',
+    ],
+    studio: [
+      `${tokens.toLocaleString()} tokens · ${videoCount} video renders`,
+      '45-day video storage',
+      '1080p full HD export',
+      'No watermark',
+      'Pexels, Unsplash & DALL-E AI images',
+      'AI voiceover (Google TTS)',
+      'Scene editor & re-renders',
+      'MP4, CapCut & audio export',
+      'AI creative assistant',
+      'Priority render queue',
+      'Tokens never expire',
+    ],
+    agency: [
+      `${tokens.toLocaleString()} tokens · ${videoCount} video renders`,
+      '45-day video storage',
+      '1080p full HD export',
+      'No watermark',
+      'Pexels, Unsplash & DALL-E AI images',
+      'AI voiceover (Google TTS)',
+      'Scene editor & re-renders',
+      'MP4, CapCut & audio export',
+      'AI creative assistant',
+      'Priority render queue',
+      'Agency workspace (5 seats)',
+      'Client review links',
+      'Brand kits per client',
+      'Shared token pool',
+      'Team activity timeline',
+      'Tokens never expire',
+    ],
+  }
+
+  if (FEATURES[key]) return FEATURES[key]
+
+  // Custom plan from admin — generic list
+  return [
+    `${tokens.toLocaleString()} tokens · ${videoCount} video renders`,
+    '1080p full HD export',
+    'No watermark',
+    'Pexels & Unsplash visuals',
     'AI voiceover (Google TTS)',
-    'MP4, CapCut & scene export',
-    'Voice extraction (MP3/WAV)',
-    'Re-renders always free',
+    'Scene editor & re-renders',
+    'MP4, CapCut & audio export',
     'Tokens never expire',
   ]
-  if (key === 'pro' || key === 'studio') base.push('Priority render queue')
-  if (key === 'studio') base.push('No watermarks on exports')
-  if (key === 'agency') {
-    base.push('No watermarks on exports')
-    base.push('Agency workspace (5 seats)')
-    base.push('Client review links')
-    base.push('Brand kits per client')
-    base.push('Shared token pool')
-    base.push('Team activity timeline')
-  }
-  if (!['starter','pro','studio','agency'].includes(key)) {
-    // Custom plan from admin
-    base.splice(2, 0, 'Up to unlimited scenes')
-  }
-  return base
 }
 
 function getLockedFeatures(key: string): string[] {
-  if (key === 'starter') return ['Priority render queue', 'No watermarks']
-  if (key === 'pro') return ['No watermarks']
-  if (key === 'agency') return []
+  if (key === 'starter') return ['DALL-E AI images', 'Priority render queue']
+  if (key === 'pro') return ['DALL-E AI images']
   return []
 }
 
