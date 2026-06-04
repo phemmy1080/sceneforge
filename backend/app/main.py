@@ -173,3 +173,38 @@ async def health_check():
         status_code=200 if status["status"] == "ok" else 503,
         content=status
     )
+
+
+# ─── Public feedback endpoint ─────────────────────────────────────────────────
+from fastapi import Body as _Body
+
+@app.post("/api/feedback")
+async def submit_feedback(
+    payload: dict = _Body(...),
+    authorization: str = Header(None),
+):
+    """Accept user feedback (rating + message). Stored in Redis for admin review."""
+    from app.api.auth import verify_token
+    from app.core.redis import get_redis_client
+    import json, datetime
+
+    token   = (authorization or "").removeprefix("Bearer ").strip()
+    user_id = verify_token(token) if token else "anonymous"
+
+    entry = {
+        "user_id":   user_id,
+        "rating":    int(payload.get("rating", 0)),
+        "message":   str(payload.get("message", ""))[:1000],
+        "type":      str(payload.get("type", "general")),
+        "page":      str(payload.get("page", "")),
+        "ts":        datetime.datetime.utcnow().isoformat(),
+    }
+    try:
+        redis = await get_redis_client()
+        await redis.lpush("sceneforge:feedback", json.dumps(entry))
+        await redis.ltrim("sceneforge:feedback", 0, 999)   # keep last 1000
+    except Exception as _e:
+        import logging
+        logging.getLogger(__name__).warning("Feedback save failed: %s", _e)
+
+    return {"saved": True}
