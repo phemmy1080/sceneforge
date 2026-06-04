@@ -516,12 +516,40 @@ async def render_video(ctx, job_id: str, payload: dict):
             "total_duration":   sum(s.duration for s in req.scenes),
             "tokens_remaining": tokens_remaining,
             "is_re_render":     is_re_render,
+            "render_seconds":   round(_render_seconds, 2),
         }
         await redis.set(f"job:{job_id}:progress", json.dumps(final_result), ex=86400)
         if user_id:
             await unregister_active_job(redis, user_id, job_id)
             await track_render_abuse(redis, user_id, tokens_used=100, failed=False)
         logger.info("Render complete — job %s | %s", job_id, video_url)
+
+        # ── Schedule video retention cleanup ──────────────────────────────────
+        # Free: 3 days, Starter: 7 days, Pro: 30 days, Studio/Agency: 45 days
+        _RETENTION_DAYS = {
+            "free": 3, "starter": 7, "pro": 30, "studio": 45, "agency": 45,
+        }
+        try:
+            _plan_for_retention = "free"
+            if user_id:
+                _ur = await redis.get(f"user:{user_id}")
+                if _ur:
+                    _plan_for_retention = json.loads(_ur).get("plan", "free")
+            _ret_days = _RETENTION_DAYS.get(_plan_for_retention, 7)
+            _ret_secs = _ret_days * 86400
+            # Store expiry metadata — a scheduled cleanup job reads this
+            await redis.set(
+                f"job:{job_id}:expires_at",
+                str(int(__import__('time').time()) + _ret_secs),
+                ex=_ret_secs + 86400   # Redis key itself expires 1 day after the video should be gone
+            )
+            await redis.lpush("render:cleanup:queue", json.dumps({
+                "job_id": job_id, "delete_after": int(__import__('time').time()) + _ret_secs,
+                "plan": _plan_for_retention, "user_id": user_id or "",
+            }))
+            logger.info("Retention scheduled — job=%s plan=%s days=%d", job_id, _plan_for_retention, _ret_days)
+        except Exception as _re:
+            logger.warning("Retention scheduling failed (non-fatal): %s", _re)
 
         # ── Cost tracking ─────────────────────────────────────────────────────
         try:
@@ -571,8 +599,8 @@ async def render_video(ctx, job_id: str, payload: dict):
                 else "groq"
             )
 
-            # Actual render wall-clock time
-            _render_secs = float(result.get("render_seconds", 0) if isinstance(result, dict) else 0) or 30.0
+            # Actual render wall-clock time (stored in final_result above)
+            _render_secs = float(result.get("render_seconds", 0) if isinstance(result, dict) else 0)
 
             # Real AI token usage — stored by generate.py when scenes were generated
             _ai_in, _ai_out = 0, 0
@@ -677,6 +705,7 @@ async def render_video(ctx, job_id: str, payload: dict):
 
 
 from arq.connections import RedisSettings
+from arq.cron import cron
 from urllib.parse import urlparse as _urlparse
 
 def _make_redis_settings(url: str) -> RedisSettings:
@@ -701,9 +730,44 @@ async def startup(ctx):
         logger.warning("R2 disabled — missing: %s", missing)
 
 
+async def cleanup_expired_videos(ctx):
+    """Arq job: process the render:cleanup:queue and delete expired R2 objects."""
+    from app.services.storage import delete_job_files
+    redis = ctx["redis"]
+    now   = int(__import__('time').time())
+    count = 0
+    # Process up to 50 entries per run
+    for _ in range(50):
+        raw = await redis.rpop("render:cleanup:queue")
+        if not raw:
+            break
+        try:
+            entry = json.loads(raw)
+            job_id      = entry.get("job_id", "")
+            delete_after = int(entry.get("delete_after", 0))
+            if not job_id:
+                continue
+            if now < delete_after:
+                # Not yet expired — put back at the front and stop
+                await redis.rpush("render:cleanup:queue", raw)
+                break
+            # Expired — delete from R2
+            deleted = await delete_job_files(job_id)
+            count += deleted
+            logger.info("Retention cleanup — job=%s deleted=%d objects", job_id, deleted)
+        except Exception as _e:
+            logger.warning("Cleanup entry failed: %s | %s", raw, _e)
+    if count:
+        logger.info("Retention cleanup run complete — total objects deleted: %d", count)
+
+
 class WorkerSettings:
-    functions      = [render_video]
+    functions      = [render_video, cleanup_expired_videos]
     on_startup     = startup
     redis_settings = _make_redis_settings(settings.redis_url)
     max_jobs       = 2
     job_timeout    = 600
+    cron_jobs      = [
+        # Run cleanup every 6 hours
+        cron(cleanup_expired_videos, hour={0, 6, 12, 18}, minute=30),
+    ]
