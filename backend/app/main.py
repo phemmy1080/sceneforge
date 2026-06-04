@@ -184,12 +184,12 @@ async def submit_feedback(
     authorization: str = Header(None),
 ):
     """Accept user feedback (rating + message). Stored in Redis for admin review."""
-    from app.api.auth import verify_token
+    from app.services import auth as _auth_svc
     from app.core.redis import get_redis_client
     import json, datetime
 
     token   = (authorization or "").removeprefix("Bearer ").strip()
-    user_id = verify_token(token) if token else "anonymous"
+    user_id = _auth_svc.verify_token(token) if token else "anonymous"
 
     entry = {
         "user_id":   user_id,
