@@ -185,7 +185,7 @@ async def submit_feedback(
 ):
     """Accept user feedback (rating + message). Stored in Redis for admin review."""
     from app.services import auth as _auth_svc
-    from app.core.redis import get_redis_client
+    import redis.asyncio as _aioredis
     import json, datetime
 
     token   = (authorization or "").removeprefix("Bearer ").strip()
@@ -200,9 +200,10 @@ async def submit_feedback(
         "ts":        datetime.datetime.utcnow().isoformat(),
     }
     try:
-        redis = await get_redis_client()
+        redis = await _aioredis.from_url(settings.redis_url, decode_responses=True)
         await redis.lpush("sceneforge:feedback", json.dumps(entry))
         await redis.ltrim("sceneforge:feedback", 0, 999)   # keep last 1000
+        await redis.aclose()
     except Exception as _e:
         import logging
         logging.getLogger(__name__).warning("Feedback save failed: %s", _e)
