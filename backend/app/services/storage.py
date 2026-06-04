@@ -77,7 +77,41 @@ def _public_url(key: str) -> str:
     return f"https://{c['account_id']}.r2.cloudflarestorage.com/{c['bucket']}/{key}"
 
 
-async def upload_file(local_path: str, key: str) -> str:
+async def delete_job_files(job_id: str) -> int:
+    """Delete all R2 objects for a job (renders/{job_id}/*). Returns count deleted."""
+    if not r2_enabled():
+        return 0
+    c = _cfg()
+    bucket = c["bucket"]
+    prefix = f"renders/{job_id}/"
+
+    def _do():
+        client = _client()
+        # List all objects with prefix
+        paginator = client.get_paginator("list_objects_v2")
+        keys = []
+        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+            for obj in page.get("Contents", []):
+                keys.append({"Key": obj["Key"]})
+        if not keys:
+            return 0
+        # Delete in batches of 1000
+        deleted = 0
+        for i in range(0, len(keys), 1000):
+            resp = client.delete_objects(
+                Bucket=bucket,
+                Delete={"Objects": keys[i:i+1000], "Quiet": True}
+            )
+            deleted += len(keys[i:i+1000]) - len(resp.get("Errors", []))
+        return deleted
+
+    loop = asyncio.get_event_loop()
+    count = await loop.run_in_executor(None, _do)
+    logger.info("R2 cleanup — job %s: deleted %d objects", job_id, count)
+    return count
+
+
+
     """Upload one file to R2. Returns public URL. Raises on failure."""
     c = _cfg()
 
