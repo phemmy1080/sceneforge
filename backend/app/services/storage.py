@@ -111,7 +111,7 @@ async def delete_job_files(job_id: str) -> int:
     return count
 
 
-
+async def upload_file(local_path: str, key: str) -> str:
     """Upload one file to R2. Returns public URL. Raises on failure."""
     c = _cfg()
 
