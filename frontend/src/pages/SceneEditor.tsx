@@ -44,6 +44,7 @@ export default function SceneEditor() {
   const [visualLoading, setVisualLoading] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewing, setPreviewing] = useState<false | 'saving' | 'rendering'>(false)
+  const renderingRef = useRef(false)  // ref-lock prevents double-click race condition
   const [confirmDeleteIndex, setConfirmDeleteIndex] = useState<number | null>(null)
 
   // Review notes from agency project comments
@@ -206,6 +207,8 @@ export default function SceneEditor() {
   // Re-render a single scene: saves current changes first, then re-renders
   async function previewScene() {
     if (!activeScene) return
+    if (renderingRef.current) return  // block double-click
+    renderingRef.current = true
     setPreviewing('saving')
     setPreviewUrl(null)
     try {
@@ -256,6 +259,7 @@ export default function SceneEditor() {
       alert(e.response?.data?.detail || 'Re-render failed. Try again.')
     } finally {
       setPreviewing(false)
+      renderingRef.current = false
     }
   }
 
