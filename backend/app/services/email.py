@@ -25,7 +25,7 @@ SMTP_USER     = os.environ.get("SMTP_USER", "")
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
 
 
-async def _send(to: str, subject: str, html: str, text: str) -> None:
+async def _send(to: str, subject: str, html: str, text: str = "") -> None:
     from_email = getattr(settings, "email_from", None) or SMTP_USER or "hello.sceneforge@gmail.com"
     from_name  = getattr(settings, "email_from_name", None) or "SceneForge"
 
@@ -45,17 +45,19 @@ async def _send(to: str, subject: str, html: str, text: str) -> None:
         except Exception as e:
             logger.error("Resend failed, trying SMTP: %s", e)
 
-    # 3. Gmail SMTP (uses your SMTP_USER + SMTP_PASSWORD env vars)
+    # 3. Gmail SMTP
     if SMTP_USER and SMTP_PASSWORD:
         try:
             await _send_smtp(to, subject, html, text, from_email, from_name)
             return
         except Exception as e:
             logger.error("SMTP failed: %s", e)
+            raise  # re-raise so broadcast counts it as failed
 
-    # All providers failed
+    # No provider configured or all failed
     logger.warning("No email provider configured — email not sent to %s", to)
     _log_otp_fallback(to, subject)
+    raise RuntimeError(f"No email provider available — email not sent to {to}")
 
 
 async def _send_brevo(to, subject, html, text, from_email, from_name):
@@ -631,10 +633,16 @@ async def send_low_balance_alert(
       <p style="color:#94A3B8;font-size:14px;line-height:1.6;">
         Top up your token pool to keep your team's renders running without interruption.
       </p>
-      <a href="https://scenraforge.com" style="display:inline-block;margin-top:20px;padding:12px 28px;background:#F59E0B;color:#0F172A;font-weight:700;border-radius:8px;text-decoration:none;font-size:14px;">
+      <a href="https://sceneraforge.com" style="display:inline-block;margin-top:20px;padding:12px 28px;background:#F59E0B;color:#0F172A;font-weight:700;border-radius:8px;text-decoration:none;font-size:14px;">
         Top up tokens →
       </a>
       <p style="margin-top:28px;color:#475569;font-size:12px;">SceneForge · You are receiving this because you own workspace {workspace_name}</p>
     </div>
     """
-    await _send(to_email, subject, html)
+    text = (
+        f"Hi {owner_name},\n\n"
+        f"Your agency workspace {workspace_name} has {balance:,} tokens remaining — "
+        f"below the {threshold:,} token alert threshold.\n\n"
+        f"Top up your tokens at https://sceneraforge.com\n\n— SceneForge"
+    )
+    await _send(to_email, subject, html, text)
