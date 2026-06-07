@@ -6,6 +6,7 @@ Admin API — protected by ADMIN_SECRET_KEY header.
 
 import csv
 import hashlib
+import asyncio
 import hmac
 import io
 import json
@@ -560,21 +561,13 @@ async def broadcast_email(
     x_csrf_token: Optional[str] = Header(None, alias="x-csrf-token"),
 ):
     """
-    await _verify_csrf(redis, admin, x_csrf_token)
-    await _verify_csrf(redis, admin, x_csrf_token)
-    await _verify_csrf(redis, admin, x_csrf_token)
-    await _verify_csrf(redis, admin, x_csrf_token)
-    await _verify_csrf(redis, admin, x_csrf_token)
-    await _verify_csrf(redis, admin, x_csrf_token)
-    await _verify_csrf(redis, admin, x_csrf_token)
-    await _verify_csrf(redis, admin, x_csrf_token)
-    await _verify_csrf(redis, admin, x_csrf_token)
     Targeted email broadcast.
     target=all   → every non-suspended user
     target=plan  → all users on a specific plan (free/starter/pro/studio)
     target=user  → one specific user by UUID
     Use {{name}} and {{email}} in subject/message for personalisation.
     """
+    await _verify_csrf(redis, admin, x_csrf_token)
     from app.services.email import _send
 
     # ── Collect recipients ────────────────────────────────────────────────────
@@ -666,7 +659,7 @@ async def broadcast_email(
     # ── Send ──────────────────────────────────────────────────────────────────
     sent = failed = skipped = 0
 
-    for user in recipients:
+    for i, user in enumerate(recipients):
         email = user.get("email", "")
         name  = user.get("full_name", "Creator")
         if not email:
@@ -681,6 +674,9 @@ async def broadcast_email(
         except Exception as e:
             logger.error("Broadcast failed → %s: %s", email, e)
             failed += 1
+        # Rate-limit: pause every 10 emails to stay within Brevo/Resend limits
+        if i > 0 and i % 10 == 0:
+            await asyncio.sleep(1)
 
     # Store record
     rec = {
@@ -798,7 +794,7 @@ async def ai_generate_campaign(
 
     prompt = (
         "You are a world-class email copywriter for SceneForge, an AI video studio "
-        "for content creators in Nigeria. The app URL is https://scenraforge.com.\n\n"
+        "for content creators in Nigeria. The app URL is https://sceneraforge.com.\n\n"
         f"Campaign goal: {goal_desc}\n"
         f"Tone: {req.tone}\n"
         f"Target segment: {req.segment} users\n"
@@ -863,7 +859,7 @@ async def ai_writing_assist(
     action_prompts = {
         "shorten":   "Shorten this email to under 100 words keeping the core message and CTA. " + _emoji,
         "emotional": "Rewrite this email to be more emotionally resonant and personal. " + _emoji,
-        "cta":       "Add a strong call-to-action button/link to scenraforge.com. " + _emoji,
+        "cta":       "Add a strong call-to-action button/link to sceneraforge.com. " + _emoji,
         "rewrite":   "Rewrite this email in a fresher, more engaging way. " + _emoji,
         "simplify":  "Simplify this email — shorter sentences, simpler words, easier to read. " + _emoji,
         "urgent":    "Rewrite this email with more urgency and FOMO. " + _emoji,
@@ -1903,7 +1899,7 @@ async def preview_campaign_email(
 </head>
 <body>
   <div class="bar">
-    <div class="row"><span class="lbl">From</span><span class="val">SceneForge &lt;hello@scenraforge.com&gt;</span></div>
+    <div class="row"><span class="lbl">From</span><span class="val">SceneForge &lt;hello@sceneraforge.com&gt;</span></div>
     <div class="row"><span class="lbl">To</span><span class="val">{name} &lt;preview@example.com&gt;</span></div>
     <div class="row"><span class="lbl">Campaign</span><span class="val">{campaign_type.replace("_"," ").title()}</span></div>
     <div class="subj">{subject}</div>
