@@ -716,6 +716,9 @@ def _make_redis_settings(url: str) -> RedisSettings:
         password=p.password or None,
         database=int((p.path or "/0").lstrip("/") or 0),
         ssl=p.scheme in ("rediss",),
+        conn_timeout=10,
+        conn_retries=20,       # retry 20× before giving up (~40s total)
+        conn_retry_delay=2.0,  # wait 2s between retries
     )
 
 async def startup(ctx):
@@ -761,13 +764,24 @@ async def cleanup_expired_videos(ctx):
         logger.info("Retention cleanup run complete — total objects deleted: %d", count)
 
 
+async def ping_redis(ctx):
+    """Ping Redis every 30 minutes to prevent idle connection timeout on Railway."""
+    try:
+        await ctx["redis"].ping()
+        logger.debug("Redis keepalive ping OK")
+    except Exception as _e:
+        logger.warning("Redis keepalive ping failed: %s", _e)
+
+
 class WorkerSettings:
-    functions      = [render_video, cleanup_expired_videos]
+    functions      = [render_video, cleanup_expired_videos, ping_redis]
     on_startup     = startup
     redis_settings = _make_redis_settings(settings.redis_url)
     max_jobs       = 2
     job_timeout    = 600
     cron_jobs      = [
-        # Run cleanup every 6 hours
+        # Cleanup expired videos every 6 hours
         cron(cleanup_expired_videos, hour={0, 6, 12, 18}, minute=30),
+        # Keepalive ping every 30 minutes — prevents Railway Redis from closing idle connections
+        cron(ping_redis, minute={0, 30}),
     ]
