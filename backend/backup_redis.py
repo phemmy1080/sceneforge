@@ -19,7 +19,14 @@ BATCH = 500   # keys per pipeline batch — safe for all Redis providers
 
 async def dump_redis(r) -> dict:
     """Dump all Redis keys to a plain dict using batched pipelines."""
-    all_keys = await r.keys("*")
+    # Use SCAN instead of KEYS * — works on all providers including Railway
+    all_keys = []
+    cursor = 0
+    while True:
+        cursor, batch = await r.scan(cursor, count=500)
+        all_keys.extend(batch)
+        if cursor == 0:
+            break
     total = len(all_keys)
     log.info("Found %d keys to back up", total)
     if total == 0:
@@ -100,7 +107,7 @@ async def backup(local_only: bool = False):
     r = await aioredis.from_url(url, decode_responses=False,
                                 ssl_cert_reqs=None if is_tls else None)
 
-    t_start = datetime.datetime.utcnow()
+    t_start = datetime.datetime.now(datetime.timezone.utc)
     data    = await dump_redis(r)
     await r.aclose()
 
@@ -109,7 +116,7 @@ async def backup(local_only: bool = False):
     with open(tmp, "w") as f:
         json.dump(data, f)
     size_kb = os.path.getsize(tmp) / 1024
-    elapsed = (datetime.datetime.utcnow() - t_start).total_seconds()
+    elapsed = (datetime.datetime.now(datetime.timezone.utc) - t_start).total_seconds()
     log.info("Backup file written: %s  (%.1f KB, %d keys, %.1fs)",
              tmp, size_kb, len(data), elapsed)
 
