@@ -104,8 +104,10 @@ async def backup(local_only: bool = False):
 
     url = os.environ["REDIS_URL"]
     is_tls = url.startswith("rediss://")
-    r = await aioredis.from_url(url, decode_responses=False,
-                                ssl_cert_reqs=None if is_tls else None)
+    if is_tls:
+        r = await aioredis.from_url(url, decode_responses=False, ssl_cert_reqs=None)
+    else:
+        r = await aioredis.from_url(url, decode_responses=False)
 
     t_start = datetime.datetime.now(datetime.timezone.utc)
     data    = await dump_redis(r)
