@@ -4,6 +4,12 @@ backup_redis.py  —  Fast Redis backup using pipelining.
 Batches all TYPE checks and all GET/LRANGE/HGETALL calls into pipelines
 so the number of round-trips is O(keys/batch) not O(keys).
 
+Each backed-up value is stored as {"type": <redis type>, "value": <data>}
+so restore can dispatch to the correct write command (SADD/RPUSH/HSET/SET/
+ZADD) instead of guessing from the JSON shape — a plain list is ambiguous
+between a Redis LIST and a Redis SET, which is what caused the WRONGTYPE
+corruption last time.
+
 Usage:
   python backup_redis.py          # backup to R2
   python backup_redis.py --local  # backup to /tmp only (for testing)
@@ -27,6 +33,7 @@ async def dump_redis(r) -> dict:
         all_keys.extend(batch)
         if cursor == 0:
             break
+
     total = len(all_keys)
     log.info("Found %d keys to back up", total)
     if total == 0:
@@ -68,9 +75,10 @@ async def dump_redis(r) -> dict:
 
             for key, value in zip(batch, values):
                 k_str = key.decode() if isinstance(key, bytes) else key
+
                 # Normalise bytes → str throughout
                 if isinstance(value, bytes):
-                    data[k_str] = value.decode(errors="replace")
+                    norm_value = value.decode(errors="replace")
                 elif isinstance(value, list):
                     norm = []
                     for item in value:
@@ -82,19 +90,26 @@ async def dump_redis(r) -> dict:
                             ])
                         else:
                             norm.append(item.decode(errors="replace") if isinstance(item, bytes) else item)
-                    data[k_str] = norm
+                    norm_value = norm
                 elif isinstance(value, dict):
-                    data[k_str] = {
+                    norm_value = {
                         (a.decode(errors="replace") if isinstance(a, bytes) else a):
                         (b.decode(errors="replace") if isinstance(b, bytes) else b)
                         for a, b in value.items()
                     }
                 elif isinstance(value, set):
-                    data[k_str] = list(value)
+                    norm_value = [
+                        x.decode(errors="replace") if isinstance(x, bytes) else x
+                        for x in value
+                    ]
                 elif value is None:
-                    data[k_str] = None
+                    norm_value = None
                 else:
-                    data[k_str] = value
+                    norm_value = value
+
+                # Critical fix: tag the value with its Redis type so restore
+                # knows whether to SADD, RPUSH, HSET, SET, or ZADD it back.
+                data[k_str] = {"type": t_str, "value": norm_value}
 
     return data
 
@@ -117,6 +132,7 @@ async def backup(local_only: bool = False):
     tmp = f"/tmp/redis_backup_{ts}.json"
     with open(tmp, "w") as f:
         json.dump(data, f)
+
     size_kb = os.path.getsize(tmp) / 1024
     elapsed = (datetime.datetime.now(datetime.timezone.utc) - t_start).total_seconds()
     log.info("Backup file written: %s  (%.1f KB, %d keys, %.1fs)",
